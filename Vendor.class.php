@@ -10,22 +10,24 @@ class Vendor {
     // Register a new vendor (or complete profile if user_id exists)
     public function registerVendor($user_id, $data) {
         try {
-            // Check if a vendor profile already exists for this user_id
             $existingVendor = $this->getVendorByUserId($user_id);
+            error_log("Vendor.registerVendor: Checking for existing vendor for user_id: " . $user_id . ", Found: " . ($existingVendor ? "Yes (ID: " . $existingVendor['id'] . ")" : "No"));
 
             if ($existingVendor) {
                 // If profile exists, update it
+                error_log("Vendor.registerVendor: Updating existing vendor profile ID: " . $existingVendor['id']);
                 return $this->updateVendor($existingVendor['id'], $data);
             } else {
                 // If no profile exists, create a new one
-                $stmt = $this->conn->prepare("INSERT INTO vendor_profiles 
+                error_log("Vendor.registerVendor: Creating new vendor profile for user_id: " . $user_id);
+                $query = "INSERT INTO vendor_profiles 
                     (user_id, business_name, business_license, tax_id, website, 
                      business_address, business_city, business_state, business_country, 
                      business_postal_code, service_radius, min_budget, max_budget, 
                      experience_years) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 
-                $stmt->execute([
+                $params = [
                     $user_id,
                     $data['business_name'],
                     $data['business_license'] ?? null,
@@ -40,12 +42,28 @@ class Vendor {
                     $data['min_budget'] ?? null,
                     $data['max_budget'] ?? null,
                     $data['experience_years'] ?? null
-                ]);
+                ];
                 
-                return $this->conn->lastInsertId();
+                error_log("Vendor.registerVendor (INSERT): Query: " . $query);
+                error_log("Vendor.registerVendor (INSERT): Params: " . print_r($params, true));
+
+                $stmt = $this->conn->prepare($query);
+                $result = $stmt->execute($params);
+                
+                if ($result) {
+                    $lastId = $this->conn->lastInsertId();
+                    error_log("Vendor.registerVendor (INSERT): Success, new ID: " . $lastId);
+                    return $lastId;
+                } else {
+                    error_log("Vendor.registerVendor (INSERT): Failed to execute, PDO ErrorInfo: " . print_r($stmt->errorInfo(), true));
+                    return false;
+                }
             }
         } catch (PDOException $e) {
-            error_log("Vendor registration/update error: " . $e->getMessage());
+            error_log("Vendor.registerVendor error: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
+            return false;
+        } catch (Exception $e) {
+            error_log("Vendor.registerVendor general error: " . $e->getMessage());
             return false;
         }
     }
@@ -55,9 +73,11 @@ class Vendor {
         try {
             $stmt = $this->conn->prepare("SELECT * FROM vendor_profiles WHERE user_id = ?");
             $stmt->execute([$user_id]);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            $vendorData = $stmt->fetch(PDO::FETCH_ASSOC);
+            // error_log("Vendor.getVendorByUserId: Fetched data: " . print_r($vendorData, true)); // Too verbose for regular use
+            return $vendorData;
         } catch (PDOException $e) {
-            error_log("Get vendor error: " . $e->getMessage());
+            error_log("Vendor.getVendorByUserId error: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
             return false;
         }
     }
@@ -82,8 +102,7 @@ class Vendor {
                 updated_at = NOW()
                 WHERE id = ?";
             
-            $stmt = $this->conn->prepare($query);
-            return $stmt->execute([
+            $params = [
                 $data['business_name'],
                 $data['business_license'] ?? null,
                 $data['tax_id'] ?? null,
@@ -97,10 +116,27 @@ class Vendor {
                 $data['min_budget'] ?? null,
                 $data['max_budget'] ?? null,
                 $data['experience_years'] ?? null,
-                $vendor_profile_id // Use vendor_profile_id here, not user_id
-            ]);
+                $vendor_profile_id
+            ];
+
+            error_log("Vendor.updateVendor (UPDATE): Query: " . $query);
+            error_log("Vendor.updateVendor (UPDATE): Params: " . print_r($params, true));
+            
+            $stmt = $this->conn->prepare($query);
+            $result = $stmt->execute($params);
+
+            if ($result) {
+                error_log("Vendor.updateVendor (UPDATE): Success for vendor ID: " . $vendor_profile_id);
+                return true;
+            } else {
+                error_log("Vendor.updateVendor (UPDATE): Failed to execute, PDO ErrorInfo: " . print_r($stmt->errorInfo(), true));
+                return false;
+            }
         } catch (PDOException $e) {
-            error_log("Update vendor error: " . $e->getMessage());
+            error_log("Vendor.updateVendor error: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
+            return false;
+        } catch (Exception $e) {
+            error_log("Vendor.updateVendor general error: " . $e->getMessage());
             return false;
         }
     }
