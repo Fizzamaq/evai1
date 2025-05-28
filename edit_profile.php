@@ -1,151 +1,406 @@
 <?php
-require_once '../includes/config.php';
-require_once '../classes/User.class.php'; // Include User class
-require_once '../classes/Vendor.class.php'; // Include Vendor class for vendor profile
-include 'header.php';
+// classes/Vendor.class.php
+class Vendor {
+    private $conn;
+    
+    public function __construct($pdo) {
+        $this->conn = $pdo;
+    }
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: " . BASE_URL . "public/login.php");
-    exit();
-}
+    // Register a new vendor (or complete profile if user_id exists)
+    public function registerVendor($user_id, $data) {
+        try {
+            $existingVendor = $this->getVendorByUserId($user_id);
+            error_log("Vendor.registerVendor: Checking for existing vendor for user_id: " . $user_id . ", Found: " . ($existingVendor ? "Yes (ID: " . $existingVendor['id'] . ")" : "No"));
 
-$user = new User($pdo); // Pass PDO
-$profile = $user->getProfile($_SESSION['user_id']); // getProfile is correct
+            if ($existingVendor) {
+                // If profile exists, update it
+                error_log("Vendor.registerVendor: Updating existing vendor profile ID: " . $existingVendor['id']);
+                return $this->updateVendor($existingVendor['id'], $data);
+            } else {
+                // If no profile exists, create a new one
+                error_log("Vendor.registerVendor: Creating new vendor profile for user_id: " . $user_id);
+                $query = "INSERT INTO vendor_profiles 
+                    (user_id, business_name, business_license, tax_id, website, 
+                     business_address, business_city, business_state, business_country, 
+                     business_postal_code, service_radius, min_budget, max_budget, 
+                     experience_years) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                
+                $params = [
+                    $user_id,
+                    $data['business_name'],
+                    $data['business_license'] ?? null,
+                    $data['tax_id'] ?? null,
+                    $data['website'] ?? null,
+                    $data['business_address'],
+                    $data['business_city'],
+                    $data['business_state'],
+                    $data['business_country'],
+                    $data['business_postal_code'],
+                    $data['service_radius'] ?? 50,
+                    $data['min_budget'] ?? null,
+                    $data['max_budget'] ?? null,
+                    $data['experience_years'] ?? null
+                ];
+                
+                error_log("Vendor.registerVendor (INSERT): Query: " . $query);
+                error_log("Vendor.registerVendor (INSERT): Params: " . print_r($params, true));
 
-$is_vendor = false;
-$vendor_data = null;
-if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 2 is vendor type
-    $is_vendor = true;
-    $vendor = new Vendor($pdo);
-    $vendor_data = $vendor->getVendorByUserId($_SESSION['user_id']);
-}
+                $stmt = $this->conn->prepare($query);
+                $result = $stmt->execute($params);
+                
+                if ($result) {
+                    $lastId = $this->conn->lastInsertId();
+                    error_log("Vendor.registerVendor (INSERT): Success, new ID: " . $lastId);
+                    return $lastId;
+                } else {
+                    error_log("Vendor.registerVendor (INSERT): Failed to execute, PDO ErrorInfo: " . print_r($stmt->errorInfo(), true));
+                    return false;
+                }
+            }
+        } catch (PDOException $e) {
+            error_log("Vendor.registerVendor error: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
+            return false;
+        } catch (Exception $e) {
+            error_log("Vendor.registerVendor general error: " . $e->getMessage());
+            return false;
+        }
+    }
 
-$error = $_SESSION['profile_error'] ?? null;
-$success = $_SESSION['profile_success'] ?? null;
-unset($_SESSION['profile_error'], $_SESSION['profile_success']);
-?>
-<div class="profile-container">
-    <h1>Edit Profile</h1>
+    // Get vendor by user ID
+    public function getVendorByUserId($user_id) {
+        try {
+            $stmt = $this->conn->prepare("SELECT * FROM vendor_profiles WHERE user_id = ?");
+            $stmt->execute([$user_id]);
+            $vendorData = $stmt->fetch(PDO::FETCH_ASSOC);
+            // error_log("Vendor.getVendorByUserId: Fetched data: " . print_r($vendorData, true)); // Too verbose for regular use
+            return $vendorData;
+        } catch (PDOException $e) {
+            error_log("Vendor.getVendorByUserId error: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
+            return false;
+        }
+    }
 
-    <?php if ($error): ?>
-        <div class="alert error"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
+    // Update vendor profile (assuming vendor_id is the primary key of vendor_profiles)
+    public function updateVendor($vendor_profile_id, $data) {
+        try {
+            $query = "UPDATE vendor_profiles SET 
+                business_name = ?,
+                business_license = ?,
+                tax_id = ?,
+                website = ?,
+                business_address = ?,
+                business_city = ?,
+                business_state = ?,
+                business_country = ?,
+                business_postal_code = ?,
+                service_radius = ?,
+                min_budget = ?,
+                max_budget = ?,
+                experience_years = ?,
+                updated_at = NOW()
+                WHERE id = ?";
+            
+            $params = [
+                $data['business_name'],
+                $data['business_license'] ?? null,
+                $data['tax_id'] ?? null,
+                $data['website'] ?? null,
+                $data['business_address'],
+                $data['business_city'],
+                $data['business_state'],
+                $data['business_country'],
+                $data['business_postal_code'],
+                $data['service_radius'] ?? 50,
+                $data['min_budget'] ?? null,
+                $data['max_budget'] ?? null,
+                $data['experience_years'] ?? null,
+                $vendor_profile_id
+            ];
 
-    <?php if ($success): ?>
-        <div class="alert success"><?= htmlspecialchars($success) ?></div>
-    <?php endif; ?>
+            error_log("Vendor.updateVendor (UPDATE): Query: " . $query);
+            error_log("Vendor.updateVendor (UPDATE): Params: " . print_r($params, true));
+            
+            $stmt = $this->conn->prepare($query);
+            $result = $stmt->execute($params);
 
-    <form action="process_profile.php" method="post" enctype="multipart/form-data">
-        <h2>Personal Information</h2>
-        <div class="form-group">
-            <label>Profile Picture</label>
-            <input type="file" name="profile_image" accept="image/*">
-            <?php if (!empty($profile['profile_image'])): ?>
-                <p style="margin-top: 10px;">Current: <img src="<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($profile['profile_image']) ?>" alt="Profile Picture" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover;"></p>
-            <?php endif; ?>
-        </div>
+            if ($result) {
+                error_log("Vendor.updateVendor (UPDATE): Success for vendor ID: " . $vendor_profile_id);
+                return true;
+            } else {
+                error_log("Vendor.updateVendor (UPDATE): Failed to execute, PDO ErrorInfo: " . print_r($stmt->errorInfo(), true));
+                return false;
+            }
+        } catch (PDOException $e) {
+            error_log("Vendor.updateVendor error: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
+            return false;
+        } catch (Exception $e) {
+            error_log("Vendor.updateVendor general error: " . $e->getMessage());
+            return false;
+        }
+    }
 
-        <div class="form-group">
-            <label>First Name</label>
-            <input type="text" name="first_name" value="<?= htmlspecialchars($profile['first_name']) ?>" required>
-        </div>
+    // Add vendor service offering
+    public function addServiceOffering($vendor_id, $service_id, $data) {
+        try {
+            $stmt = $this->conn->prepare("INSERT INTO vendor_service_offerings 
+                (vendor_id, service_id, price_range_min, price_range_max, description)
+                VALUES (?, ?, ?, ?, ?)");
+            
+            return $stmt->execute([
+                $vendor_id,
+                $service_id,
+                $data['price_min'] ?? null,
+                $data['price_max'] ?? null,
+                $data['description'] ?? null
+            ]);
+        } catch (PDOException $e) {
+            error_log("Add service offering error: " . $e->getMessage());
+            return false;
+        }
+    }
 
-        <div class="form-group">
-            <label>Last Name</label>
-            <input type="text" name="last_name" value="<?= htmlspecialchars($profile['last_name']) ?>" required>
-        </div>
+    // Get vendor services
+    public function getVendorServices($vendor_id) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT vso.*, vs.service_name, vc.category_name 
+                FROM vendor_service_offerings vso
+                JOIN vendor_services vs ON vso.service_id = vs.id
+                JOIN vendor_categories vc ON vs.category_id = vc.id
+                WHERE vso.vendor_id = ? AND vso.is_active = TRUE
+            "); //
+            $stmt->execute([$vendor_id]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Get vendor services error: " . $e->getMessage());
+            return false;
+        }
+    }
 
-        <div class="form-group">
-            <label>Address</label>
-            <input type="text" name="address" value="<?= htmlspecialchars($profile['address'] ?? '') ?>">
-        </div>
+    // NEW METHOD: Update vendor's service offerings (delete existing and insert new ones)
+    public function updateVendorServiceOfferings($vendor_profile_id, $service_ids_array) {
+        try {
+            $this->conn->beginTransaction();
 
-        <div class="form-group">
-            <label>City</label>
-            <input type="text" name="city" value="<?= htmlspecialchars($profile['city'] ?? '') ?>">
-        </div>
+            // 1. Delete all existing offerings for this vendor
+            $stmt = $this->conn->prepare("DELETE FROM vendor_service_offerings WHERE vendor_id = ?"); //
+            $stmt->execute([$vendor_profile_id]);
+            error_log("Vendor.updateVendorServiceOfferings: Deleted existing offerings for vendor ID: " . $vendor_profile_id);
 
-        <div class="form-group">
-            <label>State</label>
-            <input type="text" name="state" value="<?= htmlspecialchars($profile['state'] ?? '') ?>">
-        </div>
+
+            // 2. Insert new offerings
+            if (!empty($service_ids_array)) {
+                $insert_sql = "INSERT INTO vendor_service_offerings (vendor_id, service_id) VALUES (?, ?)"; //
+                $insert_stmt = $this->conn->prepare($insert_sql);
+                foreach ($service_ids_array as $service_id) {
+                    // Basic validation to ensure service_id is an integer (optional but good practice)
+                    $service_id = (int)$service_id; 
+                    if ($service_id > 0) {
+                        $insert_stmt->execute([$vendor_profile_id, $service_id]);
+                    }
+                }
+                error_log("Vendor.updateVendorServiceOfferings: Inserted " . count($service_ids_array) . " new offerings for vendor ID: " . $vendor_profile_id);
+            } else {
+                error_log("Vendor.updateVendorServiceOfferings: No new offerings to insert for vendor ID: " . $vendor_profile_id);
+            }
+
+            $this->conn->commit();
+            return true;
+        } catch (PDOException $e) {
+            $this->conn->rollBack();
+            error_log("Vendor.updateVendorServiceOfferings error: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
+            return false;
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            error_log("Vendor.updateVendorServiceOfferings general error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+
+    // Add portfolio item
+    public function addPortfolioItem($vendor_id, $data) {
+        try {
+            $stmt = $this->conn->prepare("INSERT INTO vendor_portfolios 
+                (vendor_id, title, description, event_type_id, image_url, 
+                 video_url, project_date, client_testimonial, is_featured)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"); //
+            
+            return $stmt->execute([
+                $vendor_id,
+                $data['title'],
+                $data['description'] ?? null,
+                $data['event_type_id'] ?? null,
+                $data['image_url'] ?? null,
+                $data['video_url'] ?? null,
+                $data['project_date'] ?? null,
+                $data['client_testimonial'] ?? null,
+                $data['is_featured'] ?? false
+            ]);
+        } catch (PDOException $e) {
+            error_log("Add portfolio item error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Get vendor portfolio
+    public function getVendorPortfolio($vendor_id) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT vp.*, et.type_name as event_type_name
+                FROM vendor_portfolios vp
+                LEFT JOIN event_types et ON vp.event_type_id = et.id
+                WHERE vp.vendor_id = ?
+                ORDER BY vp.display_order, vp.created_at DESC
+            "); //
+            $stmt->execute([$vendor_id]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Get portfolio error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Set vendor availability (Unified method)
+    public function updateAvailability($vendorId, $date, $start_time, $end_time, $status) {
+        $stmt = $this->conn->prepare("
+            INSERT INTO vendor_availability 
+            (vendor_id, date, start_time, end_time, status)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                start_time = VALUES(start_time),
+                end_time = VALUES(end_time),
+                status = VALUES(status),
+                updated_at = NOW()
+        "); //
         
-        <div class="form-group">
-            <label>Country</label>
-            <input type="text" name="country" value="<?= htmlspecialchars($profile['country'] ?? '') ?>">
-        </div>
+        return $stmt->execute([
+            $vendorId,
+            $date, // Use 'date' column for the specific day
+            $start_time,
+            $end_time,
+            $status
+        ]);
+    }
 
-        <div class="form-group">
-            <label>Postal Code</label>
-            <input type="text" name="postal_code" value="<?= htmlspecialchars($profile['postal_code'] ?? '') ?>">
-        </div>
+    // Get vendor availability (Unified method)
+    public function getAvailability($vendorId, $startDate, $endDate) {
+        $stmt = $this->conn->prepare("
+            SELECT 
+                id,
+                date, // Select 'date' column
+                start_time,
+                end_time,
+                status
+            FROM vendor_availability
+            WHERE 
+                vendor_id = ? AND
+                date BETWEEN ? AND ? // Query by date
+            ORDER BY date, start_time
+        "); //
+        
+        $stmt->execute([$vendorId, $startDate, $endDate]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
-        <?php if ($is_vendor): ?>
-            <h2 style="margin-top: 40px;">Business Information</h2>
-            <p>Please complete your business details to activate your vendor profile.</p>
-            <div class="form-group">
-                <label>Business Name <span class="required">*</span></label>
-                <input type="text" name="business_name" value="<?= htmlspecialchars($vendor_data['business_name'] ?? '') ?>" required>
-            </div>
-            <div class="form-group">
-                <label>Business License (Optional)</label>
-                <input type="text" name="business_license" value="<?= htmlspecialchars($vendor_data['business_license'] ?? '') ?>">
-            </div>
-            <div class="form-group">
-                <label>Tax ID (Optional)</label>
-                <input type="text" name="tax_id" value="<?= htmlspecialchars($vendor_data['tax_id'] ?? '') ?>">
-            </div>
-            <div class="form-group">
-                <label>Website (Optional)</label>
-                <input type="url" name="website" value="<?= htmlspecialchars($vendor_data['website'] ?? '') ?>">
-            </div>
-            <div class="form-group">
-                <label>Business Address <span class="required">*</span></label>
-                <input type="text" name="business_address" value="<?= htmlspecialchars($vendor_data['business_address'] ?? '') ?>" required>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Business City <span class="required">*</span></label>
-                    <input type="text" name="business_city" value="<?= htmlspecialchars($vendor_data['business_city'] ?? '') ?>" required>
-                </div>
-                <div class="form-group">
-                    <label>Business State <span class="required">*</span></label>
-                    <input type="text" name="business_state" value="<?= htmlspecialchars($vendor_data['business_state'] ?? '') ?>" required>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Business Country <span class="required">*</span></label>
-                    <input type="text" name="business_country" value="<?= htmlspecialchars($vendor_data['business_country'] ?? '') ?>" required>
-                </div>
-                <div class="form-group">
-                    <label>Business Postal Code <span class="required">*</span></label>
-                    <input type="text" name="business_postal_code" value="<?= htmlspecialchars($vendor_data['business_postal_code'] ?? '') ?>" required>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Service Radius (miles) (Optional)</label>
-                    <input type="number" name="service_radius" value="<?= htmlspecialchars($vendor_data['service_radius'] ?? '') ?>" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Years of Experience (Optional)</label>
-                    <input type="number" name="experience_years" value="<?= htmlspecialchars($vendor_data['experience_years'] ?? '') ?>" min="0">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Minimum Budget (Optional)</label>
-                    <input type="number" name="min_budget" value="<?= htmlspecialchars($vendor_data['min_budget'] ?? '') ?>" step="0.01" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Maximum Budget (Optional)</label>
-                    <input type="number" name="max_budget" value="<?= htmlspecialchars($vendor_data['max_budget'] ?? '') ?>" step="0.01" min="0">
-                </div>
-            </div>
-        <?php endif; ?>
+    // Get recommended vendors for an event
+    public function getRecommendedVendors($event_id, $service_id, $limit = 5) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT vp.*, u.first_name, u.last_name, u.profile_image,
+                       ar.confidence_score, ar.total_score
+                FROM ai_recommendations ar
+                JOIN vendor_profiles vp ON ar.vendor_id = vp.id
+                JOIN users u ON vp.user_id = u.id
+                WHERE ar.event_id = ? AND ar.service_id = ?
+                ORDER BY ar.total_score DESC
+                LIMIT ?
+            "); //
+            $stmt->execute([$event_id, $service_id, $limit]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Get recommended vendors error: " . $e->getMessage());
+            return false;
+        }
+    }
+ 
+    /**
+     * Verifies if the current session user is a vendor and has a complete vendor profile.
+     * Redirects if conditions are not met.
+     */
+    public function verifyVendorAccess() {
+        // Ensure BASE_URL is defined (from config.php)
+        if (!defined('BASE_URL')) {
+            error_log("BASE_URL not defined in config.php. Cannot perform vendor access verification.");
+            // Fallback to a generic error or login page if BASE_URL is not set
+            header('Location: /login.php'); // Absolute path fallback
+            exit();
+        }
 
-        <button type="submit" class="btn btn-primary">Save Changes</button>
-    </form>
-</div>
-<?php include 'footer.php'; ?>
+        // 1. Check if user is logged in at all
+        if (!isset($_SESSION['user_id'])) {
+            // Not logged in, redirect to login page
+            header('Location: ' . BASE_URL . 'public/login.php'); 
+            exit();
+        }
+
+        // 2. Check if the logged-in user's type is 'vendor' (user_type_id = 2)
+        // This relies on $_SESSION['user_type'] being set correctly during login.
+        if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] != 2) {
+            // User is logged in but not a vendor, redirect to their general dashboard
+            header('Location: ' . BASE_URL . 'public/dashboard.php'); 
+            exit();
+        }
+
+        // 3. If user is a vendor type, check if they have a completed vendor profile
+        $vendorData = $this->getVendorByUserId($_SESSION['user_id']);
+        if ($vendorData) {
+            // Vendor profile found, set vendor_id in session for convenience
+            $_SESSION['vendor_id'] = $vendorData['id'];
+        } else {
+            // User is of type 'vendor' but no vendor_profiles entry exists.
+            // Redirect them to a page where they can complete their vendor profile.
+            $_SESSION['error_message'] = "Your vendor profile is incomplete. Please register your business details to access vendor features.";
+            header('Location: ' . BASE_URL . 'public/edit_profile.php'); // Redirect to edit_profile or a dedicated vendor onboarding page
+            exit();
+        }
+    }
+
+    // Checks if a user is of type 'vendor'
+    public function isVendor($userId) {
+        $stmt = $this->conn->prepare("SELECT user_type_id FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result && $result['user_type_id'] == 2; // Assuming 2 is vendor type
+    }
+
+    // Get total booking count for a vendor
+    public function getBookingCount($vendorId) {
+        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ?"); //
+        $stmt->execute([$vendorId]);
+        return $stmt->fetchColumn();
+    }
+
+    // Get count of upcoming bookings for a vendor
+    public function getUpcomingEvents($vendorId) {
+        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ? AND service_date >= CURDATE() AND status != 'cancelled'"); //
+        $stmt->execute([$vendorId]);
+        return $stmt->fetchColumn();
+    }
+
+    // Placeholder for vendor response rate (requires chat message tracking)
+    public function getResponseRate($vendorId) {
+        // This would involve more complex logic tracking messages sent to vendor vs. vendor replies.
+        // For now, return a static value or implement a basic calculation.
+        return 0.85; // Example static value
+    }
+
+    // Get a list of upcoming bookings for a vendor
+    public function getUpcomingBookings($vendorId) {
+        $stmt = $this->conn->prepare("SELECT b.*, e.title as event_title FROM bookings b JOIN events e ON b.event_id = e.id WHERE b.vendor_id = ? AND b.service_date >= CURDATE() ORDER BY b.service_date ASC LIMIT 5"); //
+        $stmt->execute([$vendorId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
