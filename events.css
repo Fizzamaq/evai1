@@ -1,0 +1,145 @@
+/* assets/css/events.css */
+
+/* Events Container (Specific overrides for this page) */
+.events-container {
+    max-width: 1200px;
+    margin: var(--spacing-lg) auto;
+    padding: var(--spacing-md);
+    box-sizing: border-box;
+}
+
+.events-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 2px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.events-header h1 {
+    font-size: 2em;
+    margin-bottom: var(--spacing-xs);
+}
+
+.events-header p {
+    color: var(--text-subtle);
+    font-size: 1.1em;
+}
+
+.events-header .create-event-btn {
+    margin-left: var(--spacing-sm); /* Space between buttons */
+}
+
+.events-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.event-card {
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    padding: var(--spacing-md);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.event-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.event-title {
+    font-size: 1.4em;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: var(--spacing-sm);
+}
+
+.event-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    color: var(--text-subtle);
+    font-size: 0.9em;
+}
+
+.event-meta span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.event-meta i {
+    color: var(--primary-color);
+}
+
+.event-description {
+    color: var(--text-subtle);
+    line-height: 1.5;
+    margin-bottom: var(--spacing-md);
+}
+
+.event-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-wrap: wrap;
+}
+
+.event-actions .btn {
+    padding: 8px 16px;
+    font-size: 0.9em;
+    border-radius: 6px;
+}
+
+/* Status Badges */
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    white-space: nowrap; /* Prevent badge text from wrapping */
+}
+
+.status-planning {
+    background: #ffeaa7; /* Light yellow */
+    color: #fdcb6e; /* Darker yellow */
+}
+
+.status-active {
+    background: #55efc4; /* Light teal */
+    color: #00b894; /* Darker teal */
+}
+
+.status-completed {
+    background: #a29bfe; /* Light purple */
+    color: #6c5ce7; /* Darker purple */
+}
+
+.status-cancelled {
+    background: #ff7675; /* Light red */
+    color: #d63031; /* Darker red */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .events-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .events-header .create-event-btn {
+        margin-left: 0;
+        margin-top: var(--spacing-sm);
+        width: 100%;
+    }
+    .events-grid {
+        grid-template-columns: 1fr; /* Stack event cards */
+    }
+    .event-actions .btn {
+        width: 100%;
+    }
+}

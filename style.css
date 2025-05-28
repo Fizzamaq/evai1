@@ -1,0 +1,562 @@
+/* assets/css/style.css */
+
+/* --- Global Variables & Base Styles --- */
+:root {
+    /* Color Palette (Minimalist Pastel) */
+    --primary-color: #2A4D69; /* Sky Blue */
+    --secondary-color: #40bbc4; /* Pale Green */
+    --tertiary-color: #000000; /* Plum/Thistle - for subtle accents */
+    --mint-aqua-color: #b0fafa; /* Pale Turquoise */
+
+    --text-dark: #237cb8; /* Charcoal Gray */
+    --text-subtle: #778899; /* Light Slate Gray */
+    --background-light: #F0F8FF; /* Alice Blue - very light background */
+    --white: #FFFFFF;
+    --border-color: #E0FFFF; /* Light Cyan - very subtle border */
+
+    --success-color: #7DCEA0; /* Medium Aquamarine */
+    --error-color: #bf3ce7; /* Alizarin Red */
+    --warning-color: #F4D03F; /* Yellow */
+
+    /* Font */
+    --font-family: 'Inter', sans-serif; /* Prefer Inter, fall back to generic sans-serif */
+
+    /* Spacing */
+    --spacing-xs: 5px;
+    --spacing-sm: 10px;
+    --spacing-md: 20px;
+    --spacing-lg: 30px;
+    --spacing-xl: 40px;
+    --spacing-xxl: 60px; /* Added for larger sections */
+}
+
+body {
+    font-family: var(--font-family);
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background: var(--background-light);
+    color: var(--text-dark);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* General container for content - wide and flexible */
+.container {
+    width: 100%; /* Take full width initially */
+    max-width: 1200px; /* Max width for larger screens */
+    margin: 0 auto; /* Center the container */
+    padding: var(--spacing-md); /* Add horizontal and vertical padding */
+    box-sizing: border-box; /* Include padding in width calculation */
+}
+
+/* Main content area padding */
+.main-content-area {
+    padding-top: var(--spacing-lg);
+    padding-bottom: var(--spacing-lg);
+}
+
+/* --- Typography --- */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-dark);
+    margin-top: 0;
+    margin-bottom: var(--spacing-md);
+    font-weight: 700; /* Make headings bolder */
+}
+
+h1 { font-size: 2.8em; } /* Slightly larger */
+h2 { font-size: 2.2em; } /* Slightly larger */
+h3 { font-size: 1.7em; } /* Slightly larger */
+
+p {
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-subtle);
+}
+
+a {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+a:hover {
+    color: var(--secondary-color);
+    text-decoration: underline;
+}
+
+/* --- Buttons --- */
+.btn {
+    padding: 14px 28px; /* Slightly larger padding */
+    border: none;
+    border-radius: 10px; /* More rounded corners */
+    font-size: 17px; /* Slightly larger font */
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease; /* Smooth transitions for hover effects */
+    display: inline-block; /* Allows padding and margin to work correctly */
+    text-align: center;
+    text-decoration: none; /* Remove underline for links acting as buttons */
+    color: #40bbc4;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); /* Consistent shadow */
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--tertiary-color) 100%); /* Pastel gradient */
+    color: var(--white);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Subtle text shadow */
+    
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px); /* More pronounced lift effect */
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2); /* Enhanced shadow */
+    opacity: 0.9; /* Slight opacity change */
+}
+
+.btn-secondary {
+    background: var(--background-light); /* Lighter background */
+    color: var(--text-dark);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.btn-secondary:hover {
+    background: #eaf5ff; /* Slightly darker light background */
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-danger {
+    background: var(--error-color);
+    color: var(--white);
+}
+
+.btn-danger:hover {
+    background: #c92d3b; /* Darkened error-color */
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-success {
+    background: var(--success-color);
+    color: var(--white);
+}
+
+.btn-success:hover {
+    background: #6bbd8b; /* Darkened success-color */
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Small button variant */
+.btn-sm {
+    padding: 10px 20px;
+    font-size: 0.9em;
+    border-radius: 8px;
+}
+
+/* Large button variant */
+.btn-large {
+    padding: 18px 36px;
+    font-size: 1.2em;
+    border-radius: 12px;
+}
+
+
+/* --- Forms --- */
+.form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="number"],
+.form-group input[type="date"],
+.form-group input[type="time"],
+.form-group input[type="url"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px; /* Rounded corners for inputs */
+    font-size: 16px;
+    color: var(--text-dark);
+    background-color: var(--white);
+    box-sizing: border-box; /* Include padding in width */
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-group input[type="file"] {
+    padding: 10px; /* Adjust padding for file input */
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(135, 206, 235, 0.3); /* Pastel blue focus ring */
+}
+
+.form-group textarea {
+    resize: vertical; /* Allow vertical resizing */
+    min-height: 100px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+}
+
+/* Checkbox/Radio styling */
+input[type="checkbox"],
+input[type="radio"] {
+    margin-right: 8px;
+    transform: scale(1.2); /* Slightly larger checkboxes */
+}
+
+/* --- Alerts --- */
+.alert {
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    border-radius: 8px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.alert.success {
+    background-color: #d4edda; /* Light green */
+    color: #155724; /* Dark green */
+    border: 1px solid #c3e6cb;
+}
+
+.alert.error {
+    background-color: #f8d7da; /* Light red */
+    color: #721c24; /* Dark red */
+    border: 1px solid #f5c6cb;
+}
+
+.alert.warning {
+    background-color: #fff3cd; /* Light yellow */
+    color: #856404; /* Dark yellow */
+    border: 1px solid #ffeeba;
+}
+
+/* Empty state message */
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-xl) var(--spacing-md);
+    color: var(--text-subtle);
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    margin-top: var(--spacing-lg);
+}
+
+.empty-state h3 {
+    color: var(--text-dark);
+    margin-bottom: var(--spacing-sm);
+}
+
+/* --- Header Styles --- */
+.main-header {
+    background: #40BBC4; /* Dark header for contrast */
+    color: var(--white);
+    padding: 1rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1); /* Subtle shadow for depth */
+}
+
+.main-header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap; /* Allow items to wrap */
+}
+
+.logo {
+    color: var(--white);
+    font-size: 1.8rem; /* Slightly larger logo */
+    font-weight: 700;
+    text-decoration: none;
+    margin-right: var(--spacing-md);
+    padding: 5px 0; /* Add padding for better alignment */
+}
+
+.main-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md); /* Space between nav items */
+    margin-left: auto; /* Push nav to the right */
+}
+
+.main-nav a {
+    color: var(--white);
+    text-decoration: none;
+    position: relative;
+    padding: 8px 0; /* More padding for touch targets */
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.main-nav a.active {
+    font-weight: 700;
+    color: var(--primary-color); /* Highlight active link */
+}
+
+.main-nav a:hover {
+    color: var(--primary-color); /* Change color on hover */
+}
+
+.main-nav a:hover::after {
+    content: '';
+    position: absolute;
+    bottom: 0px; /* Adjust based on padding */
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--primary-color);
+    transform: scaleX(1);
+    transition: transform 0.3s ease;
+}
+
+/* --- Footer Styles --- */
+.main-footer {
+    background: #40BBC4;
+    color: var(--white);
+    padding: var(--spacing-xl) 0 var(--spacing-md);
+    margin-top: var(--spacing-xl);
+    text-align: center;
+}
+
+.main-footer .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.main-footer p {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9em;
+    margin-bottom: var(--spacing-sm);
+}
+
+.footer-nav {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.footer-nav a {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.9em;
+    transition: color 0.2s ease;
+}
+
+.footer-nav a:hover {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+/* --- Responsive Adjustments (General) --- */
+@media (max-width: 768px) {
+    .container {
+        padding: var(--spacing-sm); /* Reduce padding on smaller screens */
+    }
+
+    .main-header .container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .logo {
+        margin-bottom: var(--spacing-sm);
+        margin-right: 0;
+    }
+
+    .main-nav {
+        width: 100%;
+        margin-left: 0;
+        flex-direction: column;
+        gap: var(--spacing-xs);
+        text-align: center;
+    }
+
+    .main-nav a {
+        width: 100%;
+        padding: 10px 0;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr; /* Stack form rows vertically */
+    }
+
+    .btn {
+        width: 100%; /* Full width buttons on small screens */
+        margin-bottom: var(--spacing-sm); /* Add space between stacked buttons */
+    }
+
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .dashboard-header > div:last-child {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+    .dashboard-header .btn {
+        width: 100%;
+        margin-left: 0; /* Remove margin-left when stacked */
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    h1 { font-size: 2.2em; } /* Adjusted for smaller screens */
+    h2 { font-size: 1.8em; }
+    h3 { font-size: 1.4em; }
+
+    .btn {
+        padding: 12px 20px;
+        font-size: 15px;
+    }
+}
+
+/* Auth Forms (existing, integrated) */
+.auth-container {
+    max-width: 500px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background: var(--white);
+    border-radius: 12px; /* More rounded */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1); /* Enhanced shadow */
+}
+
+/* Events (existing, integrated) */
+/* .events-container is defined in dashboard.css */
+
+.events-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.event-card {
+    background: var(--white);
+    border-radius: 12px; /* More rounded */
+    padding: 1.5rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08); /* Enhanced shadow */
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.event-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.event-card h3 {
+    margin-top: 0;
+    color: var(--text-dark);
+}
+
+.event-date {
+    color: var(--text-subtle);
+    font-size: 0.9rem;
+}
+
+.event-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Event Form (existing, integrated) */
+.event-form-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.services-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.service-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Profile (existing, integrated) */
+.profile-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 0 1rem; /* Added padding for consistency */
+}
+.profile-section {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+    flex-wrap: wrap; /* Allow wrapping */
+    background: var(--white);
+    padding: var(--spacing-md);
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.profile-pic {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    background: var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0; /* Prevent shrinking */
+    margin: 0 auto var(--spacing-md); /* Center on small screens */
+}
+.profile-pic img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.profile-pic .initials {
+    font-size: 3rem;
+    font-weight: bold;
+    color: var(--text-subtle);
+}
+.profile-info {
+    flex-grow: 1; /* Allow info to take remaining space */
+    text-align: center; /* Center on small screens */
+}
+@media (min-width: 769px) {
+    .profile-info {
+        text-align: left; /* Align left on larger screens */
+    }
+    .profile-pic {
+        margin: 0; /* Remove auto margin on larger screens */
+    }
+}

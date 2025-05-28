@@ -2,7 +2,7 @@
 session_start();
 require_once '../../includes/config.php';
 require_once '../../classes/User.class.php';
-require_once '../../classes/SystemSettings.class.php';
+require_once '../../classes/SystemSettings.class.php'; // Include SystemSettings class
 
 $user = new User($pdo); // Pass PDO
 $settings = new SystemSettings($pdo); // Pass PDO
@@ -15,20 +15,9 @@ if (!$user->isAdmin($_SESSION['user_id'] ?? null)) { // Check if user is admin
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach ($_POST['settings'] as $key => $value) {
-        // Sanitize input values
-        $sanitizedValue = htmlspecialchars($value);
-
-        // Fetch data_type from DB for proper boolean/json handling if needed,
-        // or assume basic string conversion based on form input.
-        // For boolean checkboxes, a '1' value is submitted if checked, absence if unchecked.
-        // Adjust value for boolean based on whether key exists in POST (if it's a checkbox)
-        if (isset($_POST['settings_checkboxes']) && in_array($key, $_POST['settings_checkboxes'])) {
-             $finalValue = isset($_POST['settings'][$key]) ? '1' : '0';
-        } else {
-             $finalValue = $sanitizedValue;
-        }
-
-        $settings->updateSetting($key, $finalValue);
+        // Sanitize and validate input before updating settings
+        $sanitizedValue = htmlspecialchars($value); // Basic sanitization
+        $settings->updateSetting($key, $sanitizedValue);
     }
     $_SESSION['success'] = "Settings updated successfully!";
     header('Location: ' . BASE_URL . 'admin/settings.php');
@@ -108,20 +97,23 @@ $system_settings = $settings->getAllSettings();
 
                     <?php if ($setting['data_type'] === 'boolean'): ?>
                         <label>
-                            <input type="hidden" name="settings_checkboxes[]" value="<?= htmlspecialchars($setting['setting_key']); ?>">
-                            <input type="checkbox" name="settings[<?php echo htmlspecialchars($setting['setting_key']); ?>]" 
+                            <input type="checkbox" name="settings[<?php echo htmlspecialchars($setting['setting_key']); ?>]"
                                 value="1" <?php echo $setting['setting_value'] ? 'checked' : ''; ?>>
                             Enable
                         </label>
                     <?php elseif ($setting['data_type'] === 'json'): ?>
-                        <textarea class="setting-input" name="settings[<?php echo htmlspecialchars($setting['setting_key']); ?>]" 
+                        <textarea class="setting-input" name="settings[<?php echo htmlspecialchars($setting['setting_key']); ?>]"
                             rows="4"><?php echo htmlspecialchars($setting['setting_value']); ?></textarea>
                     <?php else: ?>
-                        <input type="text" class="setting-input" 
-                            name="settings[<?php echo htmlspecialchars($setting['setting_key']); ?>]" 
+                        <input type="text" class="setting-input"
+                            name="settings[<?php echo htmlspecialchars($setting['setting_key']); ?>]"
                             value="<?php echo htmlspecialchars($setting['setting_value']); ?>">
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
 
             <button type="submit" class="btn btn-primary">Save All Changes</button>
+        </form>
+    </div>
+</body>
+</html>

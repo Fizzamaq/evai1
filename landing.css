@@ -1,0 +1,197 @@
+/* assets/css/landing.css */
+
+/* Hero Section */
+.hero {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: var(--white);
+    padding: 100px 0; /* More vertical padding for a grander feel */
+    text-align: center;
+    position: relative;
+    overflow: hidden; /* Hide overflow from any subtle background animations */
+    min-height: 60vh; /* Ensure it takes a decent height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hero-content {
+    z-index: 1; /* Ensure content is above any background effects */
+    max-width: 800px;
+    margin: 0 auto;
+    padding: var(--spacing-md);
+}
+
+.hero-content h1 {
+    font-size: 3.5em; /* Larger, more impactful heading */
+    margin-bottom: var(--spacing-md);
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--white);
+}
+
+.subtitle {
+    font-size: 1.5em;
+    max-width: 700px;
+    margin: 0 auto var(--spacing-xl);
+    opacity: 0.9;
+    color: var(--white);
+}
+
+.cta-buttons {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: center;
+    flex-wrap: wrap; /* Allow buttons to wrap */
+}
+
+/* Features Section */
+.section {
+    padding: var(--spacing-xl) 0;
+    background: var(--white);
+}
+
+.section.bg-light { /* Optional: for sections with a lighter background */
+    background: var(--background-light);
+}
+
+.section h2 {
+    text-align: center;
+    margin-bottom: var(--spacing-xl);
+    font-size: 2.5em;
+    color: var(--text-dark);
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.feature-card {
+    background: var(--white);
+    padding: var(--spacing-lg);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.feature-icon {
+    font-size: 3.5em;
+    margin-bottom: var(--spacing-md);
+    color: var(--primary-color);
+}
+
+.feature-card h3 {
+    margin-top: 0;
+    color: var(--text-dark);
+    font-size: 1.4em;
+}
+
+/* How It Works Section */
+.steps {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-xl);
+    flex-wrap: wrap;
+}
+
+.step {
+    flex: 1;
+    min-width: 250px;
+    max-width: 350px;
+    text-align: center;
+    padding: var(--spacing-md);
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.step-number {
+    width: 70px;
+    height: 70px;
+    background: var(--primary-color);
+    color: var(--white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2em;
+    font-weight: 700;
+    margin: 0 auto var(--spacing-md);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.step h3 {
+    color: var(--text-dark);
+    font-size: 1.3em;
+}
+
+/* Responsive adjustments for landing page */
+@media (max-width: 992px) {
+    .hero-content h1 {
+        font-size: 3em;
+    }
+    .subtitle {
+        font-size: 1.3em;
+    }
+}
+
+@media (max-width: 768px) {
+    .hero {
+        padding: 80px var(--spacing-sm);
+    }
+    .hero-content h1 {
+        font-size: 2.5em;
+    }
+    .subtitle {
+        font-size: 1.1em;
+        margin-bottom: var(--spacing-lg);
+    }
+    .cta-buttons {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+    .cta-buttons .btn {
+        width: 100%;
+    }
+    .section {
+        padding: var(--spacing-lg) 0;
+    }
+    .section h2 {
+        font-size: 2em;
+        margin-bottom: var(--spacing-lg);
+    }
+    .features-grid, .steps {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+    .feature-card, .step {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero-content h1 {
+        font-size: 2em;
+    }
+    .subtitle {
+        font-size: 1em;
+    }
+    .section h2 {
+        font-size: 1.8em;
+    }
+    .feature-icon {
+        font-size: 3em;
+    }
+    .step-number {
+        width: 60px;
+        height: 60px;
+        font-size: 1.8em;
+    }
+}

@@ -1,0 +1,280 @@
+/* assets/css/dashboard.css */
+
+/* --- Customer Dashboard Container --- */
+.customer-dashboard-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--spacing-md);
+    box-sizing: border-box;
+}
+
+/* --- Dashboard Header (Common to both customer and vendor) --- */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 2px solid var(--border-color);
+    flex-wrap: wrap; /* Allow items to wrap */
+}
+
+.dashboard-header h1 {
+    font-size: 2em;
+    margin-bottom: var(--spacing-xs);
+    color: #40bbc4;
+    
+}
+
+.dashboard-header p {
+    color: var(--text-subtle);
+    font-size: 1.1em;
+}
+
+.dashboard-header > div {
+    margin-bottom: var(--spacing-sm); /* Space when items wrap */
+}
+
+.dashboard-header .btn {
+    margin-left: var(--spacing-sm); /* Space between buttons */
+}
+
+/* --- Stats Grid (Customer & Vendor) --- */
+.customer-stats-grid,
+.vendor-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.stat-card {
+    background: var(--white);
+    padding: var(--spacing-md);
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.12);
+}
+
+.metric-value {
+    font-size: 2.2em;
+    font-weight: 700;
+    color: var(--primary-color); /* Use primary color for key metrics */
+    margin-bottom: var(--spacing-xs);
+}
+
+.metric-label {
+    color: var(--text-subtle);
+    font-size: 0.95em;
+}
+
+/* --- Dashboard Sections (Common to both customer and vendor) --- */
+.dashboard-sections {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Default two columns */
+    gap: var(--spacing-lg);
+}
+
+.section-card {
+    background: var(--white);
+    padding: var(--spacing-md);
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.section-card h2 {
+    margin-top: 0;
+    color: var(--text-dark);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.list-item {
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.list-item:last-child {
+    border-bottom: none;
+}
+
+.list-item-title {
+    font-weight: 600;
+    color: var(--text-dark);
+    flex-basis: 100%; /* Take full width on wrap */
+}
+
+.list-item-meta {
+    font-size: 0.9em;
+    color: var(--text-subtle);
+    flex-basis: 100%;
+    margin-top: 5px;
+}
+
+.list-item .btn-link {
+    margin-top: var(--spacing-xs);
+    font-size: 0.9em;
+    padding: 5px 10px;
+    border-radius: 5px;
+    background-color: rgba(102, 126, 234, 0.1); /* Light background for link button */
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.list-item .btn-link:hover {
+    background-color: rgba(102, 126, 234, 0.2);
+    text-decoration: none;
+}
+
+/* --- Vendor Dashboard Specifics --- */
+.vendor-dashboard {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: var(--spacing-md);
+    box-sizing: border-box;
+}
+
+.vendor-header .rating {
+    font-size: 1.1em;
+    color: var(--warning-color); /* Star color */
+    font-weight: 600;
+}
+
+.upcoming-bookings h3 {
+    margin-bottom: var(--spacing-xs);
+}
+
+.booking-item .btn {
+    padding: 8px 16px;
+    font-size: 0.9em;
+}
+
+.calendar-widget {
+    background: var(--white);
+    padding: var(--spacing-md);
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* FullCalendar Custom Styles (from vendor.css, integrated here for dashboard context) */
+#availability-calendar { /* Specific ID for dashboard widget */
+    max-width: 100%; /* Ensure calendar fits its container */
+    margin: 0 auto;
+    padding: 0; /* Remove internal padding if container already has it */
+    box-shadow: none; /* Remove redundant shadow if parent has one */
+    background: transparent; /* Transparent background */
+}
+
+.fc-event {
+    cursor: pointer;
+    padding: 3px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    text-align: center;
+    border: 1px solid transparent; /* Default border */
+    color: var(--text-dark); /* Default text color */
+}
+
+.fc-event-available {
+    background: #e6ffe6; /* Lighter green */
+    border-color: #a5d6a7;
+    color: #1b5e20;
+}
+
+.fc-event-booked {
+    background: #ffe6e6; /* Lighter red */
+    border-color: #ef9a9a;
+    color: #b71c1c;
+}
+
+.fc-event-blocked {
+    background: #f0f0f0; /* Light grey */
+    border-color: #bdbdbd;
+    color: #424242;
+}
+
+/* Admin Settings Page Styles (from settings.php, moved here for consistency) */
+.settings-container {
+    max-width: 800px;
+    margin: var(--spacing-lg) auto;
+    padding: var(--spacing-md);
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.setting-item {
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--background-light);
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.setting-key {
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-dark);
+    font-size: 1.1em;
+}
+
+.setting-description {
+    color: var(--text-subtle);
+    font-size: 0.9em;
+    margin-bottom: var(--spacing-sm);
+}
+
+.setting-input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+.settings-container .btn-primary {
+    margin-top: var(--spacing-md);
+    width: auto; /* Override full width button from global styles */
+    padding: 12px 30px;
+}
+
+/* --- Responsive Adjustments (Dashboard Specific) --- */
+@media (max-width: 992px) {
+    .dashboard-sections {
+        grid-template-columns: 1fr; /* Stack sections vertically on medium screens */
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .dashboard-header > div:last-child {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+    .dashboard-header .btn {
+        width: 100%;
+        margin-left: 0;
+        margin-bottom: var(--spacing-sm);
+    }
+    .customer-stats-grid,
+    .vendor-stats {
+        grid-template-columns: 1fr; /* Stack stats cards on small screens */
+    }
+}
