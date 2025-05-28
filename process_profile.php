@@ -6,9 +6,7 @@ error_reporting(E_ALL);
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';     // Include User class
 require_once '../classes/Vendor.class.php';   // Include Vendor class
-require_once '../classes/UploadHandler.class.php'; // Include UploadHandler
-
-
+require_once '../classes/UploadHandler.class.php'; // Corrected: now in classes/ and named UploadHandler.class.php
 
 if (!isset($_SESSION['user_id']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
     header("Location: " . BASE_URL . "public/login.php");
@@ -24,26 +22,21 @@ try {
 
     // --- Process User Profile Data ---
     $user_profile_data = [
-        'first_name' => trim($_POST['first_name']),
-        'last_name' => trim($_POST['last_name']),
+        'first_name' => trim($_POST['first_name'] ?? ''),
+        'last_name' => trim($_POST['last_name'] ?? ''),
         'address' => $_POST['address'] ?? null,
         'city' => $_POST['city'] ?? null,
         'state' => $_POST['state'] ?? null,
-        'country' => $_POST['country'] ?? null, // Added country
-        'postal_code' => $_POST['postal_code'] ?? null // Added postal_code
+        'country' => $_POST['country'] ?? null,
+        'postal_code' => $_POST['postal_code'] ?? null
     ];
-
-    // TEMPORARY: Log received POST data for debugging
-    error_log("PROCESS_PROFILE: Received POST data: " . print_r($_POST, true));
-    error_log("PROCESS_PROFILE: User profile data prepared: " . print_r($user_profile_data, true));
 
     // Handle profile picture upload
     if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK) {
-        $filename = $uploader->handleUpload($_FILES['profile_image'], 'users/');
-        $user->updateProfileImage($userId, $filename); // Call updateProfileImage
-        error_log("PROCESS_PROFILE: Profile image uploaded: " . $filename);
+        $uploaded_filename = $uploader->handleUpload($_FILES['profile_image'], 'users/');
+        $user->updateProfileImage($userId, $uploaded_filename); // Call updateProfileImage
     } else if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] !== UPLOAD_ERR_NO_FILE) {
-        // Handle other file upload errors
+        // Handle other file upload errors, but only if a file was actually attempted to be uploaded
         throw new Exception("File upload error: " . $_FILES['profile_image']['error']);
     }
 
@@ -51,7 +44,6 @@ try {
     if (!$user->updateProfile($userId, $user_profile_data)) {
         throw new Exception("Failed to update personal profile data.");
     }
-    error_log("PROCESS_PROFILE: Personal profile updated successfully for user ID: " . $userId);
 
     // --- Process Vendor Profile Data (if user is a vendor) ---
     if ($is_vendor) {
@@ -73,20 +65,30 @@ try {
             'experience_years' => !empty($_POST['experience_years']) ? (int)$_POST['experience_years'] : null
         ];
 
-        error_log("PROCESS_PROFILE: Vendor profile data prepared: " . print_r($vendor_profile_data, true));
-
         // Basic validation for required vendor fields
         if (empty($vendor_profile_data['business_name']) || empty($vendor_profile_data['business_address']) ||
             empty($vendor_profile_data['business_city']) || empty($vendor_profile_data['business_state']) ||
             empty($vendor_profile_data['business_country']) || empty($vendor_profile_data['business_postal_code'])) {
-            throw new Exception("Please fill in all required business information fields.");
+            throw new Exception("Please fill in all required business information fields for your vendor profile.");
         }
 
         // Use registerVendor which handles both insert (if new) and update (if exists)
-        if (!$vendor->registerVendor($userId, $vendor_profile_data)) {
-            throw new Exception("Failed to update vendor profile data. Check Vendor.class.php logs.");
+        // This method returns the vendor_profile_id on success.
+        $vendor_profile_id = $vendor->registerVendor($userId, $vendor_profile_data);
+
+        if (!$vendor_profile_id) {
+            throw new Exception("Failed to update vendor profile data.");
         }
-        error_log("PROCESS_PROFILE: Vendor profile updated/created successfully for user ID: " . $userId);
+
+        // Handle vendor services offered
+        $services_offered = $_POST['services_offered'] ?? []; // This will be an array of service IDs
+        if (!is_array($services_offered)) {
+            $services_offered = []; // Ensure it's an array
+        }
+
+        if (!$vendor->updateVendorServiceOfferings($vendor_profile_id, $services_offered)) {
+            throw new Exception("Failed to update vendor service offerings.");
+        }
     }
 
     $_SESSION['profile_success'] = "Profile updated successfully!";
@@ -101,10 +103,9 @@ try {
 
 } catch (Exception $e) {
     $_SESSION['profile_error'] = $e->getMessage();
-    error_log("PROCESS_PROFILE: Profile update error for user $userId: " . $e->getMessage()); // Log detailed error
-    // TEMPORARY: Output error directly for debugging
-    die("Error processing profile: " . $e->getMessage() . " (Check PHP error logs for more details)");
-    // After debugging, remove the 'die()' and keep the redirect:
-    // header("Location: " . BASE_URL . "public/edit_profile.php");
-    // exit();
+    error_log("Profile update error for user $userId: " . $e->getMessage()); // Log detailed error
+    // For debugging, you might want to uncomment the 'die()' below temporarily
+    // die("Error: " . $e->getMessage()); 
+    header("Location: " . BASE_URL . "public/edit_profile.php");
+    exit();
 }
