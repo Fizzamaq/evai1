@@ -170,7 +170,7 @@ class Vendor {
                 JOIN vendor_services vs ON vso.service_id = vs.id
                 JOIN vendor_categories vc ON vs.category_id = vc.id
                 WHERE vso.vendor_id = ? AND vso.is_active = TRUE
-            ");
+            "); //
             $stmt->execute([$vendor_id]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -179,13 +179,54 @@ class Vendor {
         }
     }
 
+    // NEW METHOD: Update vendor's service offerings (delete existing and insert new ones)
+    public function updateVendorServiceOfferings($vendor_profile_id, $service_ids_array) {
+        try {
+            $this->conn->beginTransaction();
+
+            // 1. Delete all existing offerings for this vendor
+            $stmt = $this->conn->prepare("DELETE FROM vendor_service_offerings WHERE vendor_id = ?"); //
+            $stmt->execute([$vendor_profile_id]);
+            error_log("Vendor.updateVendorServiceOfferings: Deleted existing offerings for vendor ID: " . $vendor_profile_id);
+
+
+            // 2. Insert new offerings
+            if (!empty($service_ids_array)) {
+                $insert_sql = "INSERT INTO vendor_service_offerings (vendor_id, service_id) VALUES (?, ?)"; //
+                $insert_stmt = $this->conn->prepare($insert_sql);
+                foreach ($service_ids_array as $service_id) {
+                    // Basic validation to ensure service_id is an integer (optional but good practice)
+                    $service_id = (int)$service_id; 
+                    if ($service_id > 0) {
+                        $insert_stmt->execute([$vendor_profile_id, $service_id]);
+                    }
+                }
+                error_log("Vendor.updateVendorServiceOfferings: Inserted " . count($service_ids_array) . " new offerings for vendor ID: " . $vendor_profile_id);
+            } else {
+                error_log("Vendor.updateVendorServiceOfferings: No new offerings to insert for vendor ID: " . $vendor_profile_id);
+            }
+
+            $this->conn->commit();
+            return true;
+        } catch (PDOException $e) {
+            $this->conn->rollBack();
+            error_log("Vendor.updateVendorServiceOfferings error: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
+            return false;
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            error_log("Vendor.updateVendorServiceOfferings general error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+
     // Add portfolio item
     public function addPortfolioItem($vendor_id, $data) {
         try {
             $stmt = $this->conn->prepare("INSERT INTO vendor_portfolios 
                 (vendor_id, title, description, event_type_id, image_url, 
                  video_url, project_date, client_testimonial, is_featured)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"); //
             
             return $stmt->execute([
                 $vendor_id,
@@ -213,7 +254,7 @@ class Vendor {
                 LEFT JOIN event_types et ON vp.event_type_id = et.id
                 WHERE vp.vendor_id = ?
                 ORDER BY vp.display_order, vp.created_at DESC
-            ");
+            "); //
             $stmt->execute([$vendor_id]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -233,7 +274,7 @@ class Vendor {
                 end_time = VALUES(end_time),
                 status = VALUES(status),
                 updated_at = NOW()
-        ");
+        "); //
         
         return $stmt->execute([
             $vendorId,
@@ -258,7 +299,7 @@ class Vendor {
                 vendor_id = ? AND
                 date BETWEEN ? AND ? // Query by date
             ORDER BY date, start_time
-        ");
+        "); //
         
         $stmt->execute([$vendorId, $startDate, $endDate]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -276,7 +317,7 @@ class Vendor {
                 WHERE ar.event_id = ? AND ar.service_id = ?
                 ORDER BY ar.total_score DESC
                 LIMIT ?
-            ");
+            "); //
             $stmt->execute([$event_id, $service_id, $limit]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -337,14 +378,14 @@ class Vendor {
 
     // Get total booking count for a vendor
     public function getBookingCount($vendorId) {
-        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ?");
+        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ?"); //
         $stmt->execute([$vendorId]);
         return $stmt->fetchColumn();
     }
 
     // Get count of upcoming bookings for a vendor
     public function getUpcomingEvents($vendorId) {
-        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ? AND service_date >= CURDATE() AND status != 'cancelled'");
+        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ? AND service_date >= CURDATE() AND status != 'cancelled'"); //
         $stmt->execute([$vendorId]);
         return $stmt->fetchColumn();
     }
@@ -358,7 +399,7 @@ class Vendor {
 
     // Get a list of upcoming bookings for a vendor
     public function getUpcomingBookings($vendorId) {
-        $stmt = $this->conn->prepare("SELECT b.*, e.title as event_title FROM bookings b JOIN events e ON b.event_id = e.id WHERE b.vendor_id = ? AND b.service_date >= CURDATE() ORDER BY b.service_date ASC LIMIT 5");
+        $stmt = $this->conn->prepare("SELECT b.*, e.title as event_title FROM bookings b JOIN events e ON b.event_id = e.id WHERE b.vendor_id = ? AND b.service_date >= CURDATE() ORDER BY b.service_date ASC LIMIT 5"); //
         $stmt->execute([$vendorId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
