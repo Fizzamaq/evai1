@@ -1,12 +1,14 @@
 <?php
+// TEMPORARY: Enable full error reporting for debugging
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';     // Include User class
 require_once '../classes/Vendor.class.php';   // Include Vendor class
 require_once '../classes/UploadHandler.class.php'; // Include UploadHandler
 
-// TEMPORARY: Enable full error reporting for debugging
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+
 
 if (!isset($_SESSION['user_id']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
     header("Location: " . BASE_URL . "public/login.php");
