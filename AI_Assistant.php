@@ -14,7 +14,7 @@ class AI_Assistant {
     public function generateEventRecommendation($prompt) {
         try {
             $this->lastPrompt = $prompt;
-
+            
             if (empty($this->apiKey)) {
                 throw new Exception('OpenAI API key not configured');
             }
@@ -23,9 +23,12 @@ class AI_Assistant {
                 [
                     'role' => 'system',
                     'content' => 'You are an event planning assistant. Help users create event details based on their description. ' .
-                                'Respond with JSON format containing: event_title, event_type, description, event_date (YYYY-MM-DD), ' .
-                                'budget_range (min and max), required_services (array of service names with priorities and optional budget allocation), ' .
-                                'and reasoning (brief explanation of choices).'
+                                 'Respond STRICTLY in JSON format. The JSON MUST contain: ' .
+                                 'event_title, event_type, description, event_date (YYYY-MM-DD), ' .
+                                 'budget_range (an object with min and max properties), ' .
+                                 'required_services (an array of service objects, each with "name", "priority", and optional "budget_allocation"). ' .
+                                 'If you mention services in your "reasoning", they MUST be included in the "required_services" array. ' .
+                                 'Also include "reasoning" (a brief explanation of your choices).'
                 ],
                 [
                     'role' => 'user',
@@ -56,7 +59,7 @@ class AI_Assistant {
             if ($error) throw new Exception('CURL error: ' . $error);
 
             $data = json_decode($response, true);
-
+            
             if (isset($data['error'])) {
                 throw new Exception('OpenAI API error: ' . $data['error']['message']);
             }
@@ -80,10 +83,16 @@ class AI_Assistant {
     private function formatEventData($aiData) {
         $eventTypes = $this->dbFetchAll("SELECT id, type_name FROM event_types");
         $services = $this->dbFetchAll("SELECT id, service_name FROM vendor_services");
-
+        
         $typeMap = array_column($eventTypes, 'id', 'type_name');
-        $serviceMap = array_column($services, 'id', 'service_name');
-
+        
+        // REVISED: Create serviceMap with normalized keys for consistent lookup
+        $serviceMap = [];
+        foreach ($services as $s) {
+            $normalizedDbServiceName = strtolower(str_replace(' ', '_', $s['service_name']));
+            $serviceMap[$normalizedDbServiceName] = $s['id'];
+        }
+        
         $formatted = [
             'event' => [
                 'event_type_id' => $typeMap[$aiData['event_type']] ?? null,
@@ -101,46 +110,91 @@ class AI_Assistant {
         ];
 
         foreach ($aiData['required_services'] ?? [] as $service) {
-            // Normalize service name before lookup if needed (e.g., lowercase, remove spaces)
+            // Ensure 'name' key exists and is not null before proceeding
+            if (!isset($service['name']) || $service['name'] === null) {
+                error_log("Skipping service due to missing 'name' key in AI response: " . json_encode($service));
+                continue; // Skip to the next iteration if 'name' is not set or null
+            }
+
+            // Normalize service name before lookup (e.g., lowercase, remove spaces)
             $normalizedServiceName = strtolower(str_replace(' ', '_', $service['name']));
-            if (isset($serviceMap[$normalizedServiceName])) { // Check against normalized name
+            
+            // Check if service exists in our database's service map before adding
+            if (isset($serviceMap[$normalizedServiceName])) {
                 $formatted['services'][] = [
                     'service_id' => $serviceMap[$normalizedServiceName],
                     'priority' => $service['priority'] ?? 'medium',
                     'budget' => $service['budget_allocation'] ?? null
                 ];
+            } else {
+                error_log("AI suggested service name '" . $service['name'] . "' not found in vendor_services map.");
             }
         }
 
+        // FALLBACK: If AI did not populate 'required_services', try to infer from 'reasoning'/'decision_factors'
+        if (empty($formatted['services']) && isset($aiData['reasoning'])) {
+            $reasoning = $aiData['reasoning'];
+            
+            // ADJUSTED: commonServiceKeywords values to match DB service_name for correct normalization
+            $commonServiceKeywords = [
+                'venue' => 'Ballroom Rental', // Mapping 'Venue Rental' from AI to a specific DB service
+                'catering' => 'Buffet Catering',
+                'audio-visual' => 'Audio/Visual Equipment', 
+                'decor' => 'Venue Decor & Styling',
+                'photography' => 'Wedding Photography',
+                'videography' => 'Event Videography',
+                'music' => 'Live Band Performance',
+                'dj' => 'DJ Services',
+                'officiant' => 'Wedding Officiants',
+                'planning' => 'Full Event Planning'
+            ];
+
+            foreach ($commonServiceKeywords as $keyword => $dbServiceName) { // Use $dbServiceName as the exact name from DB
+                if (stripos($reasoning, $keyword) !== false) {
+                    $normalizedFallbackServiceName = strtolower(str_replace(' ', '_', $dbServiceName)); // Normalize for lookup
+                    if (isset($serviceMap[$normalizedFallbackServiceName])) {
+                        $existingServiceIds = array_column($formatted['services'], 'service_id');
+                        if (!in_array($serviceMap[$normalizedFallbackServiceName], $existingServiceIds)) {
+                            $formatted['services'][] = [
+                                'service_id' => $serviceMap[$normalizedFallbackServiceName],
+                                'priority' => 'medium', // Default priority for inferred
+                                'budget' => null // No budget inference from reasoning
+                            ];
+                        }
+                    } else {
+                        error_log("Fallback: Inferred service '" . $dbServiceName . "' (normalized: " . $normalizedFallbackServiceName . ") not found in serviceMap.");
+                    }
+                }
+            }
+        }
+        
         return $formatted;
     }
 
     public function getVendorRecommendations($eventId) {
         try {
-            // Modified to select venue_location as ST_X and ST_Y
             $event = $this->dbFetch(
-                "SELECT *, ST_X(venue_location) AS lat, ST_Y(venue_location) AS lng 
-                 FROM events WHERE id = ?", // Corrected to lat/lng for consistency in PHP
+                "SELECT *, ST_X(venue_location) AS lng, ST_Y(venue_location) AS lat 
+                 FROM events WHERE id = ?", 
                 [$eventId]
             );
-
+            
             $services = $this->dbFetchAll(
                 "SELECT service_id FROM event_service_requirements WHERE event_id = ?", 
                 [$eventId]
             );
-
+            
             $serviceIds = array_column($services, 'service_id');
             if (empty($serviceIds)) return [];
 
             $placeholders = implode(',', array_fill(0, count($serviceIds), '?'));
-
-            // Modified to select business_location as ST_X and ST_Y
+            
             $query = "SELECT vp.*, 
                      COUNT(vso.service_id) AS matched_services,
                      AVG(vso.price_range_min) AS avg_min_price,
                      AVG(vso.price_range_max) AS avg_max_price,
-                     ST_X(vp.business_location) AS business_lat, -- Corrected to lat/lng
-                     ST_Y(vp.business_location) AS business_lng, -- Corrected to lat/lng
+                     ST_X(business_location) AS business_lng,
+                     ST_Y(business_location) AS business_lat,
                      (SELECT COUNT(*) FROM vendor_availability 
                       WHERE vendor_id = vp.id 
                       AND date = ? 
@@ -153,7 +207,7 @@ class AI_Assistant {
                               availability_score DESC,
                               (avg_min_price + avg_max_price) / 2 ASC
                      LIMIT 10";
-
+            
             $params = array_merge([$event['event_date']], $serviceIds);
             $vendors = $this->dbFetchAll($query, $params);
 
@@ -175,30 +229,27 @@ class AI_Assistant {
             'price' => $this->calculatePriceScore($vendor, $event),
             'reviews' => ($vendor['rating'] ?? 0) * 0.2
         ];
-
+        
         return array_sum($scores);
     }
 
     private function calculateLocationScore($vendor, $event) {
-        // Check if coordinates exist before calculating distance
-        if (!isset($vendor['business_lat']) || !isset($vendor['business_lng']) || !isset($event['lat']) || !isset($event['lng'])) {
+        if (!isset($vendor['business_lat']) || !isset($event['lat']) || !isset($vendor['business_lng']) || !isset($event['lng'])) {
             return 0.5; // Default score if location data missing
         }
-
+        
         $distance = $this->calculateDistance(
             $vendor['business_lat'], $vendor['business_lng'],
             $event['lat'], $event['lng']
         );
-
-        return (($vendor['service_radius'] ?? 0) >= $distance) ? 1 : 0.2; // Return 0.2 if outside radius
+        
+        return (($vendor['service_radius'] ?? 0) >= $distance) ? 1 : 0; // Handle null service_radius
     }
 
     private function calculatePriceScore($vendor, $event) {
         $avgPrice = (($vendor['avg_min_price'] ?? 0) + ($vendor['avg_max_price'] ?? 0)) / 2;
         $eventBudget = (($event['budget_min'] ?? 0) + ($event['budget_max'] ?? 0)) / 2;
-
-        if ($eventBudget == 0) return 0.5; // Neutral if event budget is TBD
-
+        
         if ($avgPrice <= ($event['budget_min'] ?? 0)) return 1;
         if ($avgPrice <= ($event['budget_max'] ?? 0)) return 0.8;
         return 0.2;
