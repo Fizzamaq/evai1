@@ -2,7 +2,7 @@
 class Event {
     private $conn;
 
-    public function __construct($pdo) {
+    public function __construct($pdo) { // Pass PDO to constructor
         $this->conn = $pdo;
     }
 
@@ -37,7 +37,7 @@ class Event {
 
             $execute_params = [
                 ':user_id' => $data['user_id'],
-                ':event_type_id' => $data['event_type'],
+                ':event_type_id' => $data['event_type_id'], // MODIFIED: Changed from $data['event_type'] to $data['event_type_id']
                 ':title' => $data['title'],
                 ':description' => $data['description'],
                 ':event_date' => $data['event_date'],
@@ -100,11 +100,11 @@ class Event {
 
         } catch (PDOException $e) {
             $this->conn->rollBack();
-            error_log("Event creation PDO error: " . $e->getMessage()); // Log specific PDO error
+            error_log("Event creation PDO error: " . $e->getMessage());
             return false;
         } catch (Exception $e) {
             $this->conn->rollBack();
-            error_log("Event creation general error: " . $e->getMessage()); // Log general exception
+            error_log("Event creation general error: " . $e->getMessage());
             return false;
         }
     }
