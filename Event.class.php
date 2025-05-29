@@ -2,7 +2,7 @@
 class Event {
     private $conn;
 
-    public function __construct($pdo) { // Pass PDO to constructor
+    public function __construct($pdo) {
         $this->conn = $pdo;
     }
 
@@ -24,27 +24,20 @@ class Event {
                 :user_id, :event_type_id, :title, :description, :event_date, :event_time,
                 :end_date, :end_time, :venue_name, :venue_address, :venue_city, :venue_state,
                 :venue_country, :venue_postal_code, :guest_count, :budget_min, :budget_max,
-                :status, :special_requirements, :ai_preferences, :location_string, ST_GeomFromText(?),
+                :status, :special_requirements, :ai_preferences, :location_string, ST_GeomFromText(:venue_location_point_str),
                 :created_at, :updated_at
             )";
 
             $stmt = $this->conn->prepare($sql);
 
-            // For location, if a single string is given, try to parse it or just store it.
-            // For this example, we'll store it as location_string and set venue_location to NULL
-            // unless explicit lat/lon is provided.
-            $venue_location_point_str = null;
-            // If you want to convert address to POINT, you'd need a geocoding service here.
-            // For now, setting a dummy point if no lat/lon from location string, or just use NULL.
+            $venue_location_point_str_val = null;
             if (!empty($data['location_string'])) {
-                // Example: Try to parse "lat,lon" from a special input or just set a default for now.
-                // For a real app, integrate with a geocoding API.
-                // $venue_location_point_str = "POINT(longitude latitude)";
+                // Placeholder for geocoding logic
             }
 
-            $stmt->execute([
+            $execute_params = [
                 ':user_id' => $data['user_id'],
-                ':event_type_id' => $data['event_type'], // assuming event_type is already an ID here
+                ':event_type_id' => $data['event_type'],
                 ':title' => $data['title'],
                 ':description' => $data['description'],
                 ':event_date' => $data['event_date'],
@@ -58,35 +51,47 @@ class Event {
                 ':venue_country' => $data['venue_country'] ?? null,
                 ':venue_postal_code' => $data['venue_postal_code'] ?? null,
                 ':guest_count' => $data['guest_count'],
-                ':budget_min' => $data['budget_min'] ?? $data['budget'], // Use budget as min/max if only one is provided
-                ':budget_max' => $data['budget_max'] ?? $data['budget'],
+                ':budget_min' => $data['budget_min'],
+                ':budget_max' => $data['budget_max'],
                 ':status' => $data['status'],
                 ':special_requirements' => $data['special_requirements'],
-                ':ai_preferences' => $data['ai_preferences'] ?? null, // From AI Assistant
-                ':location_string' => $data['location'] ?? null, // From form's 'location' input
-                1 => $venue_location_point_str, // Pass for ST_GeomFromText, can be NULL
+                ':ai_preferences' => $data['ai_preferences'] ?? null,
+                ':location_string' => $data['location_string'] ?? null,
+                ':venue_location_point_str' => $venue_location_point_str_val,
                 ':created_at' => $data['created_at'],
                 ':updated_at' => $data['updated_at']
-            ]);
+            ];
+
+            $event_insert_success = $stmt->execute($execute_params);
+
+            if (!$event_insert_success) {
+                throw new PDOException("Events table insert failed.");
+            }
 
             $event_id = $this->conn->lastInsertId();
 
             // Handle services (insert into event_service_requirements)
-            if (!empty($data['services_needed_array'])) { // Expecting an array here
+            if (!empty($data['services_needed_array'])) {
                 $service_req_sql = "INSERT INTO event_service_requirements 
                                     (event_id, service_id, priority, budget_allocated, specific_requirements, status) 
                                     VALUES (?, ?, ?, ?, ?, ?)";
                 $service_stmt = $this->conn->prepare($service_req_sql);
 
-                foreach ($data['services_needed_array'] as $service) {
-                    $service_stmt->execute([
+                foreach ($data['services_needed_array'] as $index => $service) {
+                    $service_execute_params = [
                         $event_id,
                         $service['service_id'],
                         $service['priority'] ?? 'medium',
                         $service['budget_allocated'] ?? null,
                         $service['specific_requirements'] ?? null,
                         $service['status'] ?? 'needed'
-                    ]);
+                    ];
+
+                    $service_insert_success = $service_stmt->execute($service_execute_params);
+
+                    if (!$service_insert_success) {
+                        throw new PDOException("Service insert failed for service_id: " . $service['service_id']);
+                    }
                 }
             }
 
@@ -95,7 +100,11 @@ class Event {
 
         } catch (PDOException $e) {
             $this->conn->rollBack();
-            error_log("Event creation error: " . $e->getMessage());
+            error_log("Event creation PDO error: " . $e->getMessage()); // Log specific PDO error
+            return false;
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            error_log("Event creation general error: " . $e->getMessage()); // Log general exception
             return false;
         }
     }
@@ -184,9 +193,7 @@ class Event {
 
             $stmt = $this->conn->prepare($sql);
 
-            $venue_location_point_str = null; // Default to null for location point
-            // If you get lat/lon, construct POINT. e.g. "POINT(lon lat)"
-            // For now, assuming location is only string input or it needs geocoding.
+            $venue_location_point_str = null;
             if (!empty($data['location_string_from_form'])) {
                 // Placeholder for geocoding logic
             }
@@ -194,7 +201,7 @@ class Event {
             $stmt->execute([
                 ':title' => $data['title'],
                 ':description' => $data['description'],
-                ':event_type_id' => $data['event_type'], // assuming it's event_type_id from form/AI
+                ':event_type_id' => $data['event_type'],
                 ':event_date' => $data['event_date'],
                 ':event_time' => $data['event_time'] ?? null,
                 ':end_date' => $data['end_date'] ?? null,
@@ -210,14 +217,13 @@ class Event {
                 ':budget_max' => $data['budget_max'] ?? null,
                 ':status' => $data['status'] ?? 'planning',
                 ':special_requirements' => $data['special_requirements'] ?? null,
-                ':location_string' => $data['location_string_from_form'] ?? null, // From edit form
-                1 => $venue_location_point_str, // Parameter for ST_GeomFromText
+                ':location_string' => $data['location_string_from_form'] ?? null,
+                1 => $venue_location_point_str,
                 ':event_id' => $event_id,
                 ':user_id' => $user_id
             ]);
 
             // Update services (delete existing and insert new ones)
-            // Assuming $data['services_needed_array'] holds an array of service_ids
             $this->conn->prepare("DELETE FROM event_service_requirements WHERE event_id = ?")
                        ->execute([$event_id]);
 
@@ -227,7 +233,7 @@ class Event {
                                     VALUES (?, ?, ?)";
                 $service_stmt = $this->conn->prepare($service_req_sql);
                 foreach ($data['services_needed_array'] as $service_id) {
-                    $service_stmt->execute([$event_id, $service_id, 'medium']); // Default priority
+                    $service_stmt->execute([$event_id, $service_id, 'medium']);
                 }
             }
 
@@ -246,13 +252,8 @@ class Event {
      */
     public function deleteEvent($event_id, $user_id) {
         try {
-            // Option 1: Soft delete (recommended)
             $sql = "UPDATE events SET status = 'deleted', updated_at = NOW() 
                     WHERE id = :event_id AND user_id = :user_id";
-
-            // Option 2: Hard delete (uncomment if preferred)
-            // $sql = "DELETE FROM events WHERE id = :event_id AND user_id = :user_id";
-
             $stmt = $this->conn->prepare($sql);
             $stmt->bindParam(':event_id', $event_id);
             $stmt->bindParam(':user_id', $user_id);
@@ -276,13 +277,12 @@ class Event {
                     WHERE e.user_id = :user_id";
             $params = [':user_id' => $user_id];
 
-            // Add search conditions
             if (!empty($criteria['title'])) {
                 $sql .= " AND e.title LIKE :title";
                 $params[':title'] = '%' . $criteria['title'] . '%';
             }
 
-            if (!empty($criteria['event_type_id'])) { // Search by ID now
+            if (!empty($criteria['event_type_id'])) {
                 $sql .= " AND e.event_type_id = :event_type_id";
                 $params[':event_type_id'] = $criteria['event_type_id'];
             }
@@ -356,8 +356,8 @@ class Event {
                         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_events,
                         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_events,
                         SUM(CASE WHEN event_date >= CURDATE() THEN 1 ELSE 0 END) as upcoming_events,
-                        AVG( (budget_min + budget_max) / 2 ) as avg_budget, -- Use avg of min/max
-                        SUM( (budget_min + budget_max) / 2 ) as total_budget -- Use sum of avg of min/max
+                        AVG( (budget_min + budget_max) / 2 ) as avg_budget,
+                        SUM( (budget_min + budget_max) / 2 ) as total_budget 
                     FROM events 
                     WHERE user_id = :user_id AND status != 'deleted'";
 
@@ -398,9 +398,7 @@ class Event {
             $params = [':service_id' => $service_id];
 
             if ($location) {
-                // This location search would typically involve spatial queries
-                // e.g., using ST_Distance_Sphere if venue_location is populated
-                $sql .= " AND e.location_string LIKE :location"; // Use the string location field
+                $sql .= " AND e.location_string LIKE :location";
                 $params[':location'] = '%' . $location . '%';
             }
 
@@ -433,7 +431,7 @@ class Event {
 
             // Prepare new event data
             $new_event_data = $original_event;
-            unset($new_event_data['id']); // Remove ID to allow new insert
+            unset($new_event_data['id']);
             $new_event_data['title'] .= ' (Copy)';
             $new_event_data['status'] = 'planning';
             $new_event_data['created_at'] = date('Y-m-d H:i:s');
@@ -446,7 +444,7 @@ class Event {
             // Services needed for duplication (fetch from event_service_requirements)
             $services_to_duplicate = $this->conn->prepare("SELECT service_id, priority, budget_allocated, specific_requirements, status FROM event_service_requirements WHERE event_id = ?");
             $services_to_duplicate->execute([$event_id]);
-            $new_event_data['services_needed_array'] = $services_to_duplicate->fetchAll(PDO::FETCH_ASSOC); // Store as an array
+            $new_event_data['services_needed_array'] = $services_to_duplicate->fetchAll(PDO::FETCH_ASSOC);
 
             // Need to map old 'event_type_name' back to 'event_type_id' for insertion
             $event_type_stmt = $this->conn->prepare("SELECT id FROM event_types WHERE type_name = ?");
