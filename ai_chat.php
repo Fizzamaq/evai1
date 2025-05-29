@@ -23,11 +23,8 @@ if (!isset($_SESSION['user_id'])) {
     }
 }
 
-echo ""; // DEBUG
-
-$user_id = $_SESSION['user_id'];
-$ai_assistant = new AI_Assistant($pdo);
-$event_class = new Event($pdo); // Instantiate Event class
+// Ensure $pdo is accessible here if it wasn't by includes
+// global $pdo; 
 
 // --- AI Chat Session Management ---
 $session_id = $_GET['session_id'] ?? null;
@@ -36,25 +33,21 @@ $messages = []; // Array to store chat history
 
 // Function to fetch chat session from DB or create a new one
 function getOrCreateChatSession($pdo, $user_id, $session_id = null) {
-    echo ""; // DEBUG
     if ($session_id) {
         $stmt = $pdo->prepare("SELECT * FROM ai_chat_sessions WHERE id = ? AND user_id = ?");
         $stmt->execute([$session_id, $user_id]);
         $session = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($session) {
-            echo ""; // DEBUG
             return $session;
         }
     }
 
     // If no session found or invalid, create a new one
-    echo ""; // DEBUG
     $session_token = bin2hex(random_bytes(16)); // Generate a unique token
     $stmt = $pdo->prepare("INSERT INTO ai_chat_sessions (user_id, session_token, current_step, status) VALUES (?, ?, ?, ?)");
     $stmt->execute([$user_id, $session_token, 'start', 'active']); // 'start' is the initial step
     $new_session_id = $pdo->lastInsertId();
 
-    echo ""; // DEBUG
     return [
         'id' => $new_session_id,
         'user_id' => $user_id,
@@ -71,25 +64,19 @@ function getOrCreateChatSession($pdo, $user_id, $session_id = null) {
 
 // Function to save a message to DB
 function saveMessage($pdo, $session_id, $message_type, $message_content, $intent = null, $entities = null) {
-    echo ""; // DEBUG
     $stmt = $pdo->prepare("INSERT INTO ai_chat_messages (session_id, message_type, message_content, intent, entities) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$session_id, $message_type, $message_content, $intent, $entities ? json_encode($entities) : null]);
-    echo ""; // DEBUG
 }
 
 // Function to get messages for a session
 function getMessages($pdo, $session_id) {
-    echo ""; // DEBUG
     $stmt = $pdo->prepare("SELECT * FROM ai_chat_messages WHERE session_id = ? ORDER BY created_at ASC");
     $stmt->execute([$session_id]);
-    $msgs = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    echo ""; // DEBUG
-    return $msgs;
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Function to update session state (e.g., current_step, event_data)
 function updateSession($pdo, $session_id, $data) {
-    echo ""; // DEBUG
     $set_clauses = [];
     $params = [];
     foreach ($data as $key => $value) {
@@ -101,56 +88,40 @@ function updateSession($pdo, $session_id, $data) {
     $sql = "UPDATE ai_chat_sessions SET " . implode(', ', $set_clauses) . " WHERE id = ?";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
-    echo ""; // DEBUG
 }
 
 // --- IMPORTANT: Handle AJAX POST requests first, before any HTML output ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_content'])) {
-    echo ""; // DEBUG
     header('Content-Type: application/json'); // Respond with JSON for AJAX
 
     $current_session = getOrCreateChatSession($pdo, $user_id, $session_id); // Ensure session is loaded for POST
     $user_message_content = trim($_POST['message_content']);
     saveMessage($pdo, $current_session['id'], 'user', $user_message_content);
-    // DEBUG: After saving user message
-    echo ""; // DEBUG
 
     $ai_response_content = '';
     $next_step = $current_session['current_step'];
     $event_data = json_decode($current_session['event_data'] ?? '{}', true);
 
-    echo ""; // DEBUG
     switch ($current_session['current_step']) {
-        case 'start': // This case should only be hit if a new session just started, but no initial AI message sent yet
+        case 'start':
             $ai_response_content = "Hello! I'm your Event Planning AI. What type of event are you planning?";
             $next_step = 'ask_event_type';
-            echo ""; // DEBUG
             break;
 
         case 'ask_event_type':
-            $event_data['event_type_name'] = $user_message_content; // Store raw type name
+            $event_data['event_type_name'] = $user_message_content;
             
-            // Try to map to event_type_id
             $stmt = $pdo->prepare("SELECT id FROM event_types WHERE LOWER(type_name) LIKE ?");
-            // DEBUG: Parameters for event type lookup
-            echo ""; // DEBUG
-            try { // DEBUG: Add try-catch for DB lookup
-                $stmt->execute(['%' . strtolower($user_message_content) . '%']);
-                $matched_type = $stmt->fetch(PDO::FETCH_ASSOC);
-            } catch (PDOException $e) {
-                echo ""; // DEBUG
-                $matched_type = false; // Treat as no match
-            }
+            $stmt->execute(['%' . strtolower($user_message_content) . '%']);
+            $matched_type = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($matched_type) {
                 $event_data['event_type_id'] = $matched_type['id'];
                 $ai_response_content = "Got it, a " . htmlspecialchars($user_message_content) . ". And for how many guests do you expect?";
                 $next_step = 'ask_guest_count';
-                echo ""; // DEBUG
             } else {
                 $ai_response_content = "Hmm, I'm not familiar with that event type. Could you describe it briefly, or choose from common types like 'Wedding', 'Birthday Party', 'Corporate Event'?";
-                $next_step = 'ask_event_type'; // Keep asking until recognized or user gives up
-                echo ""; // DEBUG
+                $next_step = 'ask_event_type';
             }
             break;
 
@@ -159,11 +130,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_content'])) {
                 $event_data['guest_count'] = (int)$user_message_content;
                 $ai_response_content = "Perfect! What's your approximate budget for this event (e.g., $5000 - $10000)?";
                 $next_step = 'ask_budget';
-                echo ""; // DEBUG
             } else {
                 $ai_response_content = "Please provide a valid number for the guest count (e.g., '50', '200').";
                 $next_step = 'ask_guest_count';
-                echo ""; // DEBUG
             }
             break;
 
@@ -177,11 +146,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_content'])) {
                 
                 $ai_response_content = "Okay, understood your budget. When is the event date? (e.g.,YYYY-MM-DD)";
                 $next_step = 'ask_event_date';
-                echo ""; // DEBUG
             } else {
                 $ai_response_content = "Please provide a valid budget, for example, '$5000' or '$5000 - $10000'.";
                 $next_step = 'ask_budget';
-                echo ""; // DEBUG
             }
             break;
 
@@ -190,11 +157,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_content'])) {
                 $event_data['event_date'] = $user_message_content;
                 $ai_response_content = "Great! Do you have a specific location or venue in mind? (e.g., 'The Grand Ballroom, New York' or 'My backyard')";
                 $next_step = 'ask_location';
-                echo ""; // DEBUG
             } else {
-                $ai_response_content = "Please provide the date in يَYYYY-MM-DD format (e.g., 2025-06-15).";
+                $ai_response_content = "Please provide the date in YYYY-MM-DD format (e.g., 2025-06-15).";
                 $next_step = 'ask_event_date';
-                echo ""; // DEBUG
             }
             break;
         
@@ -202,27 +167,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_content'])) {
             $event_data['location_string'] = $user_message_content;
             $ai_response_content = "Got it. Now, could you tell me about any specific services you think you'll need? (e.g., 'Catering', 'Photography', 'Music', 'Decorations')";
             $next_step = 'ask_services';
-            echo ""; // DEBUG
             break;
 
         case 'ask_services':
             $event_data['special_requirements'] = ($event_data['special_requirements'] ?? '') . "\nServices requested: " . $user_message_content;
             
-            // Here, we can call AI_Assistant to get more detailed service suggestions
-            // For now, we'll confirm and move to saving.
             $ai_response_content = "Understood. I have enough information to create a draft event plan. Would you like to save this event plan now? (Yes/No)";
             $next_step = 'confirm_save';
-            echo ""; // DEBUG
             break;
 
         case 'confirm_save':
             if (strtolower($user_message_content) === 'yes') {
-                echo ""; // DEBUG
                 $event_to_save = [
                     'user_id' => $user_id,
                     'title' => ($event_data['event_type_name'] ?? 'AI Planned') . ' Event' . (isset($event_data['event_date']) ? ' on ' . $event_data['event_date'] : ''),
                     'description' => 'Planned with AI Assistant. ' . ($event_data['special_requirements'] ?? ''),
-                    'event_type_id' => $event_data['event_type_id'] ?? 1, // Use event_type_id here for DB
+                    'event_type_id' => $event_data['event_type_id'] ?? 1,
                     'event_date' => $event_data['event_date'] ?? date('Y-m-d', strtotime('+1 month')),
                     'event_time' => null,
                     'end_date' => null,
@@ -246,32 +206,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_content'])) {
                 ];
 
                 try {
-                    echo ""; // DEBUG
-                    echo "<pre>"; // DEBUG
-                    print_r($event_to_save); // DEBUG
-                    echo "</pre>"; // DEBUG
                     $new_event_id = $event_class->createEvent($event_to_save);
                     
                     if ($new_event_id) {
                         $ai_response_content = "Great! Your event has been saved! You can view it here: <a href='" . BASE_URL . "public/event.php?id=" . $new_event_id . "'>View Event</a>. Would you like me to suggest some vendors for this event?";
                         $next_step = 'ask_vendor_suggestions';
-                        updateSession($pdo, $current_session['id'], ['event_data' => json_encode($event_data), 'current_step' => $next_step, 'context_data' => json_encode(['event_id' => $new_event_id])]); // Use json_encode for event_data and context_data
-                        echo ""; // DEBUG
+                        updateSession($pdo, $current_session['id'], ['event_data' => json_encode($event_data), 'current_step' => $next_step, 'context_data' => json_encode(['event_id' => $new_event_id])]);
                     } else {
                         $ai_response_content = "I encountered an error saving your event. Please try again later. Or would you like to continue planning?";
-                        $next_step = 'confirm_save'; // Ask again
-                        echo ""; // DEBUG
+                        $next_step = 'confirm_save';
                     }
                 } catch (Exception $e) {
                     error_log("AI Chat - Save Event Error: " . $e->getMessage());
                     $ai_response_content = "Oops! Something went wrong while trying to save your event. Error: " . htmlspecialchars($e->getMessage()) . ". Would you like to try again?";
                     $next_step = 'confirm_save';
-                    echo ""; // DEBUG
                 }
             } else {
                 $ai_response_content = "Okay, I won't save it as an event for now. What else can I help you with? Or would you like to restart planning?";
                 $next_step = 'restart_or_continue';
-                echo ""; // DEBUG
             }
             break;
         
@@ -282,16 +234,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_content'])) {
                 if ($event_id_for_vendors) {
                     $ai_response_content = "Finding the best vendors for your event... This feature is under development, but you can explore vendors manually from your dashboard.";
                     $next_step = 'end_chat';
-                    echo ""; // DEBUG
                 } else {
                     $ai_response_content = "I couldn't find the event details to suggest vendors. Would you like to start a new plan?";
                     $next_step = 'restart_or_continue';
-                    echo ""; // DEBUG
                 }
             } else {
                 $ai_response_content = "Okay, no vendor suggestions for now. What else can I help you with?";
                 $next_step = 'restart_or_continue';
-                echo ""; // DEBUG
             }
             break;
 
@@ -299,37 +248,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_content'])) {
             if (strtolower($user_message_content) === 'restart') {
                 updateSession($pdo, $current_session['id'], ['current_step' => 'start', 'event_data' => null, 'context_data' => null]);
                 $ai_response_content = "Okay, let's start fresh! What type of event are you planning?";
-                $next_step = 'ask_event_type'; // Set next step to event type
-                echo ""; // DEBUG
+                $next_step = 'ask_event_type';
             } else {
                 $ai_response_content = "Alright, let me know if you need anything else.";
-                $next_step = 'end_chat'; // End the chat
-                echo ""; // DEBUG
+                $next_step = 'end_chat';
             }
             break;
 
         case 'end_chat':
             $ai_response_content = "It was great chatting with you! Feel free to come back anytime. Goodbye!";
-            $next_step = 'end_chat'; // Keep it on end_chat
-            echo ""; // DEBUG
+            $next_step = 'end_chat';
             break;
 
         default:
             $ai_response_content = "I'm not sure how to respond to that. Can you please rephrase?";
-            echo ""; // DEBUG
             break;
     }
 
     saveMessage($pdo, $current_session['id'], 'ai', $ai_response_content);
-    updateSession($pdo, $current_session['id'], ['current_step' => $next_step, 'event_data' => json_encode($event_data), 'context_data' => json_encode($context_data ?? [])]); // Ensure event_data and context_data are always JSON encoded
+    updateSession($pdo, $current_session['id'], ['current_step' => $next_step, 'event_data' => json_encode($event_data), 'context_data' => json_encode($context_data ?? [])]);
 
-    // Send back the new messages
     $updated_messages = getMessages($pdo, $current_session['id']);
     echo json_encode(['success' => true, 'messages' => $updated_messages, 'current_step' => $next_step]);
-    echo ""; // DEBUG
-    exit(); // IMPORTANT: Ensure script terminates after JSON response for AJAX calls
+    exit();
 }
-
 
 // --- Main page load logic (initial setup) ---
 // Initialize session if not set via POST, and retrieve messages
@@ -338,17 +280,14 @@ $messages = getMessages($pdo, $current_session['id']);
 
 // Initial AI greeting for new sessions (if no POST or initial load)
 if (empty($messages) && $current_session['current_step'] === 'start') {
-    echo ""; // DEBUG
     $initial_ai_message = "Hello! I'm your Event Planning AI. What type of event are you planning?";
     saveMessage($pdo, $current_session['id'], 'ai', $initial_ai_message);
     updateSession($pdo, $current_session['id'], ['current_step' => 'ask_event_type']);
     $messages = getMessages($pdo, $current_session['id']); // Refresh messages to include initial greeting
-    echo ""; // DEBUG
 }
 
 // INCLUDE HEADER AND FOOTER ONLY FOR NON-AJAX REQUESTS (Normal page load)
-include 'header.php'; // Moved here
-echo ""; // DEBUG
+include 'header.php';
 ?>
 <div class="ai-chat-wrapper">
     <div class="ai-chat-header">
@@ -369,7 +308,7 @@ echo ""; // DEBUG
     </div>
 </div>
 
-<?php include 'footer.php'; // Moved here ?>
+<?php include 'footer.php'; ?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -390,7 +329,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const content = document.createElement('div');
         content.classList.add('message-content');
-        content.innerHTML = message.message_content.replace(/\n/g, '<br>'); // Handle line breaks
+        content.innerHTML = message.message_content.replace(/\n/g, '<br>');
         
         const time = document.createElement('div');
         time.classList.add('message-time');
@@ -409,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
     sendMessageBtn.addEventListener('click', sendMessage);
     messageInput.addEventListener('keydown', function(event) {
         if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault(); // Prevent new line
+            event.preventDefault();
             sendMessage();
         }
     });
@@ -418,20 +357,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const messageContent = messageInput.value.trim();
         if (messageContent === '') return;
 
-        // Optimistically add user message to UI
         addMessageToDisplay({
             message_type: 'user',
             message_content: messageContent,
             created_at: new Date().toISOString()
         });
 
-        messageInput.value = ''; // Clear input
-        messageInput.style.height = 'auto'; // Reset textarea height
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
 
         const formData = new URLSearchParams();
         formData.append('message_content', messageContent);
 
-        // Fetch URL updated to include session_id
         fetch('<?= BASE_URL ?>public/ai_chat.php?session_id=' + currentSessionId, {
             method: 'POST',
             headers: {
@@ -440,21 +377,18 @@ document.addEventListener('DOMContentLoaded', function() {
             body: formData
         })
         .then(response => {
-            // Check if the response is OK (HTTP 200) and if it's JSON
             if (!response.ok) {
-                // If not OK, log the status and response text for more details
                 return response.text().then(text => {
                     console.error('HTTP Error:', response.status, response.statusText, text);
                     throw new Error('Network response was not ok: ' + response.statusText + ' - ' + text);
                 });
             }
-            return response.json(); // Try to parse as JSON
+            return response.json();
         })
         .then(data => {
             if (data.success) {
-                // To avoid duplicate messages, clear existing messages and re-render all from the response
-                chatMessagesContainer.innerHTML = ''; // Clear current messages
-                data.messages.forEach(msg => addMessageToDisplay(msg)); // Add all updated messages
+                chatMessagesContainer.innerHTML = '';
+                data.messages.forEach(msg => addMessageToDisplay(msg));
             } else {
                 console.error('Error from server (data.success is false):', data.error);
                 addMessageToDisplay({
@@ -462,7 +396,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     message_content: 'Sorry, I encountered an error: ' + (data.error || 'Unknown server error.'),
                     created_at: new Date().toISOString()
                 });
-                 // If there's a redirect in the data, handle it
                 if (data.redirect) {
                     alert(data.error || 'You have been logged out.');
                     window.location.href = data.redirect;
@@ -471,7 +404,6 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Fetch error (caught by JS):', error);
-            // Provide a user-friendly error message
             addMessageToDisplay({
                 message_type: 'ai',
                 message_content: 'Network error or unable to get response. Please try again. Check console for details.',
@@ -480,13 +412,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Auto-resize textarea
     messageInput.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = (this.scrollHeight) + 'px';
     });
 
-    // Download chat functionality
     downloadChatBtn.addEventListener('click', function() {
         const chatHistory = [];
         document.querySelectorAll('.message-bubble').forEach(bubble => {
