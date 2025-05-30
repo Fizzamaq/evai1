@@ -44,10 +44,10 @@
     flex-wrap: wrap; /* Allow buttons to wrap */
 }
 
-/* Features Section */
+/* Features Section (existing, updated for new colors) */
 .section {
     padding: var(--spacing-xl) 0;
-    background: var(--white);
+    background: var(--background-light); /* Use new background color */
 }
 
 .section.bg-light { /* Optional: for sections with a lighter background */
@@ -58,7 +58,7 @@
     text-align: center;
     margin-bottom: var(--spacing-xl);
     font-size: 2.5em;
-    color: var(--text-dark);
+    color: var(--text-dark); /* Use new text color */
 }
 
 .features-grid {
@@ -84,16 +84,16 @@
 .feature-icon {
     font-size: 3.5em;
     margin-bottom: var(--spacing-md);
-    color: var(--primary-color);
+    color: var(--primary-color); /* Use new primary color */
 }
 
 .feature-card h3 {
     margin-top: 0;
-    color: var(--text-dark);
+    color: var(--text-dark); /* Use new text color */
     font-size: 1.4em;
 }
 
-/* How It Works Section */
+/* How It Works Section (existing, updated for new colors) */
 .steps {
     display: flex;
     justify-content: center;
@@ -115,7 +115,7 @@
 .step-number {
     width: 70px;
     height: 70px;
-    background: var(--primary-color);
+    background: var(--primary-color); /* Use new primary color */
     color: var(--white);
     border-radius: 50%;
     display: flex;
@@ -128,8 +128,131 @@
 }
 
 .step h3 {
-    color: var(--text-dark);
+    color: var(--text-dark); /* Use new text color */
     font-size: 1.3em;
+}
+
+/* NEW: Categories Section */
+.categories-section {
+    padding: var(--spacing-xl) 0;
+    background: var(--background-light);
+}
+
+.categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* Adjust min width for more categories */
+    gap: var(--spacing-md);
+    justify-content: center;
+    /* For a carousel-like effect, we would use flexbox with overflow-x: auto */
+    /* display: flex; */
+    /* overflow-x: auto; */
+    /* scroll-snap-type: x mandatory; */
+    /* -webkit-overflow-scrolling: touch; */
+}
+
+.category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: var(--spacing-md);
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    min-width: 150px; /* Ensure minimum width for carousel effect */
+    scroll-snap-align: start; /* For scroll-snap effect */
+}
+
+.category-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.category-icon {
+    font-size: 3em;
+    margin-bottom: var(--spacing-sm);
+    color: var(--secondary-color); /* Use secondary color for category icons */
+}
+
+.category-card h3 {
+    font-size: 1.1em;
+    margin: 0;
+    color: var(--text-dark);
+}
+
+/* NEW: Featured Vendors Section */
+.featured-vendors-section {
+    padding: var(--spacing-xl) 0;
+    background: var(--background-light);
+}
+
+.featured-vendors-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+    justify-content: center;
+    /* Similar to categories, for carousel functionality, use flexbox with overflow-x: auto */
+    /* display: flex; */
+    /* overflow-x: auto; */
+    /* scroll-snap-type: x mandatory; */
+}
+
+.vendor-card-item {
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    overflow: hidden; /* Ensures image corners are rounded */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    text-align: left;
+    min-width: 280px; /* Ensure minimum width for carousel effect */
+    scroll-snap-align: start; /* For scroll-snap effect */
+}
+
+.vendor-card-item:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.vendor-card-image {
+    width: 100%;
+    height: 200px; /* Fixed height for images */
+    background-size: cover;
+    background-position: center;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.vendor-card-content {
+    padding: var(--spacing-md);
+}
+
+.vendor-card-content h3 {
+    font-size: 1.4em;
+    margin-top: 0;
+    margin-bottom: var(--spacing-xs);
+    color: var(--primary-color);
+}
+
+.vendor-card-content p {
+    font-size: 0.9em;
+    color: var(--text-subtle);
+    margin-bottom: var(--spacing-xs);
+}
+
+.vendor-card-rating {
+    color: var(--warning-color); /* Star color */
+    font-size: 1.1em;
+    margin-bottom: var(--spacing-sm);
+}
+
+.vendor-card-rating i {
+    margin-right: 3px;
+}
+
+.vendor-card-services {
+    font-size: 0.85em;
+    color: var(--text-dark);
+    margin-bottom: var(--spacing-md);
 }
 
 /* Responsive adjustments for landing page */
@@ -139,6 +262,9 @@
     }
     .subtitle {
         font-size: 1.3em;
+    }
+    .categories-grid, .featured-vendors-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Adjust for medium screens */
     }
 }
 
@@ -171,8 +297,21 @@
         grid-template-columns: 1fr;
         gap: var(--spacing-md);
     }
-    .feature-card, .step {
+    .feature-card, .step, .category-card, .vendor-card-item {
         max-width: 100%;
+    }
+    .categories-grid, .featured-vendors-grid {
+        /* For true mobile carousel: */
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        justify-content: flex-start; /* Align items to start */
+        padding-bottom: var(--spacing-md); /* Add padding for scrollbar */
+    }
+    .category-card, .vendor-card-item {
+        flex-shrink: 0; /* Prevent items from shrinking */
+        margin-right: var(--spacing-md); /* Space between items in scroll view */
     }
 }
 
@@ -186,7 +325,7 @@
     .section h2 {
         font-size: 1.8em;
     }
-    .feature-icon {
+    .feature-icon, .category-icon {
         font-size: 3em;
     }
     .step-number {
