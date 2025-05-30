@@ -403,4 +403,55 @@ class Vendor {
         $stmt->execute([$vendorId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Get a list of featured vendors for the homepage display.
+     * Includes their profile image and a concatenated list of their services.
+     * @param int $limit The maximum number of vendors to retrieve.
+     * @return array An array of vendor data.
+     */
+    public function getFeaturedVendorsForHomepage($limit = 8) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT 
+                    vp.id, 
+                    vp.business_name, 
+                    vp.business_city,
+                    vp.rating, 
+                    vp.total_reviews,
+                    up.profile_image,
+                    GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS offered_services
+                FROM vendor_profiles vp
+                JOIN users u ON vp.user_id = u.id
+                LEFT JOIN user_profiles up ON u.id = up.user_id
+                LEFT JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
+                LEFT JOIN vendor_services vs ON vso.service_id = vs.id
+                WHERE vp.is_active = TRUE AND vp.verified = TRUE AND vp.featured = TRUE
+                GROUP BY vp.id
+                ORDER BY vp.rating DESC, vp.total_reviews DESC
+                LIMIT ?
+            ");
+            $stmt->bindParam(1, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error fetching featured vendors for homepage: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get all active vendor categories.
+     * @return array An array of vendor categories.
+     */
+    public function getAllVendorCategories() {
+        try {
+            $stmt = $this->conn->prepare("SELECT id, category_name, icon FROM vendor_categories WHERE is_active = TRUE ORDER BY category_name ASC");
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error fetching vendor categories: " . $e->getMessage());
+            return [];
+        }
+    }
 }
