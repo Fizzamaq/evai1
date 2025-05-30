@@ -1,8 +1,10 @@
 <?php
-// [cite: fizzamaq/evai/evai-270c475187253adadaf42cfe122a431191cf1f80/config.php]
+//
 require_once '../includes/config.php';
-// [cite: fizzamaq/evai/evai-270c475187253adadaf42cfe122a431191cf1f80/header.php]
+//
 include 'header.php';
+// Include the Vendor class to fetch data
+require_once '../classes/Vendor.class.php';
 
 // If user is already logged in, redirect to their appropriate dashboard
 if (isset($_SESSION['user_id'])) {
@@ -17,6 +19,16 @@ if (isset($_SESSION['user_id'])) {
     header("Location: " . $redirect_url);
     exit();
 }
+
+// Instantiate Vendor class to fetch data
+$vendor = new Vendor($pdo);
+
+// Fetch featured vendors for the homepage
+$featured_vendors = $vendor->getFeaturedVendorsForHomepage(8); // Limit to 8 for display
+
+// Fetch all vendor categories
+$vendor_categories = $vendor->getAllVendorCategories();
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -44,40 +56,59 @@ if (isset($_SESSION['user_id'])) {
         </div>
     </section>
 
-    <section class="section features-section">
+    <section class="section categories-section">
         <div class="container">
-            <h2>Why Choose EventCraftAI?</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <i class="fas fa-robot feature-icon"></i>
-                    <h3>AI-Powered Planning</h3>
-                    <p>Leverage intelligent recommendations for event types, services, and budget allocation.</p>
-                </div>
-                <div class="feature-card">
-                    <i class="fas fa-calendar-check feature-icon"></i>
-                    <h3>Effortless Management</h3>
-                    <p>Organize all your event details, schedules, and communications in one place.</p>
-                </div>
-                <div class="feature-card">
-                    <i class="fas fa-handshake feature-icon"></i>
-                    <h3>Connect with Vendors</h3>
-                    <p>Discover and book top-rated vendors tailored to your event's specific needs.</p>
-                </div>
-                <div class="feature-card">
-                    <i class="fas fa-chart-line feature-icon"></i>
-                    <h3>Performance Insights</h3>
-                    <p>Track event progress and vendor performance with detailed reports.</p>
-                </div>
-                <div class="feature-card">
-                    <i class="fas fa-mobile-alt feature-icon"></i>
-                    <h3>Mobile Friendly</h3>
-                    <p>Manage your events on the go with our fully responsive platform.</p>
-                </div>
-                <div class="feature-card">
-                    <i class="fas fa-star feature-icon"></i>
-                    <h3>Trusted Reviews</h3>
-                    <p>Read real client reviews to make informed decisions about vendors.</p>
-                </div>
+            <h2>Explore Categories</h2>
+            <div class="categories-grid">
+                <?php if (!empty($vendor_categories)): ?>
+                    <?php foreach ($vendor_categories as $category): ?>
+                        <a href="<?= BASE_URL ?>public/vendors.php?category=<?= htmlspecialchars($category['id']) ?>" class="category-card">
+                            <i class="fas fa-<?= htmlspecialchars($category['icon'] ?: 'tags') ?> category-icon"></i>
+                            <h3><?= htmlspecialchars($category['category_name']) ?></h3>
+                        </a>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p>No categories found at this time.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </section>
+
+    <section class="section featured-vendors-section">
+        <div class="container">
+            <h2>Our Featured Vendors</h2>
+            <div class="featured-vendors-grid">
+                <?php if (!empty($featured_vendors)): ?>
+                    <?php foreach ($featured_vendors as $vendor_item): ?>
+                        <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_item['id']) ?>" class="vendor-card-item">
+                            <div class="vendor-card-image" style="background-image: url('<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($vendor_item['profile_image'] ?: 'default-avatar.jpg') ?>')"></div>
+                            <div class="vendor-card-content">
+                                <h3><?= htmlspecialchars($vendor_item['business_name']) ?></h3>
+                                <p><?= htmlspecialchars($vendor_item['business_city']) ?></p>
+                                <div class="vendor-card-rating">
+                                    <?php
+                                    $rating = round($vendor_item['rating'] * 2) / 2; // Round to nearest 0.5
+                                    for ($i = 1; $i <= 5; $i++):
+                                        if ($rating >= $i) {
+                                            echo '<i class="fas fa-star"></i>'; // Full star
+                                        } elseif ($rating > ($i - 1)) {
+                                            echo '<i class="fas fa-star-half-alt"></i>'; // Half star
+                                        } else {
+                                            echo '<i class="far fa-star"></i>'; // Empty star
+                                        }
+                                    endfor;
+                                    ?>
+                                    (<?= htmlspecialchars($vendor_item['total_reviews']) ?> Reviews)
+                                </div>
+                                <?php if (!empty($vendor_item['offered_services'])): ?>
+                                    <p class="vendor-card-services">Services: <?= htmlspecialchars($vendor_item['offered_services']) ?></p>
+                                <?php endif; ?>
+                            </div>
+                        </a>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p>No featured vendors available at this time.</p>
+                <?php endif; ?>
             </div>
         </div>
     </section>
