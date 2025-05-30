@@ -21,7 +21,7 @@ define('DB_NAME', 'u950050130_ecai');
 define('BASE_URL', 'https://eventcraft.gatvia.com/');
 define('ASSETS_PATH', BASE_URL . 'assets/');
 // --- ADD THIS LINE FOR OPENAI API KEY ---
-define('OPENAI_API_KEY', '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'); // Replace with your actual key!
+define('OPENAI_API_KEY', 'fizza'); // Replace with your actual key!
 // --- END OF ADDITION ---
 
 // Initialize PDO Connection
