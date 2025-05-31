@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';     // Include User class
 require_once '../classes/Vendor.class.php';   // Include Vendor class for vendor profile
+require_once '../classes/UploadHandler.class.php'; // Include UploadHandler for portfolio image uploads
 include 'header.php';
 
 if (!isset($_SESSION['user_id'])) {
@@ -24,8 +25,7 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
     $vendor_data = $vendor->getVendorByUserId($_SESSION['user_id']);
 
     // Fetch all vendor categories
-    // Changed to dbFetchAll
-    $vendor_categories = dbFetchAll("SELECT * FROM vendor_categories ORDER BY category_name ASC"); //
+    $vendor_categories = dbFetchAll("SELECT * FROM vendor_categories ORDER BY category_name ASC");
 
     // Fetch all vendor services, grouped by category
     $all_vendor_services = dbFetchAll("
@@ -34,7 +34,7 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
         JOIN vendor_categories vc ON vs.category_id = vc.id
         WHERE vs.is_active = TRUE
         ORDER BY vc.category_name, vs.service_name
-    "); //
+    ");
 
     foreach ($all_vendor_services as $service) {
         $vendor_services_by_category[$service['category_name']][] = $service;
@@ -42,10 +42,19 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
 
     // Fetch services already offered by this vendor
     if ($vendor_data) {
-        $current_offerings = $vendor->getVendorServices($vendor_data['id']); // This method fetches current offerings
-        $selected_vendor_services = array_column($current_offerings, 'service_id'); // Extract just the service IDs
+        $current_offerings = $vendor->getVendorServices($vendor_data['id']);
+        $selected_vendor_services = array_column($current_offerings, 'service_id');
     }
 }
+
+// Get event types for portfolio dropdown (needed for portfolio form)
+try {
+    $event_types = dbFetchAll("SELECT id, type_name FROM event_types WHERE is_active = TRUE"); 
+} catch (PDOException $e) {
+    $event_types = [];
+    error_log("Get event types error for portfolio form: " . $e->getMessage());
+}
+
 
 $error = $_SESSION['profile_error'] ?? null;
 $success = $_SESSION['profile_success'] ?? null;
@@ -58,7 +67,7 @@ unset($_SESSION['profile_error'], $_SESSION['profile_success']);
         <div class="alert error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
-    <?php if ($success): ?>
+    <?php if (isset($success)): /* Added check for success variable existence */ ?>
         <div class="alert success"><?= htmlspecialchars($success) ?></div>
     <?php endif; ?>
 
@@ -187,9 +196,51 @@ unset($_SESSION['profile_error'], $_SESSION['profile_success']);
                 <?php endforeach; ?>
             </div>
 
+            <h2 style="margin-top: 40px;">Add New Portfolio Item</h2> <p>Add new pictures and details to showcase your work on your public profile. This will appear on your public vendor profile page.</p>
+            <div class="form-group">
+                <label for="portfolio_title">Item Title <span class="required">*</span></label>
+                <input type="text" id="portfolio_title" name="portfolio_title" required>
+            </div>
+            <div class="form-group">
+                <label for="portfolio_description">Description</label>
+                <textarea id="portfolio_description" name="portfolio_description" rows="4"></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="portfolio_event_type_id">Event Type</label>
+                    <select id="portfolio_event_type_id" name="portfolio_event_type_id">
+                        <option value="">Select event type</option>
+                        <?php foreach ($event_types as $type): ?>
+                            <option value="<?php echo $type['id']; ?>"><?php echo htmlspecialchars($type['type_name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="portfolio_project_date">Project Date</label>
+                    <input type="date" id="portfolio_project_date" name="portfolio_project_date">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="portfolio_image_upload">Image File</label>
+                <input type="file" id="portfolio_image_upload" name="portfolio_image_upload" accept="image/*">
+            </div>
+            <div class="form-group">
+                <label for="portfolio_video_url">Video URL (e.g., YouTube link)</label>
+                <input type="url" id="portfolio_video_url" name="portfolio_video_url" placeholder="http://youtube.com/watch?v=...">
+            </div>
+            <div class="form-group">
+                <label for="portfolio_testimonial">Client Testimonial</label>
+                <textarea id="portfolio_testimonial" name="portfolio_testimonial" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <div class="featured-checkbox">
+                    <input type="checkbox" id="portfolio_is_featured" name="portfolio_is_featured">
+                    <label for="portfolio_is_featured">Feature this item on my profile</label>
+                </div>
+            </div>
+
         <?php endif; ?>
 
-        <button type="submit" class="btn btn-primary">Save Changes</button>
-    </form>
+        <button type="submit" name="save_profile_changes" class="btn btn-primary">Save All Changes</button> </form>
 </div>
 <?php include 'footer.php'; ?>
