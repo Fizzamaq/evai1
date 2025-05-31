@@ -12,6 +12,7 @@ require_once '../classes/User.class.php';    // For User data
 
 // Retrieve user_id immediately after session_start and require authentication.
 $user_id = $_SESSION['user_id'] ?? null;
+$user_type = $_SESSION['user_type'] ?? null;
 
 if (!$user_id) { // If user_id is not set or null, redirect/exit
     // For AJAX requests, send a JSON error response instead of redirecting
@@ -25,7 +26,17 @@ if (!$user_id) { // If user_id is not set or null, redirect/exit
     }
 }
 
-// Removed: echo ""; // DEBUG
+// NEW: Redirect vendors away from the AI chat page
+if ($user_type == 2) { // Assuming 2 is the user_type_id for vendors
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Access denied. Vendors cannot use AI Assistant.', 'redirect' => BASE_URL . 'public/vendor_dashboard.php']);
+    } else {
+        $_SESSION['error_message'] = "Access denied. Vendors cannot use the AI Assistant.";
+        header("Location: " . BASE_URL . "public/vendor_dashboard.php");
+    }
+    exit();
+}
 
 $ai_assistant = new AI_Assistant($pdo);
 $event_class = new Event($pdo); // Instantiate Event class
@@ -479,12 +490,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new URLSearchParams();
         formData.append('message_content', messageContent);
 
-        fetch('<?= BASE_URL ?>public/ai_chat.php?session_id=' + currentSessionId, {
+        fetch('<?= BASE_URL ?>public/ai_chat.php?session_id=' + currentSessionId, { // Use BASE_URL
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: formData
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
         })
         .then(response => {
             if (!response.ok) {
@@ -548,4 +558,3 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 });
-</script>
