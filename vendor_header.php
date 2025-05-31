@@ -22,9 +22,8 @@
         <div class="container">
             <a href="<?= BASE_URL ?>public/dashboard.php" class="logo">EventCraftAI Vendor</a>
             <nav class="main-nav">
-                <a href="<?= BASE_URL ?>public/dashboard.php">Dashboard</a>
-                <a href="<?= BASE_URL ?>public/vendor_portfolio.php">Portfolio</a>
-                <a href="<?= BASE_URL ?>public/vendor_availability.php">Availability</a>
+                <a href="<?= BASE_URL ?>public/vendor_dashboard.php">Dashboard</a>
+                <a href="<?= BASE_URL ?>public/vendor_portfolio.php">Portfolio</a> <a href="<?= BASE_URL ?>public/vendor_availability.php">Availability</a>
                 <a href="<?= BASE_URL ?>public/chat.php">Messages</a>
                 <a href="<?= BASE_URL ?>public/reports.php">Reports</a>
                 <a href="<?= BASE_URL ?>public/profile.php">Profile</a>
