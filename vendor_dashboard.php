@@ -8,12 +8,12 @@ require_once __DIR__ . '/../classes/Vendor.class.php';
 
 // require_once __DIR__ . '/../classes/User.class.php'; // Removed: User class not directly used here after Vendor verification
 
-$vendor = new Vendor($pdo); // Pass PDO to constructor
+$vendor = new Vendor($pdo); // Pass PDO
 // $user = new User($pdo);     // Removed: User object not directly used here
 
 // Verify vendor access: This method ensures the user is logged in, is a vendor,
 // and sets $_SESSION['vendor_id'] if successful. It redirects otherwise.
-$vendor->verifyVendorAccess(); 
+$vendor->verifyVendorAccess();
 
 // Re-fetch vendor_data to ensure all details are current after verification
 $vendor_data = $vendor->getVendorByUserId($_SESSION['user_id']); 
@@ -75,6 +75,14 @@ $stats = [
             </div>
         </div>
 
+        <div class="section-card quick-action-card">
+            <h2>Manage Your Public Portfolio</h2>
+            <p>Showcase your best work and attract more clients by updating your portfolio.</p>
+            <a href="<?= BASE_URL ?>public/vendor_portfolio.php" class="btn btn-primary">
+                <i class="fas fa-images"></i> Go to My Portfolio
+            </a>
+        </div>
+        
         <div class="dashboard-sections">
             <div class="section-card upcoming-bookings">
                 <h2>Upcoming Bookings</h2>
