@@ -76,10 +76,6 @@
     margin-left: 8px;
 }
 
-.contact-buttons {
-    margin-top: var(--spacing-md);
-}
-
 .contact-buttons .btn {
     padding: 10px 20px;
     font-size: 1em;
@@ -120,7 +116,7 @@
 /* Portfolio Section - Strict 3-Column Grid */
 .portfolio-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr); /* Strict 3 columns */
+    grid-template-columns: repeat(3, 1fr); /* Strict 3 columns on larger screens */
     gap: var(--spacing-lg); /* Space between portfolio items */
 }
 
@@ -143,7 +139,7 @@
 .portfolio-image-wrapper {
     position: relative; /* For overlay positioning */
     overflow: hidden;
-    /* Ensure aspect ratio for image area */
+    /* Ensure aspect ratio for image area - e.g., square */
     width: 100%;
     padding-bottom: 100%; /* Creates a square aspect ratio (height = width) */
 }
@@ -159,7 +155,7 @@
 }
 
 .portfolio-item-card:hover img {
-    transform: scale(1.05); /* Slight zoom effect on image hover */
+    transform: scale(1.05);
 }
 
 .portfolio-placeholder {
@@ -198,7 +194,7 @@
 }
 
 .portfolio-item-card:hover .portfolio-item-overlay {
-    opacity: 1; /* Show on hover */
+    opacity: 1;
 }
 
 .portfolio-item-overlay .btn-light-overlay {
@@ -222,7 +218,7 @@
     flex-grow: 1; /* Allows content to take available space */
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: space-between; /* Space out title/description from meta info */
 }
 
 .portfolio-description-content h3 {
@@ -237,6 +233,28 @@
     line-height: 1.4;
     margin-bottom: var(--spacing-sm);
 }
+
+.portfolio-meta-info {
+    font-size: 0.8em;
+    color: var(--text-dark);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px dashed var(--border-color);
+}
+
+.portfolio-meta-info span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.portfolio-meta-info i {
+    color: var(--primary-color);
+}
+
 
 /* Reviews Section */
 .reviews-list {
