@@ -392,43 +392,38 @@ unset($_SESSION['form_errors'], $_SESSION['form_data']);
 
                     <div class="checkbox-group">
                         <div class="checkbox-item">
-                            <input type="checkbox" id="catering" name="services[]" value="1"
-                                <?= (isset($form_data['services']) && in_array('1', $form_data['services'])) ? 'checked' : '' ?>>
+                            <input type="checkbox" id="catering" name="services[]" value="3"
+                                <?= (isset($form_data['services']) && in_array('3', $form_data['services'])) ? 'checked' : '' ?>>
                             <label for="catering">🍽️ Catering</label>
                         </div>
                         <div class="checkbox-item">
-                            <input type="checkbox" id="photography" name="services[]" value="2"
-                                <?= (isset($form_data['services']) && in_array('2', $form_data['services'])) ? 'checked' : '' ?>>
+                            <input type="checkbox" id="photography" name="services[]" value="1"
+                                <?= (isset($form_data['services']) && in_array('1', $form_data['services'])) ? 'checked' : '' ?>>
                             <label for="photography">📸 Photography</label>
                         </div>
                         <div class="checkbox-item">
-                            <input type="checkbox" id="decoration" name="services[]" value="3"
-                                <?= (isset($form_data['services']) && in_array('3', $form_data['services'])) ? 'checked' : '' ?>>
+                            <input type="checkbox" id="decoration" name="services[]" value="6"
+                                <?= (isset($form_data['services']) && in_array('6', $form_data['services'])) ? 'checked' : '' ?>>
                             <label for="decoration">🎨 Decoration</label>
                         </div>
                         <div class="checkbox-item">
-                            <input type="checkbox" id="music_dj" name="services[]" value="5"
-                                <?= (isset($form_data['services']) && in_array('5', $form_data['services'])) ? 'checked' : '' ?>>
+                            <input type="checkbox" id="music_dj" name="services[]" value="8"
+                                <?= (isset($form_data['services']) && in_array('8', $form_data['services'])) ? 'checked' : '' ?>>
                             <label for="music_dj">🎵 Music/DJ</label>
                         </div>
                         <div class="checkbox-item">
-                            <input type="checkbox" id="venue" name="services[]" value="6"
-                                <?= (isset($form_data['services']) && in_array('6', $form_data['services'])) ? 'checked' : '' ?>>
+                            <input type="checkbox" id="venue" name="services[]" value="9"
+                                <?= (isset($form_data['services']) && in_array('9', $form_data['services'])) ? 'checked' : '' ?>>
                             <label for="venue">🏢 Venue</label>
                         </div>
                         <div class="checkbox-item">
-                            <input type="checkbox" id="transportation" name="services[]" value="7"
+                            <input type="checkbox" id="entertainment" name="services[]" value="7"
                                 <?= (isset($form_data['services']) && in_array('7', $form_data['services'])) ? 'checked' : '' ?>>
-                            <label for="transportation">🚗 Transportation</label>
-                        </div>
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="entertainment" name="services[]" value="8"
-                                <?= (isset($form_data['services']) && in_array('8', $form_data['services'])) ? 'checked' : '' ?>>
                             <label for="entertainment">🎭 Entertainment</label>
                         </div>
                         <div class="checkbox-item">
-                            <input type="checkbox" id="flowers" name="services[]" value="3"
-                                <?= (isset($form_data['services']) && in_array('3', $form_data['services'])) ? 'checked' : '' ?>>
+                            <input type="checkbox" id="flowers" name="services[]" value="5"
+                                <?= (isset($form_data['services']) && in_array('5', $form_data['services'])) ? 'checked' : '' ?>>
                             <label for="flowers">🌸 Flowers</label>
                         </div>
                         <div class="checkbox-item">
