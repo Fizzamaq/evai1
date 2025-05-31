@@ -2,21 +2,21 @@
 
 /* --- Global Variables & Base Styles --- */
 :root {
-    /* Color Palette (Minimalist Pastel) */
-    --primary-color: #2A4D69; /* Sky Blue */
-    --secondary-color: #40bbc4; /* Pale Green */
-    --tertiary-color: #000000; /* Plum/Thistle - for subtle accents */
-    --mint-aqua-color: #b0fafa; /* Pale Turquoise */
+    /* Color Palette (Funky: Red, Black, Purple, and complements) */
+    --primary-color: #8A2BE2; /* Blue Violet - a shade of purple */
+    --secondary-color: #DC143C; /* Crimson - a shade of red */
+    --tertiary-color: #000000; /* Black */
+    --accent-color: #FFC0CB; /* Pink - a complementary accent */
 
-    --text-dark: #237cb8; /* Charcoal Gray */
-    --text-subtle: #778899; /* Light Slate Gray */
-    --background-light: #F0F8FF; /* Alice Blue - very light background */
+    --text-dark: #330066; /* Dark Purple - for main text */
+    --text-subtle: #6A5ACD; /* Slate Blue - for subtle text, complements purple */
+    --background-light: #F8F8FF; /* Ghost White - very light background */
     --white: #FFFFFF;
-    --border-color: #E0FFFF; /* Light Cyan - very subtle border */
+    --border-color: #DDA0DD; /* Plum - a subtle purple border */
 
-    --success-color: #7DCEA0; /* Medium Aquamarine */
-    --error-color: #bf3ce7; /* Alizarin Red */
-    --warning-color: #F4D03F; /* Yellow */
+    --success-color: #2ECC71; /* Emerald Green */
+    --error-color: #E74C3C; /* Alizarin Red (stronger red for errors) */
+    --warning-color: #F1C40F; /* Sunflower Yellow */
 
     /* Font */
     --font-family: 'Inter', sans-serif; /* Prefer Inter, fall back to generic sans-serif */
@@ -96,12 +96,12 @@ a:hover {
     display: inline-block; /* Allows padding and margin to work correctly */
     text-align: center;
     text-decoration: none; /* Remove underline for links acting as buttons */
-    color: #40bbc4;
+    color: var(--white); /* Button text color */
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); /* Consistent shadow */
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--tertiary-color) 100%); /* Pastel gradient */
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%); /* Purple to Red gradient */
     color: var(--white);
     text-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Subtle text shadow */
     
@@ -121,7 +121,7 @@ a:hover {
 }
 
 .btn-secondary:hover {
-    background: #eaf5ff; /* Slightly darker light background */
+    background: #E6E6FA; /* Lavender - slightly darker light background */
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
@@ -132,7 +132,7 @@ a:hover {
 }
 
 .btn-danger:hover {
-    background: #c92d3b; /* Darkened error-color */
+    background: #C0392B; /* Darkened error-color */
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -143,7 +143,7 @@ a:hover {
 }
 
 .btn-success:hover {
-    background: #6bbd8b; /* Darkened success-color */
+    background: #27AE60; /* Darkened success-color */
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -212,7 +212,7 @@ a:hover {
 
 .form-group select[multiple]:focus {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(135, 206, 235, 0.3);
+    box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.3); /* Purple focus ring */
     outline: none;
 }
 
@@ -270,7 +270,7 @@ a:hover {
 .form-group textarea:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(135, 206, 235, 0.3); /* Pastel blue focus ring */
+    box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.3); /* Purple focus ring */
 }
 
 .form-group textarea {
@@ -303,21 +303,21 @@ input[type="radio"] {
 }
 
 .alert.success {
-    background-color: #d4edda; /* Light green */
+    background-color: #D4EDDA; /* Light green */
     color: #155724; /* Dark green */
-    border: 1px solid #c3e6cb;
+    border: 1px solid #C3E6CB;
 }
 
 .alert.error {
-    background-color: #f8d7da; /* Light red */
-    color: #721c24; /* Dark red */
-    border: 1px solid #f5c6cb;
+    background-color: #F8D7DA; /* Light red */
+    color: #721C24; /* Dark red */
+    border: 1px solid #F5C6CB;
 }
 
 .alert.warning {
-    background-color: #fff3cd; /* Light yellow */
+    background-color: #FFF3CD; /* Light yellow */
     color: #856404; /* Dark yellow */
-    border: 1px solid #ffeeba;
+    border: 1px solid #FFEBA;
 }
 
 /* Empty state message */
@@ -338,7 +338,7 @@ input[type="radio"] {
 
 /* --- Header Styles --- */
 .main-header {
-    background: #40BBC4; /* Dark header for contrast */
+    background: var(--tertiary-color); /* Black header for contrast */
     color: var(--white);
     padding: 1rem 0;
     position: sticky;
@@ -381,11 +381,11 @@ input[type="radio"] {
 
 .main-nav a.active {
     font-weight: 700;
-    color: var(--primary-color); /* Highlight active link */
+    color: var(--accent-color); /* Highlight active link with accent color */
 }
 
 .main-nav a:hover {
-    color: var(--primary-color); /* Change color on hover */
+    color: var(--accent-color); /* Change color on hover to accent */
 }
 
 .main-nav a:hover::after {
@@ -395,14 +395,14 @@ input[type="radio"] {
     left: 0;
     width: 100%;
     height: 2px;
-    background: var(--primary-color);
+    background: var(--accent-color); /* Underline with accent color */
     transform: scaleX(1);
     transition: transform 0.3s ease;
 }
 
 /* --- Footer Styles --- */
 .main-footer {
-    background: #40BBC4;
+    background: var(--tertiary-color); /* Black footer */
     color: var(--white);
     padding: var(--spacing-xl) 0 var(--spacing-md);
     margin-top: var(--spacing-xl);
@@ -437,7 +437,7 @@ input[type="radio"] {
 }
 
 .footer-nav a:hover {
-    color: var(--primary-color);
+    color: var(--accent-color); /* Accent color on hover */
     text-decoration: none;
 }
 
