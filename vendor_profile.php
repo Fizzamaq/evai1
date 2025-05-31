@@ -4,6 +4,7 @@ require_once '../includes/config.php';
 require_once '../classes/User.class.php'; // Needed for default-avatar.jpg path, or if you display reviewer info
 require_once '../classes/Vendor.class.php'; // Crucial for fetching vendor data
 require_once '../classes/Review.class.php'; // For fetching reviews
+require_once '../classes/Event.class.php'; // To fetch user's events for the chat link
 
 include 'header.php'; // Include the main site header
 
@@ -19,6 +20,7 @@ $vendor_id = (int)$_GET['id'];
 
 $vendor = new Vendor($pdo);
 $review = new Review($pdo); // Instantiate Review class
+$event = new Event($pdo); // Instantiate Event class
 
 // Fetch main vendor profile data including user and user_profile data
 $vendor_profile = $vendor->getVendorProfileById($vendor_id);
@@ -35,6 +37,13 @@ $portfolio_items = $vendor->getVendorPortfolio($vendor_id);
 // Fetch vendor's reviews
 $vendor_reviews = $review->getReviewsForEntity($vendor_profile['user_id'], 'vendor'); // Pass user_id for reviewed_id
 
+// Fetch logged-in user's events for chat initiation
+// This is not used for a dropdown anymore but might be useful for a future "link to event" feature on chat.php
+$user_events = [];
+if (isset($_SESSION['user_id'])) {
+    $user_events = $event->getUserEvents($_SESSION['user_id']);
+}
+
 ?>
 
 <!DOCTYPE html>
@@ -44,7 +53,8 @@ $vendor_reviews = $review->getReviewsForEntity($vendor_profile['user_id'], 'vend
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($vendor_profile['business_name']) ?>'s Profile - EventCraftAI</title>
     <link rel="stylesheet" href="../assets/css/style.css">
-    <link rel="stylesheet" href="../assets/css/vendor_profile.css"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/vendor_profile.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -77,10 +87,10 @@ $vendor_reviews = $review->getReviewsForEntity($vendor_profile['user_id'], 'vend
                 </div>
                 <div class="contact-buttons">
                     <?php if (isset($_SESSION['user_id'])): // Only allow contact if logged in ?>
-                        <a href="<?= BASE_URL ?>public/chat.php?vendor_id=<?= htmlspecialchars($vendor_profile['user_id']) ?>&event_id=YOUR_EVENT_ID" class="btn btn-primary">
+                        <a href="<?= BASE_URL ?>public/chat.php?vendor_id=<?= htmlspecialchars($vendor_profile['user_id']) ?>" class="btn btn-primary">
                             <i class="fas fa-comment"></i> Message Vendor
                         </a>
-                        <?php else: ?>
+                    <?php else: ?>
                         <a href="<?= BASE_URL ?>public/login.php" class="btn btn-primary">Login to Message</a>
                     <?php endif; ?>
                 </div>
