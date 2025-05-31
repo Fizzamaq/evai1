@@ -1,7 +1,7 @@
 <?php
 // public/vendor_profile.php
 require_once '../includes/config.php';
-require_once '../classes/User.class.php'; // Needed if you want to display user details like email/phone
+require_once '../classes/User.class.php'; // Needed for default-avatar.jpg path, or if you display reviewer info
 require_once '../classes/Vendor.class.php'; // Crucial for fetching vendor data
 require_once '../classes/Review.class.php'; // For fetching reviews
 
@@ -77,7 +77,7 @@ $vendor_reviews = $review->getReviewsForEntity($vendor_profile['user_id'], 'vend
                 </div>
                 <div class="contact-buttons">
                     <?php if (isset($_SESSION['user_id'])): // Only allow contact if logged in ?>
-                        <a href="<?= BASE_URL ?>public/chat.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>&event_id=YOUR_EVENT_ID" class="btn btn-primary">
+                        <a href="<?= BASE_URL ?>public/chat.php?vendor_id=<?= htmlspecialchars($vendor_profile['user_id']) ?>&event_id=YOUR_EVENT_ID" class="btn btn-primary">
                             <i class="fas fa-comment"></i> Message Vendor
                         </a>
                         <?php else: ?>
@@ -130,6 +130,7 @@ $vendor_reviews = $review->getReviewsForEntity($vendor_profile['user_id'], 'vend
                             <?php endif; ?>
                             <?php if (!empty($item['client_testimonial'])): ?>
                                 <div class="testimonial-snippet">"<?= htmlspecialchars(substr($item['client_testimonial'], 0, 100)) ?><?= (strlen($item['client_testimonial']) > 100) ? '...' : '' ?>"</div>
+                            </div>
                             <?php endif; ?>
                         </div>
                     <?php endforeach; ?>
