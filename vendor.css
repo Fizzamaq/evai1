@@ -28,3 +28,270 @@
     background: #e0e0e0;
     border-color: #bdbdbd;
 }
+
+/* New/Updated styles for vendor_portfolio.php */
+
+.portfolio-container {
+    max-width: 900px;
+    margin: var(--spacing-lg) auto;
+    padding: var(--spacing-md);
+    box-sizing: border-box;
+}
+
+.portfolio-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 2px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.portfolio-header h1 {
+    font-size: 2em;
+    margin-bottom: var(--spacing-xs);
+}
+
+.portfolio-header p {
+    color: var(--text-subtle);
+    font-size: 1.1em;
+}
+
+.portfolio-form {
+    background: var(--white);
+    padding: var(--spacing-md);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    margin-bottom: var(--spacing-lg);
+}
+
+.portfolio-form h2 {
+    font-size: 1.8em;
+    color: var(--text-dark);
+    margin-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-sm);
+}
+
+.portfolio-form .form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.portfolio-form .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+}
+
+.portfolio-form .form-group label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.portfolio-form .form-group input[type="text"],
+.portfolio-form .form-group input[type="url"],
+.portfolio-form .form-group input[type="date"],
+.portfolio-form .form-group select,
+.portfolio-form .form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+.portfolio-form .featured-checkbox {
+    display: flex;
+    align-items: center;
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.portfolio-form .featured-checkbox input {
+    margin-right: 10px;
+}
+
+.portfolio-form .btn-primary {
+    width: auto;
+    padding: 12px 25px;
+}
+
+/* Display existing portfolio items - Reusing vendor_profile.css concepts */
+.portfolio-items-display-section {
+    background: var(--background-light);
+    padding: var(--spacing-md);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.portfolio-items-display-section h2 {
+    font-size: 1.8em;
+    color: var(--text-dark);
+    margin-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-sm);
+}
+
+.portfolio-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Responsive grid */
+    gap: var(--spacing-lg); /* Space between portfolio items */
+}
+
+.portfolio-item-card {
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    overflow: hidden;
+    position: relative; /* For image wrapper and overlay */
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.portfolio-item-card:hover {
+    transform: translateY(-5px); /* Lift effect on hover */
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.portfolio-image-wrapper {
+    position: relative;
+    width: 100%;
+    padding-bottom: 75%; /* 4:3 aspect ratio for image area, adjust as needed */
+    overflow: hidden;
+}
+
+.portfolio-item-card img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+}
+
+.portfolio-item-card:hover img {
+    transform: scale(1.05);
+}
+
+.portfolio-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--background-light);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-subtle);
+    font-size: 1.5em;
+}
+
+.portfolio-item-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(var(--primary-color-rgb, 138, 43, 226), 0.7); /* Use RGB for opacity */
+    color: var(--white);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: var(--spacing-sm);
+    opacity: 0; /* Hidden by default */
+    transition: opacity 0.3s ease;
+    text-align: center;
+    z-index: 5;
+}
+
+.portfolio-item-card:hover .portfolio-item-overlay {
+    opacity: 1;
+}
+
+.portfolio-item-overlay .btn-light-overlay {
+    background: rgba(255,255,255,0.2);
+    color: var(--white);
+    border: 1px solid rgba(255,255,255,0.5);
+    padding: 8px 15px;
+    font-size: 0.85em;
+    border-radius: 6px;
+    transition: background 0.3s ease, transform 0.3s ease;
+}
+
+.portfolio-item-overlay .btn-light-overlay:hover {
+    background: rgba(255,255,255,0.3);
+    transform: translateY(-2px);
+}
+
+.portfolio-description-content {
+    padding: var(--spacing-md);
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.portfolio-description-content h3 {
+    font-size: 1.2em;
+    margin: 0 0 var(--spacing-xs);
+    color: var(--primary-color);
+}
+
+.portfolio-description-content p {
+    font-size: 0.9em;
+    color: var(--text-subtle);
+    line-height: 1.4;
+    margin-bottom: var(--spacing-sm);
+}
+
+.portfolio-meta-info {
+    font-size: 0.8em;
+    color: var(--text-dark);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px dashed var(--border-color);
+}
+
+.portfolio-meta-info span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.portfolio-meta-info i {
+    color: var(--primary-color);
+}
+
+/* Responsive adjustments for vendor_portfolio */
+@media (max-width: 768px) {
+    .portfolio-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .portfolio-header .btn {
+        width: 100%;
+        margin-top: var(--spacing-sm);
+    }
+    .portfolio-form .form-row {
+        grid-template-columns: 1fr;
+    }
+    .portfolio-grid {
+        grid-template-columns: 1fr; /* Single column on small screens */
+    }
+    .portfolio-image-wrapper {
+        padding-bottom: 56.25%; /* 16:9 aspect ratio for vertical images on mobile */
+    }
+}
