@@ -82,6 +82,33 @@ class Vendor {
         }
     }
 
+    // NEW METHOD: Get vendor profile by vendor_profiles.id
+    public function getVendorProfileById($vendor_id) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT 
+                    vp.*, 
+                    u.email, 
+                    u.first_name, 
+                    u.last_name, 
+                    up.profile_image,
+                    GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS offered_services_names
+                FROM vendor_profiles vp
+                JOIN users u ON vp.user_id = u.id
+                LEFT JOIN user_profiles up ON u.id = up.user_id
+                LEFT JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
+                LEFT JOIN vendor_services vs ON vso.service_id = vs.id
+                WHERE vp.id = ?
+                GROUP BY vp.id /* Group by vendor profile to get single row */
+            ");
+            $stmt->execute([$vendor_id]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Vendor.getVendorProfileById error: " . $e->getMessage());
+            return false;
+        }
+    }
+
     // Update vendor profile (assuming vendor_id is the primary key of vendor_profiles)
     public function updateVendor($vendor_profile_id, $data) {
         try {
@@ -426,7 +453,7 @@ class Vendor {
                 LEFT JOIN user_profiles up ON u.id = up.user_id
                 LEFT JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
                 LEFT JOIN vendor_services vs ON vso.service_id = vs.id
-                WHERE vp.is_active = TRUE AND vp.verified = TRUE AND vp.featured = TRUE
+                WHERE vp.featured = TRUE /* Condition for active/verified temporarily removed for testing */
                 GROUP BY vp.id
                 ORDER BY vp.rating DESC, vp.total_reviews DESC
                 LIMIT ?
@@ -451,6 +478,44 @@ class Vendor {
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log("Error fetching vendor categories: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get a list of vendors offering services within a specific category.
+     * Includes their profile image and a concatenated list of their services.
+     * @param int $categoryId The ID of the vendor category.
+     * @param int $limit The maximum number of vendors to retrieve.
+     * @return array An array of vendor data.
+     */
+    public function getVendorsByCategoryId($categoryId, $limit = 10) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT 
+                    vp.id, 
+                    vp.business_name, 
+                    vp.business_city,
+                    vp.rating, 
+                    vp.total_reviews,
+                    up.profile_image,
+                    GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS offered_services
+                FROM vendor_profiles vp
+                JOIN users u ON vp.user_id = u.id
+                LEFT JOIN user_profiles up ON u.id = up.user_id
+                JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
+                JOIN vendor_services vs ON vso.service_id = vs.id
+                WHERE vs.category_id = ? /* Conditions for active/verified temporarily removed for testing */
+                GROUP BY vp.id
+                ORDER BY vp.rating DESC, vp.total_reviews DESC
+                LIMIT ?
+            ");
+            $stmt->bindParam(1, $categoryId, PDO::PARAM_INT);
+            $stmt->bindParam(2, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error fetching vendors by category ID: " . $e->getMessage());
             return [];
         }
     }
