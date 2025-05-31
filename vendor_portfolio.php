@@ -26,7 +26,7 @@ if (!$vendor_data) {
 }
 
 // Handle form submissions for adding portfolio items (MOVED TO process_profile.php)
-// This block is removed from here:
+// This entire block is now removed from here:
 /*
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add_portfolio_item'])) {
@@ -114,6 +114,66 @@ try {
             <div class="alert error"><?php echo htmlspecialchars($_SESSION['error_message']); unset($_SESSION['error_message']); ?></div>
         <?php endif; ?>
 
+        <?php /* This section is removed as form is now in edit_profile.php
+        <div class="portfolio-form">
+            <h2>Add New Portfolio Item</h2>
+            <form method="POST" enctype="multipart/form-data">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="title">Title <span class="required">*</span></label>
+                        <input type="text" id="title" name="title" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="event_type_id">Event Type</label>
+                        <select id="event_type_id" name="event_type_id">
+                            <option value="">Select event type</option>
+                            <?php foreach ($event_types as $type): ?>
+                                <option value="<?php echo $type['id']; ?>"><?php echo htmlspecialchars($type['type_name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" rows="4"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="project_date">Project Date</label>
+                        <input type="date" id="project_date" name="project_date">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="portfolio_image">Image</label>
+                        <input type="file" id="portfolio_image" name="portfolio_image" accept="image/*">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="video_url">Video URL (e.g., YouTube link)</label>
+                    <input type="url" id="video_url" name="video_url" placeholder="http://youtube.com/watch?v=...">
+                </div>
+
+                <div class="form-group">
+                    <label for="testimonial">Client Testimonial</label>
+                    <textarea id="testimonial" name="testimonial" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <div class="featured-checkbox">
+                        <input type="checkbox" id="is_featured" name="is_featured">
+                        <label for="is_featured">Feature this item in my profile</label>
+                    </div>
+                </div>
+
+                <button type="submit" name="add_portfolio_item" class="btn btn-primary">Add Portfolio Item</button>
+            </form>
+        </div>
+        */ ?>
+
         <div class="portfolio-items-display-section">
             <h2>Your Current Portfolio Items</h2>
             <?php if (empty($portfolio_items)): ?>
@@ -166,6 +226,45 @@ try {
 
     <script>
         // No form validation needed here anymore, as form is moved.
+        // This script block is removed as the form is no longer on this page.
+        /*
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('.portfolio-form form');
+
+            form.addEventListener('submit', function(e) {
+                const titleInput = document.getElementById('title');
+                let isValid = true;
+
+                if (!titleInput.value.trim()) {
+                    isValid = false;
+                    titleInput.style.borderColor = 'var(--error-color)';
+                    titleInput.focus();
+                    const errorMessage = document.createElement('p');
+                    errorMessage.style.color = 'var(--error-color)';
+                    errorMessage.textContent = 'Title is required.';
+                    titleInput.parentNode.insertBefore(errorMessage, titleInput.nextSibling);
+                } else {
+                    titleInput.style.borderColor = 'var(--border-color)'; // Reset border
+                    const existingError = titleInput.parentNode.querySelector('p[style*="color: var(--error-color)"]');
+                    if (existingError) existingError.remove();
+                }
+
+                if (!isValid) {
+                    e.preventDefault();
+                }
+            });
+
+            const imageInput = document.getElementById('portfolio_image');
+            if (imageInput) {
+                imageInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        console.log('File selected:', file.name);
+                    }
+                });
+            }
+        });
+        */
     </script>
 </body>
 </html>
