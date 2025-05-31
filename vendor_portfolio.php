@@ -32,8 +32,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             if (isset($_FILES['portfolio_image']) && $_FILES['portfolio_image']['error'] === UPLOAD_ERR_OK) {
+                // UploadHandler expects subfolder path like 'vendors/'
                 $uploaded_filename = $uploader->handleUpload($_FILES['portfolio_image'], 'vendors/');
                 $image_url = 'assets/uploads/vendors/' . $uploaded_filename; // Path relative to BASE_URL
+            } else if (isset($_FILES['portfolio_image']) && $_FILES['portfolio_image']['error'] !== UPLOAD_ERR_NO_FILE) {
+                // Handle specific file upload errors, but only if a file was actually attempted to be uploaded
+                throw new Exception("File upload error: " . $_FILES['portfolio_image']['error']);
             }
 
             $portfolio_data = [
@@ -50,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($vendor->addPortfolioItem($vendor_data['id'], $portfolio_data)) {
                 $_SESSION['success_message'] = 'Portfolio item added successfully!';
             } else {
-                $_SESSION['error_message'] = 'Failed to add portfolio item.';
+                $_SESSION['error_message'] = 'Failed to add portfolio item. Database error.';
             }
         } catch (Exception $e) {
             $_SESSION['error_message'] = 'Upload/Save Error: ' . $e->getMessage();
@@ -82,9 +86,10 @@ try {
     <title>My Portfolio - EventCraftAI</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/dashboard.css">
-    <link rel="stylesheet" href="../assets/css/vendor.css"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/vendor.css"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-</head>
+    </head>
 <body>
     <?php include 'header.php'; ?>
 
@@ -105,52 +110,6 @@ try {
 
         <?php if (isset($_SESSION['error_message'])): ?>
             <div class="alert error"><?php echo htmlspecialchars($_SESSION['error_message']); unset($_SESSION['error_message']); ?></div>
-        <?php endif; ?>
-
-        <?php if (empty($portfolio_items)): ?>
-            <div class="empty-state">
-                <h3>No Portfolio Items Yet</h3>
-                <p>Add your first portfolio item to showcase your work</p>
-            </div>
-        <?php else: ?>
-            <div class="portfolio-grid">
-                <?php foreach ($portfolio_items as $item): ?>
-                    <div class="portfolio-item">
-                        <?php if ($item['image_url']): ?>
-                            <div class="portfolio-image" style="background-image: url('<?= BASE_URL . htmlspecialchars($item['image_url']) ?>')"></div>
-                        <?php else: ?>
-                            <div class="portfolio-image" style="background-image: url('<?= ASSETS_PATH ?>images/default-portfolio.jpg')">
-                                <i class="fas fa-image" style="font-size: 3em; color: var(--text-subtle);"></i>
-                            </div>
-                        <?php endif; ?>
-
-                        <div class="portfolio-content">
-                            <div class="portfolio-title"><?php echo htmlspecialchars($item['title']); ?></div>
-
-                            <div class="portfolio-meta">
-                                <?php if ($item['event_type_name']): ?>
-                                    <span><i class="fas fa-tag"></i> <?php echo htmlspecialchars($item['event_type_name']); ?></span>
-                                <?php endif; ?>
-                                <?php if ($item['project_date']): ?>
-                                    <span><i class="fas fa-calendar-alt"></i> <?php echo date('M Y', strtotime($item['project_date'])); ?></span>
-                                <?php endif; ?>
-                            </div>
-
-                            <div class="portfolio-description">
-                                <?php echo htmlspecialchars(substr($item['description'] ?? 'No description available', 0, 120)); ?>
-                                <?php if (strlen($item['description'] ?? '') > 120): ?>...<?php endif; ?>
-                            </div>
-
-                            <?php if ($item['client_testimonial']): ?>
-                                <div class="portfolio-testimonial">
-                                    "<?php echo htmlspecialchars(substr($item['client_testimonial'], 0, 100)); ?>"
-                                    <?php if (strlen($item['client_testimonial']) > 100): ?>...<?php endif; ?>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
         <?php endif; ?>
 
         <div class="portfolio-form">
@@ -209,6 +168,53 @@ try {
 
                 <button type="submit" name="add_portfolio_item" class="btn btn-primary">Add Portfolio Item</button>
             </form>
+        </div>
+
+        <div class="portfolio-items-display-section">
+            <h2>Your Current Portfolio Items</h2>
+            <?php if (empty($portfolio_items)): ?>
+                <div class="empty-state">
+                    <h3>No Portfolio Items Yet</h3>
+                    <p>Add your first portfolio item using the form above!</p>
+                </div>
+            <?php else: ?>
+                <div class="portfolio-grid">
+                    <?php foreach ($portfolio_items as $item): ?>
+                        <div class="portfolio-item-card">
+                            <div class="portfolio-image-wrapper">
+                                <?php if ($item['image_url']): ?>
+                                    <img src="<?= BASE_URL . htmlspecialchars($item['image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                                <?php else: ?>
+                                    <div class="portfolio-placeholder">
+                                        <i class="fas fa-image"></i>
+                                        <span>No Image</span>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="portfolio-item-overlay">
+                                    <?php if (!empty($item['video_url'])): ?>
+                                        <a href="<?= htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-light-overlay"><i class="fas fa-video"></i> Watch Video</a>
+                                    <?php endif; ?>
+                                    <?php if (!empty($item['client_testimonial'])): ?>
+                                        <p class="testimonial-overlay">"<?= htmlspecialchars(substr($item['client_testimonial'], 0, 100)) ?><?= (strlen($item['client_testimonial']) > 100) ? '...' : '' ?>"</p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <div class="portfolio-description-content">
+                                <h3><?= htmlspecialchars($item['title']) ?></h3>
+                                <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 150)) ?><?= (strlen($item['description'] ?? '') > 150) ? '...' : '' ?></p>
+                                <div class="portfolio-meta-info">
+                                    <?php if ($item['event_type_name']): ?>
+                                        <span><i class="fas fa-tag"></i> <?= htmlspecialchars($item['event_type_name']); ?></span>
+                                    <?php endif; ?>
+                                    <?php if ($item['project_date']): ?>
+                                        <span><i class="fas fa-calendar-alt"></i> <?= date('M Y', strtotime($item['project_date'])); ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 
