@@ -115,23 +115,28 @@ $vendor_reviews = $review->getReviewsForEntity($vendor_profile['user_id'], 'vend
                 <div class="portfolio-grid">
                     <?php foreach ($portfolio_items as $item): ?>
                         <div class="portfolio-item-card">
-                            <?php if ($item['image_url']): ?>
-                                <img src="<?= BASE_URL . htmlspecialchars($item['image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
-                            <?php else: ?>
-                                <div class="portfolio-placeholder">
-                                    <i class="fas fa-image"></i>
-                                    <span>No Image</span>
+                            <div class="portfolio-image-wrapper">
+                                <?php if ($item['image_url']): ?>
+                                    <img src="<?= BASE_URL . htmlspecialchars($item['image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                                <?php else: ?>
+                                    <div class="portfolio-placeholder">
+                                        <i class="fas fa-image"></i>
+                                        <span>No Image</span>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="portfolio-item-overlay">
+                                    <?php if (!empty($item['video_url'])): ?>
+                                        <a href="<?= htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-light-overlay"><i class="fas fa-video"></i> Watch Video</a>
+                                    <?php endif; ?>
+                                    <?php if (!empty($item['client_testimonial'])): ?>
+                                        <p class="testimonial-overlay">"<?= htmlspecialchars(substr($item['client_testimonial'], 0, 100)) ?><?= (strlen($item['client_testimonial']) > 100) ? '...' : '' ?>"</p>
+                                    <?php endif; ?>
                                 </div>
-                            <?php endif; ?>
-                            <h3><?= htmlspecialchars($item['title']) ?></h3>
-                            <p><?= htmlspecialchars(substr($item['description'] ?? 'No description.', 0, 100)) ?><?= (strlen($item['description'] ?? '') > 100) ? '...' : '' ?></p>
-                            <?php if (!empty($item['video_url'])): ?>
-                                <a href="<?= htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-secondary"><i class="fas fa-video"></i> Watch Video</a>
-                            <?php endif; ?>
-                            <?php if (!empty($item['client_testimonial'])): ?>
-                                <div class="testimonial-snippet">"<?= htmlspecialchars(substr($item['client_testimonial'], 0, 100)) ?><?= (strlen($item['client_testimonial']) > 100) ? '...' : '' ?>"</div>
                             </div>
-                            <?php endif; ?>
+                            <div class="portfolio-description-content">
+                                <h3><?= htmlspecialchars($item['title']) ?></h3>
+                                <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 150)) ?><?= (strlen($item['description'] ?? '') > 150) ? '...' : '' ?></p>
+                            </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
