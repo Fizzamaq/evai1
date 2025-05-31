@@ -1,0 +1,275 @@
+/* assets/css/vendor_profile.css */
+
+.vendor-profile-container {
+    max-width: 900px;
+    margin: var(--spacing-lg) auto;
+    padding: var(--spacing-md);
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.profile-header-section {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: var(--spacing-lg);
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    justify-content: center; /* Center content on smaller screens */
+}
+
+.profile-avatar {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    background-color: var(--background-light); /* Fallback for no image */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-info-main {
+    flex-grow: 1;
+    text-align: center; /* Default for mobile */
+}
+
+.profile-info-main h1 {
+    font-size: 2.8em;
+    margin-bottom: var(--spacing-xs);
+    color: var(--primary-color);
+}
+
+.profile-info-main .tagline {
+    font-size: 1.1em;
+    color: var(--text-subtle);
+    margin-bottom: var(--spacing-md);
+}
+
+.rating-display {
+    font-size: 1.2em;
+    color: var(--warning-color);
+    margin-bottom: var(--spacing-md);
+}
+
+.rating-display i.fas.fa-star.filled {
+    color: var(--warning-color); /* Filled star color */
+}
+
+.rating-display i.far.fa-star {
+    color: var(--border-color); /* Empty star color */
+}
+
+.rating-display span {
+    font-size: 0.8em;
+    color: var(--text-subtle);
+    margin-left: 8px;
+}
+
+.contact-buttons {
+    margin-top: var(--spacing-md);
+}
+
+.contact-buttons .btn {
+    padding: 10px 20px;
+    font-size: 1em;
+    border-radius: 8px;
+}
+
+/* General Profile Sections */
+.profile-section {
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-md);
+    background: var(--background-light);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.profile-section h2 {
+    font-size: 1.8em;
+    color: var(--text-dark);
+    margin-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-sm);
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.details-grid p {
+    margin-bottom: var(--spacing-xs);
+}
+
+.details-grid p strong {
+    color: var(--text-dark);
+}
+
+/* Portfolio Section */
+.portfolio-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.portfolio-item-card {
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+    text-align: center;
+    padding-bottom: var(--spacing-md);
+}
+
+.portfolio-item-card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    display: block;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.portfolio-placeholder {
+    width: 100%;
+    height: 200px;
+    background: var(--background-light);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-subtle);
+    font-size: 1.5em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.portfolio-item-card h3 {
+    font-size: 1.3em;
+    margin: var(--spacing-md) 0 var(--spacing-xs);
+    color: var(--primary-color);
+}
+
+.portfolio-item-card p {
+    font-size: 0.9em;
+    color: var(--text-subtle);
+    padding: 0 var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.testimonial-snippet {
+    font-style: italic;
+    font-size: 0.9em;
+    color: var(--text-dark);
+    background-color: rgba(138, 43, 226, 0.05); /* Light purple background */
+    border-left: 3px solid var(--primary-color);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin: var(--spacing-sm) var(--spacing-md);
+    border-radius: 4px;
+}
+
+/* Reviews Section */
+.reviews-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.review-card {
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    padding: var(--spacing-md);
+}
+
+.reviewer-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.reviewer-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    background-color: var(--border-color);
+}
+
+.reviewer-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.reviewer-name {
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.review-date {
+    font-size: 0.8em;
+    color: var(--text-subtle);
+    margin-left: auto; /* Push date to the right */
+}
+
+.review-rating-stars i {
+    color: var(--warning-color);
+    margin-right: 2px;
+}
+
+.review-rating-stars i.fas.fa-star.filled {
+    color: var(--warning-color);
+}
+
+.review-rating-stars i.far.fa-star {
+    color: var(--border-color);
+}
+
+.review-card h3 {
+    font-size: 1.1em;
+    color: var(--primary-color);
+    margin-top: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+}
+
+.review-card p {
+    font-size: 0.9em;
+    color: var(--text-dark);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .profile-header-section {
+        flex-direction: column;
+        text-align: center;
+    }
+    .profile-info-main {
+        text-align: center;
+    }
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+    .portfolio-grid {
+        grid-template-columns: 1fr;
+    }
+    .reviewer-info {
+        flex-wrap: wrap; /* Allow reviewer info to wrap */
+    }
+    .review-date {
+        margin-left: 0; /* Align date below name if wrapped */
+        width: 100%; /* Take full width if wrapped */
+    }
+}
