@@ -19,6 +19,7 @@ $is_vendor = (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2); // 
 try {
     $user = new User($pdo); // Pass PDO
     $uploader = new UploadHandler(); // Instantiate UploadHandler
+    $vendor_obj = new Vendor($pdo); // Instantiate Vendor object for portfolio actions
 
     // --- Process User Profile Data ---
     $user_profile_data = [
@@ -37,7 +38,7 @@ try {
         $user->updateProfileImage($userId, $uploaded_filename); // Call updateProfileImage
     } else if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] !== UPLOAD_ERR_NO_FILE) {
         // Handle other file upload errors, but only if a file was actually attempted to be uploaded
-        throw new Exception("File upload error: " . $_FILES['profile_image']['error']);
+        throw new Exception("File upload error for profile image: " . $_FILES['profile_image']['error']);
     }
 
     // Update general user profile
@@ -47,7 +48,9 @@ try {
 
     // --- Process Vendor Profile Data (if user is a vendor) ---
     if ($is_vendor) {
-        $vendor = new Vendor($pdo); // Instantiate Vendor class
+        // Fetch current vendor data to ensure we have the vendor_profile_id
+        $vendor_data = $vendor_obj->getVendorByUserId($userId);
+        $vendor_profile_id = $vendor_data['id'] ?? null;
 
         $vendor_profile_data = [
             'business_name' => trim($_POST['business_name'] ?? ''),
@@ -73,12 +76,13 @@ try {
         }
 
         // Use registerVendor which handles both insert (if new) and update (if exists)
-        // This method returns the vendor_profile_id on success.
-        $vendor_profile_id = $vendor->registerVendor($userId, $vendor_profile_data);
+        $vendor_profile_id_returned = $vendor_obj->registerVendor($userId, $vendor_profile_data);
 
-        if (!$vendor_profile_id) {
+        if (!$vendor_profile_id_returned) {
             throw new Exception("Failed to update vendor profile data.");
         }
+        // Ensure vendor_profile_id is set for subsequent actions
+        $vendor_profile_id = $vendor_profile_id_returned; 
 
         // Handle vendor services offered
         $services_offered = $_POST['services_offered'] ?? []; // This will be an array of service IDs
@@ -86,16 +90,59 @@ try {
             $services_offered = []; // Ensure it's an array
         }
 
-        if (!$vendor->updateVendorServiceOfferings($vendor_profile_id, $services_offered)) {
+        if (!$vendor_obj->updateVendorServiceOfferings($vendor_profile_id, $services_offered)) {
             throw new Exception("Failed to update vendor service offerings.");
+        }
+
+        // --- Handle NEW Portfolio Item Submission ---
+        // Check if portfolio item data is provided AND if an image was uploaded successfully
+        // We check for 'portfolio_title' as the primary indicator that a new portfolio item is being added
+        if (isset($_POST['portfolio_title']) && !empty(trim($_POST['portfolio_title']))) {
+            $portfolio_image_url = null;
+            
+            // Only attempt file upload if a file was selected and there's no error
+            if (isset($_FILES['portfolio_image_upload']) && $_FILES['portfolio_image_upload']['error'] === UPLOAD_ERR_OK) {
+                $uploaded_portfolio_filename = $uploader->handleUpload($_FILES['portfolio_image_upload'], 'vendors/');
+                $portfolio_image_url = 'assets/uploads/vendors/' . $uploaded_portfolio_filename;
+            } else if (isset($_FILES['portfolio_image_upload']) && $_FILES['portfolio_image_upload']['error'] !== UPLOAD_ERR_NO_FILE) {
+                // If a file was attempted but failed, throw an error
+                throw new Exception("Portfolio image upload error: " . $_FILES['portfolio_image_upload']['error']);
+            }
+
+            $portfolio_data = [
+                'title' => trim($_POST['portfolio_title']),
+                'description' => trim($_POST['portfolio_description'] ?? ''),
+                'event_type_id' => !empty($_POST['portfolio_event_type_id']) ? (int)$_POST['portfolio_event_type_id'] : null,
+                'image_url' => $portfolio_image_url,
+                'video_url' => trim($_POST['portfolio_video_url'] ?? ''), 
+                'project_date' => !empty($_POST['portfolio_project_date']) ? $_POST['portfolio_project_date'] : null,
+                'client_testimonial' => trim($_POST['portfolio_testimonial'] ?? ''),
+                'is_featured' => isset($_POST['portfolio_is_featured']) ? 1 : 0
+            ];
+
+            // Use the vendor_profile_id obtained from the registration/update
+            if (!$vendor_obj->addPortfolioItem($vendor_profile_id, $portfolio_data)) {
+                // If adding portfolio item fails, it should not halt the entire profile update process
+                // but should set an error message.
+                $_SESSION['profile_error'] = ($_SESSION['profile_error'] ?? '') . " Failed to add new portfolio item.";
+                error_log("Failed to add portfolio item for vendor $vendor_profile_id during profile update.");
+            } else {
+                $_SESSION['profile_success_portfolio'] = "New portfolio item added!"; // Specific success message for portfolio
+            }
         }
     }
 
     $_SESSION['profile_success'] = "Profile updated successfully!";
-    
+    // Append portfolio success message if it exists
+    if (isset($_SESSION['profile_success_portfolio'])) {
+        $_SESSION['profile_success'] .= " " . $_SESSION['profile_success_portfolio'];
+        unset($_SESSION['profile_success_portfolio']);
+    }
+
     // Redirect based on user type after successful update
     if ($is_vendor) {
-        header("Location: " . BASE_URL . "public/vendor_dashboard.php");
+        // Redirect to edit_profile.php so they can see the form cleared and success message
+        header("Location: " . BASE_URL . "public/edit_profile.php"); 
     } else {
         header("Location: " . BASE_URL . "public/profile.php");
     }
