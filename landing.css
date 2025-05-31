@@ -2,7 +2,13 @@
 
 /* Hero Section */
 .hero {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    /* REMOVED: background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); */
+    background-image: url('../images/hero1.jpg'); /* CORRECTED PATH: Removed 'assets/' from here. REPLACE 'your_hero_image.jpg' with your actual image filename */
+    background-size: cover; /* Cover the entire area */
+    background-position: center; /* Center the image */
+    background-repeat: no-repeat; /* Do not repeat the image */
+    background-color: var(--primary-color); /* Fallback color if image doesn't load */
+    
     color: var(--white);
     padding: 100px 0; /* More vertical padding for a grander feel */
     text-align: center;
@@ -132,22 +138,19 @@
     font-size: 1.3em;
 }
 
-/* NEW: Categories Section */
+/* Categories Section & Carousel */
 .categories-section {
     padding: var(--spacing-xl) 0;
     background: var(--background-light);
 }
 
-.categories-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* Adjust min width for more categories */
-    gap: var(--spacing-md);
-    justify-content: center;
-    /* For a carousel-like effect, we would use flexbox with overflow-x: auto */
-    /* display: flex; */
-    /* overflow-x: auto; */
-    /* scroll-snap-type: x mandatory; */
-    /* -webkit-overflow-scrolling: touch; */
+/* Swiper container for Categories */
+.categories-swiper {
+    width: 100%;
+    /* Ensure overflow is hidden to contain slides and allow arrows to be positioned relative to this */
+    overflow: hidden;
+    position: relative; /* Needed for absolute positioning of arrows */
+    /* Remove padding here, let the inner slides handle spacing */
 }
 
 .category-card {
@@ -160,8 +163,8 @@
     border-radius: 12px;
     box-shadow: 0 4px 10px rgba(0,0,0,0.08);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
-    min-width: 150px; /* Ensure minimum width for carousel effect */
-    scroll-snap-align: start; /* For scroll-snap effect */
+    text-decoration: none; /* Remove underline from links */
+    height: auto; /* Allow height to adjust */
 }
 
 .category-card:hover {
@@ -181,21 +184,31 @@
     color: var(--text-dark);
 }
 
-/* NEW: Featured Vendors Section */
-.featured-vendors-section {
+/* Vendor Categories Sections (each category will have its own vendor carousel) */
+.vendor-category-section {
     padding: var(--spacing-xl) 0;
     background: var(--background-light);
+    border-top: 1px solid var(--border-color); /* Separator between categories */
 }
 
-.featured-vendors-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: var(--spacing-lg);
-    justify-content: center;
-    /* Similar to categories, for carousel functionality, use flexbox with overflow-x: auto */
-    /* display: flex; */
-    /* overflow-x: auto; */
-    /* scroll-snap-type: x mandatory; */
+.vendor-category-section:first-of-type {
+    border-top: none; /* No top border for the first category */
+}
+
+.vendor-category-section h2 {
+    text-align: left; /* Align category titles to the left */
+    margin-bottom: var(--spacing-lg);
+    font-size: 2em;
+    color: var(--text-dark);
+    padding-left: var(--spacing-md); /* Match container padding */
+}
+
+/* Swiper container for Vendors */
+.swiper[class*="vendors-swiper-"] { /* Targets all vendor swipers */
+    width: 100%;
+    overflow: hidden; /* Ensure overflow is hidden */
+    position: relative; /* Needed for absolute positioning of arrows */
+    /* Remove padding here */
 }
 
 .vendor-card-item {
@@ -205,8 +218,10 @@
     overflow: hidden; /* Ensures image corners are rounded */
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     text-align: left;
-    min-width: 280px; /* Ensure minimum width for carousel effect */
-    scroll-snap-align: start; /* For scroll-snap effect */
+    text-decoration: none; /* Remove underline from links */
+    height: auto; /* Allow height to adjust */
+    display: flex; /* Ensure card content aligns properly */
+    flex-direction: column;
 }
 
 .vendor-card-item:hover {
@@ -224,6 +239,10 @@
 
 .vendor-card-content {
     padding: var(--spacing-md);
+    flex-grow: 1; /* Allows content to take up available space */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* Pushes content like services to bottom */
 }
 
 .vendor-card-content h3 {
@@ -252,7 +271,48 @@
 .vendor-card-services {
     font-size: 0.85em;
     color: var(--text-dark);
-    margin-bottom: var(--spacing-md);
+    margin-top: auto; /* Pushes to the bottom of the flex container */
+}
+
+/* Swiper Navigation Arrows */
+/* Default Swiper arrows are positioned absolutely relative to swiper container.
+   If swiper container has overflow: hidden, arrows will be clipped.
+   We can adjust their left/right properties to be inside the visible area. */
+.swiper-button-next,
+.swiper-button-prev {
+    color: var(--primary-color) !important; /* Use primary color for arrows */
+    --swiper-navigation-size: 30px; /* Adjust size */
+    opacity: 0.8;
+    transition: opacity 0.3s ease, color 0.3s ease;
+    /* Adjust positioning to be inside the visible area */
+    top: 50%; /* Center vertically */
+    transform: translateY(-50%); /* Adjust for vertical centering */
+}
+
+.swiper-button-prev {
+    left: var(--spacing-md); /* Position from the left, inside the .container padding */
+}
+
+.swiper-button-next {
+    right: var(--spacing-md); /* Position from the right, inside the .container padding */
+}
+
+.swiper-button-next:hover,
+.swiper-button-prev:hover {
+    opacity: 1;
+    color: var(--secondary-color) !important; /* Change color on hover */
+}
+
+/* Swiper Pagination Dots */
+.swiper-pagination-bullet {
+    background: var(--text-subtle) !important; /* Default dot color */
+    opacity: 0.5;
+    transition: background 0.3s ease, opacity 0.3s ease;
+}
+
+.swiper-pagination-bullet-active {
+    background: var(--primary-color) !important; /* Active dot color */
+    opacity: 1;
 }
 
 /* Responsive adjustments for landing page */
@@ -263,8 +323,12 @@
     .subtitle {
         font-size: 1.3em;
     }
-    .categories-grid, .featured-vendors-grid {
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Adjust for medium screens */
+    /* Arrows might need further adjustment on smaller screens if container padding changes */
+    .swiper-button-prev {
+        left: var(--spacing-sm);
+    }
+    .swiper-button-next {
+        right: var(--spacing-sm);
     }
 }
 
@@ -297,21 +361,19 @@
         grid-template-columns: 1fr;
         gap: var(--spacing-md);
     }
-    .feature-card, .step, .category-card, .vendor-card-item {
+    .feature-card, .step {
         max-width: 100%;
     }
-    .categories-grid, .featured-vendors-grid {
-        /* For true mobile carousel: */
-        display: flex;
-        overflow-x: auto;
-        scroll-snap-type: x mandatory;
-        -webkit-overflow-scrolling: touch;
-        justify-content: flex-start; /* Align items to start */
-        padding-bottom: var(--spacing-md); /* Add padding for scrollbar */
+    /* Swiper on mobile: allow full width and minimal padding */
+    .categories-swiper,
+    .swiper[class*="vendors-swiper-"] {
+        padding: 0 var(--spacing-sm); /* Smaller padding on mobile */
     }
-    .category-card, .vendor-card-item {
-        flex-shrink: 0; /* Prevent items from shrinking */
-        margin-right: var(--spacing-md); /* Space between items in scroll view */
+    .category-card {
+        width: 140px; /* Adjust width for categories on smaller screens to fit more */
+    }
+    .vendor-card-item {
+        width: 250px; /* Adjust width for vendors on smaller screens */
     }
 }
 
@@ -332,5 +394,11 @@
         width: 60px;
         height: 60px;
         font-size: 1.8em;
+    }
+    .category-card {
+        width: 120px; /* Even smaller width on very small screens */
+    }
+    .vendor-card-item {
+        width: 220px; /* Even smaller width for vendors on very small screens */
     }
 }
