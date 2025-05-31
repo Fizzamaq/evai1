@@ -6,7 +6,10 @@ include 'header.php';
 // Include the Vendor class to fetch data
 require_once '../classes/Vendor.class.php';
 
-// If user is already logged in, redirect to their appropriate dashboard
+// REMOVED: The redirection logic for logged-in users.
+// This block previously redirected logged-in users to their dashboards,
+// preventing them from accessing the landing page.
+/*
 if (isset($_SESSION['user_id'])) {
     $redirect_url = BASE_URL . 'public/dashboard.php'; // Default for customer
     if (isset($_SESSION['user_type'])) {
@@ -19,6 +22,7 @@ if (isset($_SESSION['user_id'])) {
     header("Location: " . $redirect_url);
     exit();
 }
+*/
 
 // Instantiate Vendor class to fetch data
 $vendor = new Vendor($pdo);
@@ -56,10 +60,7 @@ $vendor_categories = $vendor->getAllVendorCategories();
         </section>
 
     <section class="section categories-section">
-        <div class="container">
-            <h2>Explore Categories</h2>
-            <div class="swiper categories-swiper">
-                <div class="swiper-wrapper">
+        <h2 class="section-title">Explore Categories</h2> <div class="swiper categories-swiper swiper-container-fade-overlay"> <div class="swiper-wrapper">
                     <?php if (!empty($vendor_categories)): ?>
                         <?php foreach ($vendor_categories as $category): ?>
                             <div class="swiper-slide">
@@ -76,11 +77,8 @@ $vendor_categories = $vendor->getAllVendorCategories();
                     <?php endif; ?>
                 </div>
                 <div class="swiper-pagination categories-pagination"></div>
-                <div class="swiper-button-next categories-button-next"></div>
-                <div class="swiper-button-prev categories-button-prev"></div>
-            </div>
-        </div>
-    </section>
+                </div>
+        </section>
 
     <?php
     // Loop through each category and display its vendors in a horizontal carousel-like section
@@ -93,12 +91,11 @@ $vendor_categories = $vendor->getAllVendorCategories();
                 <div class="container">
                     <h2><?= htmlspecialchars($category['category_name']) ?> Vendors</h2>
                     <?php if (!empty($vendors_for_category)): ?>
-                        <div class="swiper vendors-swiper-<?= htmlspecialchars($category['id']) ?>">
-                            <div class="swiper-wrapper">
+                        <div class="swiper vendors-swiper-<?= htmlspecialchars($category['id']) ?> swiper-container-fade-overlay"> <div class="swiper-wrapper">
                                 <?php foreach ($vendors_for_category as $vendor_item): ?>
                                     <div class="swiper-slide">
                                         <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_item['id']) ?>" class="vendor-card-item">
-                                            <div class="vendor-card-image" style="background-image: url('<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($vendor_item['profile_image'] ?: 'default-avatar.jpg') ?>')"></div>
+                                            <div class="vendor-card-image" style="background-image: url('<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($vendor_item['profile_image'] ?: 'default-avatar.jpg') /* CORRECTED PATH */ ?>')"></div>
                                             <div class="vendor-card-content">
                                                 <h3><?= htmlspecialchars($vendor_item['business_name']) ?></h3>
                                                 <p><?= htmlspecialchars($vendor_item['business_city']) ?></p>
@@ -126,9 +123,7 @@ $vendor_categories = $vendor->getAllVendorCategories();
                                 <?php endforeach; ?>
                             </div>
                             <div class="swiper-pagination vendors-pagination-<?= htmlspecialchars($category['id']) ?>"></div>
-                            <div class="swiper-button-next vendors-button-next-<?= htmlspecialchars($category['id']) ?>"></div>
-                            <div class="swiper-button-prev vendors-button-prev-<?= htmlspecialchars($category['id']) ?>"></div>
-                        </div>
+                            </div>
                     <?php else: ?>
                         <p style="padding-left: var(--spacing-md);">No vendors found for this category at this time.</p>
                     <?php endif; ?>
