@@ -81,6 +81,38 @@ class Booking {
         }
     }
 
+    /**
+     * Updates the chat_conversation_id for a given booking.
+     * @param int $bookingId The ID of the booking to update.
+     * @param int $conversationId The ID of the chat conversation to link.
+     * @return bool True on success, false on failure.
+     */
+    public function updateBookingChatConversationId($bookingId, $conversationId) {
+        try {
+            $stmt = $this->pdo->prepare("UPDATE bookings SET chat_conversation_id = ? WHERE id = ?");
+            return $stmt->execute([$conversationId, $bookingId]);
+        } catch (PDOException $e) {
+            error_log("Update booking chat conversation ID error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Updates the stripe_payment_id for a given booking.
+     * @param int $bookingId The ID of the booking to update.
+     * @param string $stripePaymentId The Stripe Payment Intent ID.
+     * @return bool True on success, false on failure.
+     */
+    public function updateBookingStripePaymentId($bookingId, $stripePaymentId) {
+        try {
+            $stmt = $this->pdo->prepare("UPDATE bookings SET stripe_payment_id = ? WHERE id = ?");
+            return $stmt->execute([$stripePaymentId, $bookingId]);
+        } catch (PDOException $e) {
+            error_log("Update booking Stripe payment ID error: " . $e->getMessage());
+            return false;
+        }
+    }
+
     // Add method to get all bookings for a user
     public function getUserBookings($userId) {
         try {
