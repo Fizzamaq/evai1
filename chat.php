@@ -4,7 +4,8 @@ session_start();
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';
 require_once '../classes/Chat.class.php';
-require_once '../classes/Event.class.php';
+require_once '../classes/Event.class.php'; // To fetch user's events for selection
+require_once '../includes/auth.php'; // Required for generateCSRFToken and verifyCSRFToken
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . 'public/login.php');
@@ -17,39 +18,81 @@ $event = new Event($pdo); // Pass PDO
 
 $user_data = $user->getUserById($_SESSION['user_id']);
 $conversation_id = $_GET['conversation_id'] ?? null;
-$event_id = $_GET['event_id'] ?? null;
-$vendor_id = $_GET['vendor_id'] ?? null;
+$event_id_from_url = $_GET['event_id'] ?? null; // Capture event_id if present in URL
+$vendor_id_from_url = $_GET['vendor_id'] ?? null; // Capture vendor_id if present in URL
 
-// Handle new message
+// Generate CSRF token for the form
+$csrf_token = generateCSRFToken();
+
+// --- Logic to find/create conversation if vendor_id is passed without conversation_id ---
+// This runs only if no specific conversation_id is requested (i.e., new chat initiation)
+if (!$conversation_id && $vendor_id_from_url) {
+    // Try to find an existing conversation for this user, vendor, and (optionally) event
+    // If event_id_from_url is NULL, getConversationByParticipants will look for event_id IS NULL
+    $existing_conv = $chat->getConversationByParticipants($_SESSION['user_id'], $vendor_id_from_url, $event_id_from_url);
+
+    if ($existing_conv) {
+        $conversation_id = $existing_conv['id'];
+        // Redirect to ensure URL reflects the conversation_id for proper polling and display
+        header('Location: ' . BASE_URL . 'public/chat.php?conversation_id=' . $conversation_id);
+        exit();
+    }
+    // If no existing conversation is found, conversation_id remains null.
+    // The chat interface will be shown (because vendor_id_from_url is present),
+    // and the first message sent will create the conversation.
+}
+// --- End of new conversation finding logic ---
+
+
+// Handle new message (POST request)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
+    // Validate CSRF token
+    if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
+        error_log("CSRF token mismatch on chat message send for user " . $_SESSION['user_id']);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Invalid request. Please refresh the page and try again.']);
+        exit();
+    }
+
     $message = trim($_POST['message']);
 
-    // Validate CSRF token (if implemented)
-    // if (!verifyCSRFToken($_POST['csrf_token'])) {
-    //     error_log("CSRF token mismatch on chat message send.");
-    //     // Handle error, e.g., redirect or show message
-    // }
-
     if (!empty($message)) {
-        // If this is a new conversation (no conversation_id but has event_id and vendor_id)
-        if (!$conversation_id && $event_id && $vendor_id) {
-            $conversation_id = $chat->startConversation($event_id, $_SESSION['user_id'], $vendor_id);
+        // If conversation_id is still null, it means we need to create a new conversation.
+        if (!$conversation_id) {
+            // Get event_id and vendor_id from hidden inputs (if set by previous form state)
+            // or directly from URL parameters captured on page load.
+            $event_id_for_creation = $_POST['event_id_for_chat'] ?? $event_id_from_url;
+            $vendor_id_for_creation = $_POST['vendor_id_for_chat'] ?? $vendor_id_from_url;
+
+            // Crucially, vendor_id_for_creation MUST be present
+            if ($vendor_id_for_creation) {
+                // event_id_for_creation can now be NULL for general chats
+                $conversation_id = $chat->startConversation($event_id_for_creation, $_SESSION['user_id'], $vendor_id_for_creation);
+                if ($conversation_id) {
+                    // Success! Now send the message. And tell frontend to redirect.
+                    $chat->sendMessage($conversation_id, $_SESSION['user_id'], $message);
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => true, 'redirect_to_conversation' => BASE_URL . 'public/chat.php?conversation_id=' . $conversation_id]);
+                    exit();
+                } else {
+                    error_log("Failed to start new conversation for user " . $_SESSION['user_id'] . " and vendor " . $vendor_id_for_creation);
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => 'Failed to create new conversation.']);
+                    exit();
+                }
+            } else {
+                error_log("Missing vendor_id for new conversation creation for user " . $_SESSION['user_id']);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'A vendor must be specified to start a new chat.']);
+                exit();
+            }
         }
 
+        // If conversation_id is available (either pre-existing or just created above), send message
         if ($conversation_id) {
             $chat->sendMessage($conversation_id, $_SESSION['user_id'], $message);
-            // For AJAX-based message sending, avoid full page redirect.
-            // If it's a non-AJAX POST, redirect to prevent form re-submission on refresh
-            // header("Location: " . BASE_URL . "public/chat.php?conversation_id=" . urlencode($conversation_id));
-            // exit();
-            // For AJAX:
             header('Content-Type: application/json');
             echo json_encode(['success' => true, 'message' => 'Message sent.']);
-            exit();
-        } else {
-            error_log("Failed to send message: No conversation ID or invalid parameters for starting new conversation.");
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Failed to start/send message to conversation.']);
             exit();
         }
     } else {
@@ -59,10 +102,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
     }
 }
 
-// Get current conversation details
+// Get current conversation details (for initial page load or after redirection)
 $current_conversation = null;
 $messages = [];
 $other_party = null;
+
+// Only fetch user's events if we might need them (e.g., if event_id is missing for a new chat)
+// Not directly used in the main chat display if a conversation is loaded.
+$user_events = []; // Still useful if we want to add an option to link existing general chats to events later.
+
 
 if ($conversation_id) {
     // Mark messages as read when opening conversation
@@ -70,36 +118,39 @@ if ($conversation_id) {
 
     // Get conversation details
     try {
-        // Updated joins to correctly fetch profile_image from user_profiles table
         $stmt = $pdo->prepare("
-            SELECT cc.*, 
-                   e.title as event_title,
-                   CASE 
+            SELECT cc.*,
+                   e.title as event_title, -- event_title might be NULL now
+                   CASE
                      WHEN cc.user_id = :current_user_id THEN vp.business_name
                      ELSE CONCAT(u.first_name, ' ', u.last_name)
                    END as other_party_name,
-                   CASE 
+                   CASE
                      WHEN cc.user_id = :current_user_id THEN up_vendor.profile_image
                      ELSE up_user.profile_image
                    END as other_party_image
             FROM chat_conversations cc
-            JOIN events e ON cc.event_id = e.id
+            LEFT JOIN events e ON cc.event_id = e.id -- Use LEFT JOIN because event_id can now be NULL
             LEFT JOIN users u ON cc.vendor_id = u.id
-            LEFT JOIN user_profiles up_vendor ON u.id = up_vendor.user_id -- Join for vendor's profile image
+            LEFT JOIN vendor_profiles vp ON u.id = vp.user_id
+            LEFT JOIN user_profiles up_vendor ON u.id = up_vendor.user_id
             LEFT JOIN users u2 ON cc.user_id = u2.id
-            LEFT JOIN user_profiles up_user ON u2.id = up_user.user_id -- Join for user's profile image
+            LEFT JOIN user_profiles up_user ON u2.id = up_user.user_id
             WHERE cc.id = :conversation_id
+            AND (cc.user_id = :user_id_check1 OR cc.vendor_id = :user_id_check2)
         ");
         $stmt->execute([
-            ':current_user_id' => $_SESSION['user_id'], 
-            ':conversation_id' => $conversation_id
+            ':current_user_id' => $_SESSION['user_id'],
+            ':conversation_id' => $conversation_id,
+            ':user_id_check1' => $_SESSION['user_id'],
+            ':user_id_check2' => $_SESSION['user_id']
         ]);
         $current_conversation = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($current_conversation) {
             $other_party = [
-                'id' => ($current_conversation['user_id'] == $_SESSION['user_id']) 
-                    ? $current_conversation['vendor_id'] 
+                'id' => ($current_conversation['user_id'] == $_SESSION['user_id'])
+                    ? $current_conversation['vendor_id']
                     : $current_conversation['user_id'],
                 'name' => $current_conversation['other_party_name'],
                 'image' => $current_conversation['other_party_image']
@@ -111,9 +162,33 @@ if ($conversation_id) {
     } catch (PDOException $e) {
         error_log("Get conversation error: " . $e->getMessage());
     }
+} else if ($vendor_id_from_url) {
+    // This block runs if we arrived with just vendor_id (for a new chat initiation)
+    // We now directly show the chat interface.
+    // Fetch vendor info to display in chat header.
+    try {
+        $stmt_vendor = $pdo->prepare("SELECT vp.business_name, up.profile_image FROM vendor_profiles vp JOIN users u ON vp.user_id = u.id LEFT JOIN user_profiles up ON u.id = up.user_id WHERE u.id = ?");
+        $stmt_vendor->execute([$vendor_id_from_url]);
+        $vendor_info = $stmt_vendor->fetch(PDO::FETCH_ASSOC);
+        if ($vendor_info) {
+            $other_party = [
+                'id' => $vendor_id_from_url,
+                'name' => $vendor_info['business_name'],
+                'image' => $vendor_info['profile_image']
+            ];
+            // Since we're ready to chat, we can set current_conversation to a non-null value
+            // so the chat interface (messages and input) renders immediately.
+            // This is a dummy object just for rendering purposes before the real conversation ID is set.
+            $current_conversation = ['vendor_id' => $vendor_id_from_url, 'event_id' => $event_id_from_url];
+            $messages = []; // No messages yet for a new chat
+        }
+    } catch (PDOException $e) {
+        error_log("Error fetching vendor info for new chat initiation: " . $e->getMessage());
+    }
 }
 
-// Get user's conversations
+
+// Get user's conversations for the sidebar
 $conversations = $chat->getUserConversations($_SESSION['user_id']);
 $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
 ?>
@@ -127,7 +202,6 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/dashboard.css">
     <style>
-        /* ... (existing chat.php inline styles) ... */
         .chat-container {
             max-width: 1200px;
             margin: 0 auto;
@@ -339,6 +413,39 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
             color: #636e72;
         }
 
+        .event-selection-for-chat {
+            padding: 20px;
+            background: var(--background-light);
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .event-selection-for-chat h3 {
+            margin-top: 0;
+            color: var(--text-dark);
+            margin-bottom: 15px;
+        }
+        .event-selection-for-chat ul {
+            list-style: none;
+            padding: 0;
+        }
+        .event-selection-for-chat ul li {
+            margin-bottom: 10px;
+        }
+        .event-selection-for-chat ul li a {
+            display: block;
+            padding: 10px 15px;
+            background: var(--white);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            text-decoration: none;
+            color: var(--primary-color);
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+        .event-selection-for-chat ul li a:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+        }
+
         @media (max-width: 768px) {
             .chat-container {
                 grid-template-columns: 1fr;
@@ -364,7 +471,7 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
                     <div class="no-conversation">No conversations yet</div>
                 <?php else: ?>
                     <?php foreach ($conversations as $conv): ?>
-                        <div class="conversation-item <?php echo ($conv['id'] == $conversation_id) ? 'active' : ''; ?>" 
+                        <div class="conversation-item <?php echo ($conv['id'] == $conversation_id) ? 'active' : ''; ?>"
                              onclick="window.location.href='<?= BASE_URL ?>public/chat.php?conversation_id=<?php echo $conv['id']; ?>'">
                             <div class="conversation-avatar" style="background-image: url('<?php echo htmlspecialchars($conv['other_party_image'] ? BASE_URL . 'assets/uploads/users/' . $conv['other_party_image'] : BASE_URL . 'assets/images/default-avatar.jpg'); ?>')"></div>
                             <div class="conversation-details">
@@ -388,12 +495,20 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
         </div>
 
         <div class="chat-area">
-            <?php if ($current_conversation): ?>
+            <?php if ($current_conversation): /* A conversation is loaded or being initiated */ ?>
                 <div class="chat-header">
                     <div class="chat-header-avatar" style="background-image: url('<?php echo htmlspecialchars($other_party['image'] ? BASE_URL . 'assets/uploads/users/' . $other_party['image'] : BASE_URL . 'assets/images/default-avatar.jpg'); ?>')"></div>
                     <div class="chat-header-info">
                         <div class="chat-header-title"><?php echo htmlspecialchars($other_party['name']); ?></div>
-                        <div class="chat-header-subtitle"><?php echo htmlspecialchars($current_conversation['event_title']); ?></div>
+                        <div class="chat-header-subtitle">
+                            <?php
+                            if ($conversation_id && isset($current_conversation['event_title']) && $current_conversation['event_title'] !== null) {
+                                echo htmlspecialchars($current_conversation['event_title']);
+                            } else {
+                                echo 'General Chat';
+                            }
+                            ?>
+                        </div>
                     </div>
                 </div>
                 <div class="chat-messages" id="messages-container">
@@ -408,10 +523,13 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
                 </div>
                 <div class="chat-input">
                     <form class="message-form" method="POST">
-                        <textarea 
-                            class="message-input" 
-                            name="message" 
-                            placeholder="Type your message..." 
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                        <input type="hidden" name="vendor_id_for_chat" value="<?= htmlspecialchars($vendor_id_from_url) ?>">
+                        <input type="hidden" name="event_id_for_chat" value="<?= htmlspecialchars($event_id_from_url) ?>">
+                        <textarea
+                            class="message-input"
+                            name="message"
+                            placeholder="Type your message..."
                             id="message-input"
                             required
                         ></textarea>
@@ -422,10 +540,10 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
                         </button>
                     </form>
                 </div>
-            <?php else: ?>
+            <?php else: /* No current conversation loaded AND no vendor_id_from_url to initiate a chat */ ?>
                 <div class="no-conversation">
                     <h3>Select a conversation or start a new one</h3>
-                    <p>Choose from your existing conversations or initiate a new chat from an event page</p>
+                    <p>Choose from your existing conversations on the left, or initiate a new chat by messaging a vendor from their profile or a booking.</p>
                 </div>
             <?php endif; ?>
         </div>
@@ -448,9 +566,18 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
             const message = messageInput.value.trim();
 
             if (message) {
-                fetch('<?= BASE_URL ?>public/chat.php?<?php echo $_SERVER['QUERY_STRING']; ?>', { // Use BASE_URL
+                // Determine the URL for the POST request
+                let postUrl = '<?= BASE_URL ?>public/chat.php';
+                const currentConversationId = '<?= htmlspecialchars($conversation_id) ?>';
+                if (currentConversationId) {
+                    postUrl += `?conversation_id=${currentConversationId}`;
+                } else {
+                    // For a new conversation being created, parameters are in form via hidden inputs
+                }
+
+                fetch(postUrl, {
                     method: 'POST',
-                    body: new URLSearchParams(new FormData(form)),
+                    body: new URLSearchParams(new FormData(form)), // Use URLSearchParams with FormData for x-www-form-urlencoded
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
                     }
@@ -458,6 +585,11 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
                 .then(data => {
                     if (data.success) {
                         messageInput.value = '';
+                        // Redirect to the new conversation if it was just created (first message sent)
+                        if (data.redirect_to_conversation) {
+                            window.location.href = data.redirect_to_conversation;
+                            return; // Stop further execution
+                        }
                         const messagesContainer = document.getElementById('messages-container');
                         if (messagesContainer) {
                             const tempMsg = document.createElement('div');
@@ -480,7 +612,7 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
             }
         });
 
-        // Poll for new messages every 5 seconds (consider WebSockets for real-time)
+        // Poll for new messages every 5 seconds (NOTE: For real-time chat, consider replacing this with WebSockets for better performance and efficiency.)
         setInterval(() => {
             if (<?php echo $conversation_id ? 'true' : 'false'; ?>) {
                 fetch(`<?= BASE_URL ?>public/chat.php?conversation_id=<?php echo $conversation_id; ?>&ajax=1`) // Use BASE_URL
