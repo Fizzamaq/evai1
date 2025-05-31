@@ -7,31 +7,30 @@ class Chat {
         $this->conn = $pdo;
     }
 
-    // Start a new conversation
+    /**
+     * Start a new conversation.
+     * @param int|null $event_id The ID of the event, or NULL for general inquiries.
+     * @param int $user_id
+     * @param int $vendor_id (user ID of the vendor)
+     * @return int|false Conversation ID on success, false on failure.
+     */
     public function startConversation($event_id, $user_id, $vendor_id) {
         try {
-            // Check if conversation already exists
-            $stmt = $this->conn->prepare("SELECT id FROM chat_conversations 
-                WHERE event_id = ? AND user_id = ? AND vendor_id = ?");
-            $stmt->execute([$event_id, $user_id, $vendor_id]);
-
-            if ($stmt->rowCount() > 0) {
-                return $stmt->fetch(PDO::FETCH_ASSOC)['id'];
+            // Check if conversation already exists to prevent duplicates
+            $existing_conv = $this->getConversationByParticipants($user_id, $vendor_id, $event_id);
+            if ($existing_conv) {
+                return $existing_conv['id'];
             }
 
             // Create new conversation
-            $stmt = $this->conn->prepare("INSERT INTO chat_conversations 
-                (event_id, user_id, vendor_id) 
+            $stmt = $this->conn->prepare("INSERT INTO chat_conversations
+                (event_id, user_id, vendor_id)
                 VALUES (?, ?, ?)");
+
+            // Bind event_id. PDO automatically handles NULL correctly for INT type.
             $stmt->execute([$event_id, $user_id, $vendor_id]);
 
             $conversation_id = $this->conn->lastInsertId();
-
-            // Update booking with chat_conversation_id (if a booking exists for this event/user/vendor)
-            // This logic might need to be refined based on when a chat starts relative to a booking.
-            // Assuming you'd link an existing booking or create one later.
-            $updateBookingStmt = $this->conn->prepare("UPDATE bookings SET chat_conversation_id = ? WHERE event_id = ? AND user_id = ? AND vendor_id = ?");
-            $updateBookingStmt->execute([$conversation_id, $event_id, $user_id, $vendor_id]);
 
             return $conversation_id;
 
@@ -41,11 +40,41 @@ class Chat {
         }
     }
 
+    /**
+     * Finds an existing conversation between a user and a vendor for a specific event.
+     * If $event_id is null, it tries to find a general conversation between user and vendor.
+     * @param int $user_id
+     * @param int $vendor_id (user ID of the vendor)
+     * @param int|null $event_id The event ID, or NULL for general conversations.
+     * @return array|false Conversation details if found, false otherwise.
+     */
+    public function getConversationByParticipants($user_id, $vendor_id, $event_id = null) {
+        try {
+            $sql = "SELECT id FROM chat_conversations WHERE user_id = ? AND vendor_id = ?";
+            $params = [$user_id, $vendor_id];
+
+            if ($event_id !== null) {
+                $sql .= " AND event_id = ?";
+                $params[] = $event_id;
+            } else {
+                $sql .= " AND event_id IS NULL"; // For general conversations
+            }
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Get conversation by participants error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+
     // Send a message
     public function sendMessage($conversation_id, $sender_id, $message, $type = 'text', $attachment = null) {
         try {
-            $stmt = $this->conn->prepare("INSERT INTO chat_messages 
-                (conversation_id, sender_id, message_type, message_content, attachment_url) 
+            $stmt = $this->conn->prepare("INSERT INTO chat_messages
+                (conversation_id, sender_id, message_type, message_content, attachment_url)
                 VALUES (?, ?, ?, ?, ?)");
 
             $stmt->execute([
@@ -69,8 +98,8 @@ class Chat {
     // Update conversation last message time
     private function updateConversationTime($conversation_id) {
         try {
-            $stmt = $this->conn->prepare("UPDATE chat_conversations 
-                SET last_message_at = NOW() 
+            $stmt = $this->conn->prepare("UPDATE chat_conversations
+                SET last_message_at = NOW()
                 WHERE id = ?");
             return $stmt->execute([$conversation_id]);
         } catch (PDOException $e) {
@@ -82,9 +111,9 @@ class Chat {
     // Get conversation messages
     public function getMessages($conversation_id, $limit = 50, $offset = 0) {
         try {
-            $stmt = $this->conn->prepare("SELECT * FROM chat_messages 
-                WHERE conversation_id = ? 
-                ORDER BY created_at DESC 
+            $stmt = $this->conn->prepare("SELECT * FROM chat_messages
+                WHERE conversation_id = ?
+                ORDER BY created_at DESC
                 LIMIT ? OFFSET ?");
             $stmt->execute([$conversation_id, $limit, $offset]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -98,31 +127,32 @@ class Chat {
     public function getUserConversations($user_id, $limit = 10) {
         try {
             $stmt = $this->conn->prepare("
-                SELECT cc.*, 
-                       e.title as event_title,
-                       CASE 
+                SELECT cc.*,
+                       e.title as event_title, -- event_title might be NULL if event_id is NULL
+                       CASE
                          WHEN cc.user_id = ? THEN vp.business_name
                          ELSE CONCAT(u.first_name, ' ', u.last_name)
                        END as other_party_name,
-                       CASE 
-                         WHEN cc.user_id = ? THEN up_vendor.profile_image -- profile_image from vendor user_profile
-                         ELSE up_user.profile_image -- profile_image from user's user_profile
+                       CASE
+                         WHEN cc.user_id = ? THEN up_vendor.profile_image
+                         ELSE up_user.profile_image
                        END as other_party_image,
                        cm.message_content as last_message,
                        cm.created_at as last_message_time,
-                       (SELECT COUNT(*) FROM chat_messages 
+                       (SELECT COUNT(*) FROM chat_messages
                         WHERE conversation_id = cc.id AND sender_id != ? AND is_read = FALSE) as unread_count
                 FROM chat_conversations cc
-                JOIN events e ON cc.event_id = e.id
-                LEFT JOIN users u ON cc.vendor_id = u.id -- Join to get vendor's user data
-                LEFT JOIN user_profiles up_vendor ON u.id = up_vendor.user_id -- Join to get vendor's profile image
-                LEFT JOIN users u2 ON cc.user_id = u2.id -- Join to get user's user data
-                LEFT JOIN user_profiles up_user ON u2.id = up_user.user_id -- Join to get user's profile image
+                LEFT JOIN events e ON cc.event_id = e.id -- Use LEFT JOIN because event_id can now be NULL
+                LEFT JOIN users u ON cc.vendor_id = u.id
+                LEFT JOIN vendor_profiles vp ON u.id = vp.user_id
+                LEFT JOIN user_profiles up_vendor ON u.id = up_vendor.user_id
+                LEFT JOIN users u2 ON cc.user_id = u2.id
+                LEFT JOIN user_profiles up_user ON u2.id = up_user.user_id
                 LEFT JOIN chat_messages cm ON cc.id = cm.conversation_id AND cm.id = (
                     SELECT MAX(id) FROM chat_messages WHERE conversation_id = cc.id
-                ) -- Get only the very last message for preview
+                )
                 WHERE (cc.user_id = ? OR cc.vendor_id = ?)
-                GROUP BY cc.id -- Group by conversation to avoid duplicate rows for last message
+                GROUP BY cc.id
                 ORDER BY cc.last_message_at DESC
                 LIMIT ?
             ");
@@ -137,8 +167,8 @@ class Chat {
     // Mark messages as read
     public function markMessagesAsRead($conversation_id, $user_id) {
         try {
-            $stmt = $this->conn->prepare("UPDATE chat_messages 
-                SET is_read = TRUE, read_at = NOW() 
+            $stmt = $this->conn->prepare("UPDATE chat_messages
+                SET is_read = TRUE, read_at = NOW()
                 WHERE conversation_id = ? AND sender_id != ? AND is_read = FALSE");
             return $stmt->execute([$conversation_id, $user_id]);
         } catch (PDOException $e) {
