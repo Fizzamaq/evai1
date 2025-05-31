@@ -53,6 +53,8 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
             <p><strong>Member Since:</strong> <?= date('F Y', strtotime($profile['created_at'])) ?></p>
             
             <a href="edit_profile.php" class="btn">Edit Profile</a>
+            <?php if ($is_vendor): ?>
+                <a href="vendor_portfolio.php" class="btn btn-secondary" style="margin-left: 10px;">Manage Portfolio</a> <?php endif; ?>
         </div>
     </div>
 
