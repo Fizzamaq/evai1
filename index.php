@@ -23,12 +23,12 @@ if (isset($_SESSION['user_id'])) {
 // Instantiate Vendor class to fetch data
 $vendor = new Vendor($pdo);
 
-// Fetch featured vendors for the homepage
-$featured_vendors = $vendor->getFeaturedVendorsForHomepage(8); // Limit to 8 for display
-
 // Fetch all vendor categories
 $vendor_categories = $vendor->getAllVendorCategories();
 
+// Optional: Fetch featured vendors for a general "Featured" section if still desired,
+// otherwise this section can be removed and replaced by category-specific ones.
+// $featured_vendors = $vendor->getFeaturedVendorsForHomepage(8);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -40,6 +40,8 @@ $vendor_categories = $vendor->getAllVendorCategories();
     <link rel="stylesheet" href="../assets/css/landing.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
 </head>
 <body>
     <section class="hero" id="hero-section">
@@ -51,67 +53,91 @@ $vendor_categories = $vendor->getAllVendorCategories();
                 <a href="login.php" class="btn btn-secondary btn-large">Login</a>
             </div>
         </div>
-        <div id="hero-loading" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 1.2em; z-index: 2; display: none;">
-            Generating beautiful background...
-        </div>
-    </section>
+        </section>
 
     <section class="section categories-section">
         <div class="container">
             <h2>Explore Categories</h2>
-            <div class="categories-grid">
-                <?php if (!empty($vendor_categories)): ?>
-                    <?php foreach ($vendor_categories as $category): ?>
-                        <a href="<?= BASE_URL ?>public/vendors.php?category=<?= htmlspecialchars($category['id']) ?>" class="category-card">
-                            <i class="fas fa-<?= htmlspecialchars($category['icon'] ?: 'tags') ?> category-icon"></i>
-                            <h3><?= htmlspecialchars($category['category_name']) ?></h3>
-                        </a>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <p>No categories found at this time.</p>
-                <?php endif; ?>
+            <div class="swiper categories-swiper">
+                <div class="swiper-wrapper">
+                    <?php if (!empty($vendor_categories)): ?>
+                        <?php foreach ($vendor_categories as $category): ?>
+                            <div class="swiper-slide">
+                                <a href="<?= BASE_URL ?>public/vendors.php?category=<?= htmlspecialchars($category['id']) ?>" class="category-card">
+                                    <i class="fas fa-<?= htmlspecialchars($category['icon'] ?: 'tags') ?> category-icon"></i>
+                                    <h3><?= htmlspecialchars($category['category_name']) ?></h3>
+                                </a>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="swiper-slide">
+                            <p>No categories found at this time.</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                <div class="swiper-pagination categories-pagination"></div>
+                <div class="swiper-button-next categories-button-next"></div>
+                <div class="swiper-button-prev categories-button-prev"></div>
             </div>
         </div>
     </section>
 
-    <section class="section featured-vendors-section">
-        <div class="container">
-            <h2>Our Featured Vendors</h2>
-            <div class="featured-vendors-grid">
-                <?php if (!empty($featured_vendors)): ?>
-                    <?php foreach ($featured_vendors as $vendor_item): ?>
-                        <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_item['id']) ?>" class="vendor-card-item">
-                            <div class="vendor-card-image" style="background-image: url('<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($vendor_item['profile_image'] ?: 'default-avatar.jpg') ?>')"></div>
-                            <div class="vendor-card-content">
-                                <h3><?= htmlspecialchars($vendor_item['business_name']) ?></h3>
-                                <p><?= htmlspecialchars($vendor_item['business_city']) ?></p>
-                                <div class="vendor-card-rating">
-                                    <?php
-                                    $rating = round($vendor_item['rating'] * 2) / 2; // Round to nearest 0.5
-                                    for ($i = 1; $i <= 5; $i++):
-                                        if ($rating >= $i) {
-                                            echo '<i class="fas fa-star"></i>'; // Full star
-                                        } elseif ($rating > ($i - 1)) {
-                                            echo '<i class="fas fa-star-half-alt"></i>'; // Half star
-                                        } else {
-                                            echo '<i class="far fa-star"></i>'; // Empty star
-                                        }
-                                    endfor;
-                                    ?>
-                                    (<?= htmlspecialchars($vendor_item['total_reviews']) ?> Reviews)
-                                </div>
-                                <?php if (!empty($vendor_item['offered_services'])): ?>
-                                    <p class="vendor-card-services">Services: <?= htmlspecialchars($vendor_item['offered_services']) ?></p>
-                                <?php endif; ?>
+    <?php
+    // Loop through each category and display its vendors in a horizontal carousel-like section
+    if (!empty($vendor_categories)):
+        foreach ($vendor_categories as $category):
+            // Fetch vendors for the current category
+            $vendors_for_category = $vendor->getVendorsByCategoryId($category['id'], 10); // Limit to 10 vendors per category
+    ?>
+            <section class="section vendor-category-section">
+                <div class="container">
+                    <h2><?= htmlspecialchars($category['category_name']) ?> Vendors</h2>
+                    <?php if (!empty($vendors_for_category)): ?>
+                        <div class="swiper vendors-swiper-<?= htmlspecialchars($category['id']) ?>">
+                            <div class="swiper-wrapper">
+                                <?php foreach ($vendors_for_category as $vendor_item): ?>
+                                    <div class="swiper-slide">
+                                        <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_item['id']) ?>" class="vendor-card-item">
+                                            <div class="vendor-card-image" style="background-image: url('<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($vendor_item['profile_image'] ?: 'default-avatar.jpg') ?>')"></div>
+                                            <div class="vendor-card-content">
+                                                <h3><?= htmlspecialchars($vendor_item['business_name']) ?></h3>
+                                                <p><?= htmlspecialchars($vendor_item['business_city']) ?></p>
+                                                <div class="vendor-card-rating">
+                                                    <?php
+                                                    $rating = round($vendor_item['rating'] * 2) / 2; // Round to nearest 0.5
+                                                    for ($i = 1; $i <= 5; $i++):
+                                                        if ($rating >= $i) {
+                                                            echo '<i class="fas fa-star"></i>'; // Full star
+                                                        } elseif ($rating > ($i - 1) && $rating < $i) {
+                                                            echo '<i class="fas fa-star-half-alt"></i>'; // Half star
+                                                        } else {
+                                                            echo '<i class="far fa-star"></i>'; // Empty star
+                                                        }
+                                                    endfor;
+                                                    ?>
+                                                    (<?= htmlspecialchars($vendor_item['total_reviews']) ?> Reviews)
+                                                </div>
+                                                <?php if (!empty($vendor_item['offered_services'])): ?>
+                                                    <p class="vendor-card-services">Services: <?= htmlspecialchars($vendor_item['offered_services']) ?></p>
+                                                <?php endif; ?>
+                                            </div>
+                                        </a>
+                                    </div>
+                                <?php endforeach; ?>
                             </div>
-                        </a>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <p>No featured vendors available at this time.</p>
-                <?php endif; ?>
-            </div>
-        </div>
-    </section>
+                            <div class="swiper-pagination vendors-pagination-<?= htmlspecialchars($category['id']) ?>"></div>
+                            <div class="swiper-button-next vendors-button-next-<?= htmlspecialchars($category['id']) ?>"></div>
+                            <div class="swiper-button-prev vendors-button-prev-<?= htmlspecialchars($category['id']) ?>"></div>
+                        </div>
+                    <?php else: ?>
+                        <p style="padding-left: var(--spacing-md);">No vendors found for this category at this time.</p>
+                    <?php endif; ?>
+                </div>
+            </section>
+    <?php
+        endforeach;
+    endif;
+    ?>
 
     <section class="section how-it-works-section bg-light">
         <div class="container">
@@ -146,11 +172,17 @@ $vendor_categories = $vendor->getAllVendorCategories();
 
     <?php include 'footer.php'; ?>
 
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    <script src="<?= ASSETS_PATH ?>js/landing.js"></script>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const heroSection = document.getElementById('hero-section');
-            const heroLoading = document.getElementById('hero-loading');
+            // Removed heroLoading as it's for AI generation
+            // const heroLoading = document.getElementById('hero-loading');
 
+            // Removed the generateHeroBackground function call to use static image
+            /*
             // Function to generate and set AI background image
             async function generateHeroBackground() {
                 heroLoading.style.display = 'block'; // Show loading indicator
@@ -188,9 +220,9 @@ $vendor_categories = $vendor->getAllVendorCategories();
                     heroLoading.style.display = 'none'; // Hide loading indicator
                 }
             }
-
             // Call the function to generate background on page load
             generateHeroBackground();
+            */
 
             // Smooth scrolling for anchor links (if not handled by main.js)
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
