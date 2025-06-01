@@ -1,4 +1,10 @@
 <?php
+// TEMPORARY: Enable full error reporting for debugging.
+// This will display any PHP errors directly on the page.
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // public/chat.php
 session_start();
 require_once '../includes/config.php';
@@ -64,6 +70,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
             $event_id_for_creation = $_POST['event_id_for_chat'] ?? $event_id_from_url;
             $vendor_id_for_creation = $_POST['vendor_id_for_chat'] ?? $vendor_id_from_url;
 
+            // --- FINAL FIX for event_id_for_creation to be strict NULL or positive integer ---
+            // Validate that event_id_for_creation is a positive integer.
+            // If not (e.g., empty, 0, false, or non-numeric string), treat it as NULL.
+            $validated_event_id = filter_var($event_id_for_creation, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+            if ($validated_event_id === false) { // If validation fails (e.g., is 0, empty string, non-numeric)
+                $event_id_for_creation = NULL;
+            } else {
+                $event_id_for_creation = $validated_event_id; // Use the strictly validated integer
+            }
+            // --- END FINAL FIX ---
+
+            // --- DEBUG LOG START (retained for final confirmation) ---
+            error_log("DEBUG: chat.php - Attempting to start new conversation.");
+            error_log("DEBUG: chat.php - event_id_for_creation: " . var_export($event_id_for_creation, true) . " (Type: " . gettype($event_id_for_creation) . ")");
+            error_log("DEBUG: chat.php - user_id: " . var_export($_SESSION['user_id'], true));
+            error_log("DEBUG: chat.php - vendor_id_for_chat: " . var_export($vendor_id_for_creation, true));
+            // --- DEBUG LOG END ---
+
+
             // Crucially, vendor_id_for_creation MUST be present
             if ($vendor_id_for_creation) {
                 // event_id_for_creation can now be NULL for general chats
@@ -118,15 +144,16 @@ if ($conversation_id) {
 
     // Get conversation details
     try {
+        // Corrected: Changed named parameters to positional for HY093 fix
         $stmt = $pdo->prepare("
             SELECT cc.*,
                    e.title as event_title, -- event_title might be NULL now
                    CASE
-                     WHEN cc.user_id = :current_user_id THEN vp.business_name
+                     WHEN cc.user_id = ? THEN vp.business_name
                      ELSE CONCAT(u.first_name, ' ', u.last_name)
                    END as other_party_name,
                    CASE
-                     WHEN cc.user_id = :current_user_id THEN up_vendor.profile_image
+                     WHEN cc.user_id = ? THEN up_vendor.profile_image
                      ELSE up_user.profile_image
                    END as other_party_image
             FROM chat_conversations cc
@@ -136,14 +163,15 @@ if ($conversation_id) {
             LEFT JOIN user_profiles up_vendor ON u.id = up_vendor.user_id
             LEFT JOIN users u2 ON cc.user_id = u2.id
             LEFT JOIN user_profiles up_user ON u2.id = up_user.user_id
-            WHERE cc.id = :conversation_id
-            AND (cc.user_id = :user_id_check1 OR cc.vendor_id = :user_id_check2)
+            WHERE cc.id = ?
+            AND (cc.user_id = ? OR cc.vendor_id = ?)
         ");
         $stmt->execute([
-            ':current_user_id' => $_SESSION['user_id'],
-            ':conversation_id' => $conversation_id,
-            ':user_id_check1' => $_SESSION['user_id'],
-            ':user_id_check2' => $_SESSION['user_id']
+            $_SESSION['user_id'], // Corresponds to first ? (current_user_id in original named query)
+            $_SESSION['user_id'], // Corresponds to second ? (current_user_id in original named query)
+            $conversation_id,     // Corresponds to third ? (conversation_id in original named query)
+            $_SESSION['user_id'], // Corresponds to fourth ? (user_id_check1 in original named query)
+            $_SESSION['user_id']  // Corresponds to fifth ? (user_id_check2 in original named query)
         ]);
         $current_conversation = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -152,8 +180,8 @@ if ($conversation_id) {
                 'id' => ($current_conversation['user_id'] == $_SESSION['user_id'])
                     ? $current_conversation['vendor_id']
                     : $current_conversation['user_id'],
-                'name' => $current_conversation['other_party_name'],
-                'image' => $current_conversation['other_party_image']
+                'name' => htmlspecialchars($current_conversation['other_party_name'] ?? 'Unknown User'), // Fixed deprecated warning
+                'image' => htmlspecialchars($current_conversation['other_party_image'] ?? '') // Fixed deprecated warning
             ];
 
             $messages = $chat->getMessages($conversation_id, 100);
@@ -170,20 +198,28 @@ if ($conversation_id) {
         $stmt_vendor = $pdo->prepare("SELECT vp.business_name, up.profile_image FROM vendor_profiles vp JOIN users u ON vp.user_id = u.id LEFT JOIN user_profiles up ON u.id = up.user_id WHERE u.id = ?");
         $stmt_vendor->execute([$vendor_id_from_url]);
         $vendor_info = $stmt_vendor->fetch(PDO::FETCH_ASSOC);
-        if ($vendor_info) {
+        if (is_array($vendor_info) && !empty($vendor_info)) { // Check if vendor_info is not empty/false
             $other_party = [
                 'id' => $vendor_id_from_url,
-                'name' => $vendor_info['business_name'],
-                'image' => $vendor_info['profile_image']
+                'name' => htmlspecialchars($vendor_info['business_name'] ?? 'Unknown Vendor'), // Fixed deprecated warning
+                'image' => htmlspecialchars($vendor_info['profile_image'] ?? '') // Fixed deprecated warning
             ];
             // Since we're ready to chat, we can set current_conversation to a non-null value
             // so the chat interface (messages and input) renders immediately.
             // This is a dummy object just for rendering purposes before the real conversation ID is set.
             $current_conversation = ['vendor_id' => $vendor_id_from_url, 'event_id' => $event_id_from_url];
             $messages = []; // No messages yet for a new chat
+        } else {
+            // Handle case where vendor_id_from_url does not correspond to a valid vendor
+            error_log("Error fetching vendor info: Vendor ID '{$vendor_id_from_url}' not found or no profile.");
+            // Set current_conversation to null so it shows "Select a conversation..."
+            $current_conversation = null;
+            $_SESSION['error_message'] = "Invalid vendor selected to start chat.";
+            // You might redirect here, but for now, letting it fall through to no-conversation message
         }
     } catch (PDOException $e) {
         error_log("Error fetching vendor info for new chat initiation: " . $e->getMessage());
+        $current_conversation = null;
     }
 }
 
@@ -201,291 +237,43 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
     <title>Messages - EventCraftAI</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/dashboard.css">
-    <style>
-        .chat-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 20px;
-            height: calc(100vh - 120px);
-        }
-
-        .conversations-sidebar {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .conversations-header {
-            padding: 20px;
-            border-bottom: 2px solid #e1e5e9;
-        }
-
-        .conversations-list {
-            flex: 1;
-            overflow-y: auto;
-        }
-
-        .conversation-item {
-            padding: 15px 20px;
-            border-bottom: 1px solid #e1e5e9;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .conversation-item:hover, .conversation-item.active {
-            background-color: #f8f9fa;
-        }
-
-        .conversation-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background-size: cover;
-            background-position: center;
-            background-color: #e1e5e9;
-            flex-shrink: 0;
-        }
-
-        .conversation-details {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .conversation-title {
-            font-weight: 600;
-            color: #2d3436;
-            margin-bottom: 5px;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .conversation-preview {
-            color: #636e72;
-            font-size: 0.9em;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .conversation-time {
-            font-size: 0.8em;
-            color: #b2bec3;
-        }
-
-        .unread-badge {
-            background: #e17055;
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7em;
-            font-weight: bold;
-        }
-
-        .chat-area {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .chat-header {
-            padding: 20px;
-            border-bottom: 2px solid #e1e5e9;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .chat-header-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background-size: cover;
-            background-position: center;
-            background-color: #e1e5e9;
-        }
-
-        .chat-header-info {
-            flex: 1;
-        }
-
-        .chat-header-title {
-            font-weight: 600;
-        }
-        .chat-messages {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .message {
-            max-width: 80%;
-            padding: 15px;
-            border-radius: 15px;
-            position: relative;
-        }
-
-        .message-outgoing {
-            background: #667eea;
-            color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 5px;
-        }
-
-        .message-incoming {
-            background: #f8f9fa;
-            color: #2d3436;
-            align-self: flex-start;
-            border-bottom-left-radius: 5px;
-        }
-
-        .message-time {
-            font-size: 0.8em;
-            color: rgba(255,255,255,0.7);
-            margin-top: 5px;
-            display: block;
-            text-align: right;
-        }
-
-        .message-incoming .message-time {
-            color: #636e72;
-        }
-
-        .chat-input {
-            padding: 20px;
-            border-top: 2px solid #e1e5e9;
-            background: #f8f9fa;
-        }
-
-        .message-form {
-            display: flex;
-            gap: 10px;
-        }
-
-        .message-input {
-            flex: 1;
-            padding: 12px 20px;
-            border: 2px solid #e1e5e9;
-            border-radius: 25px;
-            font-size: 16px;
-            resize: none;
-            height: 50px;
-        }
-
-        .send-button {
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            cursor: pointer;
-            transition: background 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .send-button:hover {
-            background: #764ba2;
-        }
-
-        .no-conversation {
-            text-align: center;
-            padding: 40px;
-            color: #636e72;
-        }
-
-        .event-selection-for-chat {
-            padding: 20px;
-            background: var(--background-light);
-            border-radius: 8px;
-            margin-top: 20px;
-        }
-        .event-selection-for-chat h3 {
-            margin-top: 0;
-            color: var(--text-dark);
-            margin-bottom: 15px;
-        }
-        .event-selection-for-chat ul {
-            list-style: none;
-            padding: 0;
-        }
-        .event-selection-for-chat ul li {
-            margin-bottom: 10px;
-        }
-        .event-selection-for-chat ul li a {
-            display: block;
-            padding: 10px 15px;
-            background: var(--white);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            text-decoration: none;
-            color: var(--primary-color);
-            transition: background 0.2s ease, transform 0.2s ease;
-        }
-        .event-selection-for-chat ul li a:hover {
-            background: #f0f0f0;
-            transform: translateY(-2px);
-        }
-
-        @media (max-width: 768px) {
-            .chat-container {
-                grid-template-columns: 1fr;
-                height: auto;
-            }
-
-            .conversations-sidebar {
-                height: 400px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/chat.css">
 </head>
 <body>
-    <?php include 'header.php'; ?>
+    <?php include 'header.php'; // Using general header, assuming it adapts for vendor ?>
 
     <div class="chat-container">
         <div class="conversations-sidebar">
             <div class="conversations-header">
-                <h2>Messages <?php if ($unread_count > 0): ?><span class="unread-badge"><?php echo $unread_count; ?></span><?php endif; ?></h2>
+                <h2>Messages <?php if ($unread_count > 0): ?><span class="unread-badge"><?php echo htmlspecialchars($unread_count); ?></span><?php endif; ?></h2>
             </div>
             <div class="conversations-list">
                 <?php if (empty($conversations)): ?>
                     <div class="no-conversation">No conversations yet</div>
                 <?php else: ?>
-                    <?php foreach ($conversations as $conv): ?>
+                    <?php foreach ($conversations as $conv):
+                        // Safely get other_party_image URL for display
+                        $display_image = !empty($conv['other_party_image']) ? BASE_URL . 'assets/uploads/users/' . htmlspecialchars($conv['other_party_image'] ?? '') : BASE_URL . 'assets/images/default-avatar.jpg'; // Fixed deprecated warning
+                        // Safely get last message preview, ensuring it's not null before substr
+                        $last_message_preview = htmlspecialchars(substr($conv['last_message'] ?? 'No messages yet', 0, 30));
+                        // Safely format last message time, handling null/invalid dates
+                        $last_message_time_formatted = !empty($conv['last_message_time']) ? date('M j, g:i a', strtotime($conv['last_message_time'])) : 'N/A';
+                    ?>
                         <div class="conversation-item <?php echo ($conv['id'] == $conversation_id) ? 'active' : ''; ?>"
-                             onclick="window.location.href='<?= BASE_URL ?>public/chat.php?conversation_id=<?php echo $conv['id']; ?>'">
-                            <div class="conversation-avatar" style="background-image: url('<?php echo htmlspecialchars($conv['other_party_image'] ? BASE_URL . 'assets/uploads/users/' . $conv['other_party_image'] : BASE_URL . 'assets/images/default-avatar.jpg'); ?>')"></div>
+                             onclick="window.location.href='<?= BASE_URL ?>public/chat.php?conversation_id=<?php echo htmlspecialchars($conv['id']); ?>'">
+                            <div class="conversation-avatar" style="background-image: url('<?= $display_image ?>')"></div>
                             <div class="conversation-details">
                                 <div class="conversation-title">
-                                    <span><?php echo htmlspecialchars($conv['other_party_name']); ?></span>
+                                    <span><?php echo htmlspecialchars($conv['other_party_name'] ?? 'Unknown User'); ?></span>
                                     <?php if ($conv['unread_count'] > 0): ?>
-                                        <span class="unread-badge"><?php echo $conv['unread_count']; ?></span>
+                                        <span class="unread-badge"><?php echo htmlspecialchars($conv['unread_count']); ?></span>
                                     <?php endif; ?>
                                 </div>
                                 <div class="conversation-preview">
-                                    <?php echo htmlspecialchars(substr($conv['last_message'] ?? 'No messages yet', 0, 30)); ?>
+                                    <?php echo $last_message_preview; ?>
                                 </div>
                                 <div class="conversation-time">
-                                    <?php echo date('M j, g:i a', strtotime($conv['last_message_time'])); ?>
+                                    <?php echo $last_message_time_formatted; ?>
                                 </div>
                             </div>
                         </div>
@@ -495,15 +283,24 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
         </div>
 
         <div class="chat-area">
-            <?php if ($current_conversation): /* A conversation is loaded or being initiated */ ?>
+            <?php if ($current_conversation || $vendor_id_from_url): /* Show chat interface if a conversation is loaded OR a vendor is targeted for a new chat */ ?>
                 <div class="chat-header">
                     <div class="chat-header-avatar" style="background-image: url('<?php echo htmlspecialchars($other_party['image'] ? BASE_URL . 'assets/uploads/users/' . $other_party['image'] : BASE_URL . 'assets/images/default-avatar.jpg'); ?>')"></div>
                     <div class="chat-header-info">
-                        <div class="chat-header-title"><?php echo htmlspecialchars($other_party['name']); ?></div>
+                        <div class="chat-header-title"><?php echo htmlspecialchars($other_party['name'] ?? 'New Chat'); ?></div>
                         <div class="chat-header-subtitle">
                             <?php
-                            if ($conversation_id && isset($current_conversation['event_title']) && $current_conversation['event_title'] !== null) {
+                            // Display event title if available, otherwise "General Chat"
+                            if (isset($current_conversation['event_title']) && $current_conversation['event_title'] !== null) {
                                 echo htmlspecialchars($current_conversation['event_title']);
+                            } elseif ($vendor_id_from_url && !$conversation_id) { // For new chat where event_id_from_url might be set
+                                // Attempt to get event title if event_id_from_url is present for a new chat
+                                $new_chat_event_title = '';
+                                if (!empty($event_id_from_url)) {
+                                    $new_chat_event = $event->getEventById((int)$event_id_from_url, $_SESSION['user_id']); // Assuming user_id is needed for getEventById
+                                    $new_chat_event_title = $new_chat_event['title'] ?? '';
+                                }
+                                echo htmlspecialchars($new_chat_event_title ?: 'General Chat');
                             } else {
                                 echo 'General Chat';
                             }
@@ -512,14 +309,23 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
                     </div>
                 </div>
                 <div class="chat-messages" id="messages-container">
-                    <?php foreach ($messages as $message): ?>
-                        <div class="message <?php echo ($message['sender_id'] == $_SESSION['user_id']) ? 'message-outgoing' : 'message-incoming'; ?>" data-id="<?= $message['id'] ?>">
-                            <div class="message-content"><?php echo htmlspecialchars($message['message_content']); ?></div>
-                            <span class="message-time">
-                                <?php echo date('g:i a', strtotime($message['created_at'])); ?>
-                            </span>
-                        </div>
-                    <?php endforeach; ?>
+                    <?php if (empty($messages)): ?>
+                        <div class="empty-state">Start your conversation!</div>
+                    <?php else: ?>
+                        <?php foreach ($messages as $message):
+                            // Ensure message content is safely displayed
+                            $message_content_display = nl2br(htmlspecialchars($message['message_content'] ?? ''));
+                            // Safely format message creation time
+                            $message_time_display = !empty($message['created_at']) ? date('g:i a', strtotime($message['created_at'])) : 'N/A';
+                        ?>
+                            <div class="message <?php echo ($message['sender_id'] == $_SESSION['user_id']) ? 'message-outgoing' : 'message-incoming'; ?>" data-id="<?= htmlspecialchars($message['id']) ?>">
+                                <div class="message-content"><?php echo $message_content_display; ?></div>
+                                <span class="message-time">
+                                    <?php echo $message_time_display; ?>
+                                </span>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
                 <div class="chat-input">
                     <form class="message-form" method="POST">
@@ -651,5 +457,3 @@ $unread_count = $chat->getUnreadCount($_SESSION['user_id']);
             }
         });
     </script>
-</body>
-</html>
