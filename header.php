@@ -7,8 +7,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EventCraftAI</title>
-    <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/style.css"> 
-    <?php 
+    <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/style.css">
+    <?php
     // Dynamically load page-specific CSS if it exists
     $page_css_file = basename($_SERVER['PHP_SELF'], '.php') . '.css';
     if (file_exists("../assets/css/" . $page_css_file)): ?>
@@ -19,25 +19,30 @@
 </head>
 <body>
     <header class="main-header">
-        <div class="container"> 
+        <div class="container">
             <a href="<?= BASE_URL ?>public/index.php" class="logo">EventCraftAI</a>
             <nav class="main-nav">
                 <?php if (isset($_SESSION['user_id'])): ?>
-                    <?php 
+                    <?php
                     // Determine which dashboard link to show based on user type
                     $dashboard_link = BASE_URL . 'public/dashboard.php'; // Default for customer
-                    if (isset($_SESSION['user_type'])) {
-                        if ($_SESSION['user_type'] == 2) { // Vendor
-                            $dashboard_link = BASE_URL . 'public/vendor_dashboard.php';
-                        } elseif ($_SESSION['user_type'] == 3) { // Admin
-                            $dashboard_link = BASE_URL . 'admin/dashboard.php';
-                        }
+                    $user_type = $_SESSION['user_type'] ?? null;
+
+                    if ($user_type == 2) { // Vendor
+                        $dashboard_link = BASE_URL . 'public/vendor_dashboard.php';
+                    } elseif ($user_type == 3) { // Admin
+                        $dashboard_link = BASE_URL . 'admin/dashboard.php';
                     }
                     ?>
                     <a href="<?= $dashboard_link ?>">Dashboard</a>
-                    <a href="<?= BASE_URL ?>public/index.php">Home</a> <a href="<?= BASE_URL ?>public/events.php">My Events</a>
-                    <?php if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 1): // Show AI Assistant only for customers (type 1) ?>
+                    <a href="<?= BASE_URL ?>public/index.php">Home</a>
+                    <?php if ($user_type == 1): // Customer specific links ?>
+                        <a href="<?= BASE_URL ?>public/events.php">My Events</a>
                         <a href="<?= BASE_URL ?>public/ai_chat.php">AI Assistant</a>
+                    <?php elseif ($user_type == 2): // Vendor specific links ?>
+                        <!-- Portfolio and Availability links are removed as requested -->
+                        <!-- Reports link is removed as requested -->
+                        <a href="<?= BASE_URL ?>public/vendor_chat.php">Messages</a>
                     <?php endif; ?>
                     <a href="<?= BASE_URL ?>public/profile.php">Profile</a>
                     <a href="<?= BASE_URL ?>public/logout.php">Logout</a>
