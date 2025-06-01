@@ -44,7 +44,7 @@ body {
 /* General container for content - wide and flexible */
 .container {
     width: 100%; /* Take full width initially */
-    max-width: 1200px; /* Max width for larger screens */
+    max-width: 1400px; /* Increased max-width for wider content */
     margin: 0 auto; /* Center the container */
     padding: var(--spacing-md); /* Add horizontal and vertical padding */
     box-sizing: border-box; /* Include padding in width calculation */
@@ -211,9 +211,9 @@ a:hover {
 }
 
 .form-group select[multiple]:focus {
+    outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.3); /* Purple focus ring */
-    outline: none;
 }
 
 .form-group select[multiple] option {
@@ -340,7 +340,7 @@ input[type="radio"] {
 .main-header {
     background: var(--tertiary-color); /* Black header for contrast */
     color: var(--white);
-    padding: 1rem 0;
+    padding: 0.6rem 0; /* Decreased vertical padding further */
     position: sticky;
     top: 0;
     z-index: 1000;
@@ -404,7 +404,8 @@ input[type="radio"] {
 .main-footer {
     background: var(--tertiary-color); /* Black footer */
     color: var(--white);
-    padding: var(--spacing-xl) 0 var(--spacing-md);
+    padding: 5px; /* Decreased vertical padding further */
+    height: 110px;
     margin-top: var(--spacing-xl);
     text-align: center;
 }
@@ -414,6 +415,7 @@ input[type="radio"] {
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    
 }
 
 .main-footer p {
@@ -434,6 +436,11 @@ input[type="radio"] {
     color: rgba(255, 255, 255, 0.8);
     font-size: 0.9em;
     transition: color 0.2s ease;
+}
+
+a:hover {
+    color: var(--secondary-color);
+    text-decoration: underline;
 }
 
 .footer-nav a:hover {
@@ -625,6 +632,4 @@ input[type="radio"] {
     .profile-pic {
         margin: 0; /* Remove auto margin on larger screens */
     }
-}
-
 }
