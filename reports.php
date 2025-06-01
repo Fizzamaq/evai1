@@ -126,13 +126,7 @@ if (isset($_GET['export']) && !empty($financialData)) { // Only export if data i
     </style>
 </head>
 <body>
-    <?php
-    if ($is_admin) {
-        include '../includes/admin_header.php';
-    } else {
-        include 'header.php'; // Or vendor_header.php if user is a vendor
-    }
-    ?>
+    <?php include 'header.php'; // Use the unified header ?>
 
     <div class="reports-container">
         <h1>System Reports</h1>
