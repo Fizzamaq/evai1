@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/includes/config.php';
-require_once __DIR__ . '/classes/Vendor.class.php';
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../classes/Vendor.class.php';
 
 $vendor = new Vendor($pdo); // Pass PDO
 $vendor->verifyVendorAccess(); // Your existing auth check, ensures $_SESSION['vendor_id'] is set
@@ -104,7 +104,7 @@ $jsonEvents = json_encode($fullCalendarEvents);
     </style>
 </head>
 <body>
-    <?php include 'header.php'; ?>
+    <?php include 'header.php'; // Includes the unified header ?>
 
     <div id="calendar"></div>
 
@@ -189,7 +189,7 @@ $jsonEvents = json_encode($fullCalendarEvents);
                     } else if (arg.event.extendedProps.status === 'blocked') {
                         statusClass = 'fc-event-blocked';
                     }
-                    return { html: `<div class="<span class="math-inline">\{statusClass\}"\></span>{arg.event.title}</div>` };
+                    return { html: `<div class="${statusClass}">${arg.event.title}</div>` };
                 }
             });
             calendar.render();
