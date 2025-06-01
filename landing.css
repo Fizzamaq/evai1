@@ -22,7 +22,7 @@
 
 .hero-content {
     z-index: 1; /* Ensure content is above any background effects */
-    max-width: 800px;
+    max-width: 1000px; /* Increased max-width for wider content */
     margin: 0 auto;
     padding: var(--spacing-md);
 }
@@ -355,6 +355,49 @@
 }
 
 
+/* Styling for the CTA bottom section */
+.cta-bottom-section {
+    background-image: url('../images/cta_bg.jpg'); /* Background image for the CTA section */
+    background-size: cover;
+    background-position: center;
+    color: var(--white); /* Text color for contrast */
+    padding: var(--spacing-xxl) 0; /* Increased vertical padding for impact */
+    text-align: center; /* Center content horizontally */
+    position: relative;
+    overflow: hidden;
+}
+
+/* Overlay for text readability on background image */
+.cta-bottom-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5); /* Semi-transparent black overlay */
+    z-index: 1;
+}
+
+.cta-bottom-section .container {
+    position: relative; /* Ensure container content is above the overlay */
+    z-index: 2;
+    /* Inherits max-width, margin, padding from .container in style.css */
+}
+
+.cta-bottom-section h2 {
+    color: var(--white); /* Ensure heading is white for contrast */
+    font-size: 2.8em; /* Make it more prominent */
+    margin-bottom: var(--spacing-md);
+}
+
+.cta-bottom-section .subtitle {
+    color: rgba(255, 255, 255, 0.9); /* Ensure subtitle is white and slightly transparent */
+    font-size: 1.4em; /* Make it more prominent */
+    margin-bottom: var(--spacing-xl); /* Space below subtitle before the button */
+}
+
+
 /* Responsive adjustments for landing page */
 @media (max-width: 992px) {
     .hero-content h1 {
@@ -424,6 +467,17 @@
     }
     .swiper-pagination-bullets {
         bottom: 0px !important; /* Adjust dots for mobile */
+    }
+
+    /* Responsive adjustments for cta-bottom-section */
+    .cta-bottom-section {
+        padding: var(--spacing-xl) 0; /* Adjust padding for smaller screens */
+    }
+    .cta-bottom-section h2 {
+        font-size: 2em;
+    }
+    .cta-bottom-section .subtitle {
+        font-size: 1.1em;
     }
 }
 
