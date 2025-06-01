@@ -25,7 +25,8 @@
                 <a href="<?= BASE_URL ?>public/vendor_dashboard.php">Dashboard</a>
                 <a href="<?= BASE_URL ?>public/vendor_portfolio.php">Portfolio</a>
                 <a href="<?= BASE_URL ?>public/vendor_availability.php">Availability</a>
-                <a href="<?= BASE_URL ?>public/vendor_chat.php">Messages</a> <a href="<?= BASE_URL ?>public/reports.php">Reports</a>
+                <a href="<?= BASE_URL ?>public/vendor_chat.php">Messages</a>
+                <a href="<?= BASE_URL ?>public/reports.php">Reports</a>
                 <a href="<?= BASE_URL ?>public/profile.php">Profile</a>
                 <a href="<?= BASE_URL ?>public/logout.php">Logout</a>
             </nav>
