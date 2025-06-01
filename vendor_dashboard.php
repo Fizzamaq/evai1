@@ -47,7 +47,7 @@ $stats = [
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <?php include 'vendor_header.php'; // Includes the vendor-specific header ?>
+    <?php include 'header.php'; // Includes the unified header ?>
 
     <div class="vendor-dashboard">
         <div class="dashboard-header">
@@ -75,13 +75,14 @@ $stats = [
             </div>
         </div>
 
-        <div class="section-card quick-action-card">
-            <h2>Manage Your Public Portfolio</h2>
-            <p>Showcase your best work and attract more clients by updating your portfolio.</p>
-            <a href="<?= BASE_URL ?>public/vendor_portfolio.php" class="btn btn-primary">
-                <i class="fas fa-images"></i> Go to My Portfolio
-            </a>
-        </div>
+        <!--{{-- Removed: Quick action card for portfolio --}}-->
+        <!-- <div class="section-card quick-action-card">-->
+        <!--    <h2>Manage Your Public Portfolio</h2>-->
+        <!--    <p>Showcase your best work and attract more clients by updating your portfolio.</p>-->
+        <!--    <a href="<?= BASE_URL ?>public/vendor_portfolio.php" class="btn btn-primary">-->
+        <!--        <i class="fas fa-images"></i> Go to My Portfolio-->
+        <!--    </a>-->
+        <!--</div> --}}-->
 
         <div class="dashboard-sections">
             <div class="section-card upcoming-bookings">
