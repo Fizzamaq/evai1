@@ -1,0 +1,302 @@
+/* assets/css/chat.css */
+
+.chat-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 20px;
+    height: calc(100vh - 120px); /* Adjust height to fill viewport below header/above footer */
+    box-sizing: border-box; /* Include padding in height */
+}
+
+.conversations-sidebar {
+    background: var(--white); /* Using global white variable */
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.conversations-header {
+    padding: 20px;
+    border-bottom: 2px solid var(--border-color); /* Using global border color */
+}
+
+.conversations-list {
+    flex: 1;
+    overflow-y: auto; /* Enable scrolling for conversation list */
+}
+
+.conversation-item {
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.conversation-item:hover, .conversation-item.active {
+    background-color: var(--background-light); /* Using global light background variable */
+}
+
+.conversation-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--border-color); /* Fallback/placeholder color */
+    flex-shrink: 0; /* Prevent shrinking */
+}
+
+.conversation-details {
+    flex: 1;
+    min-width: 0; /* Allow content to shrink within flex container */
+}
+
+.conversation-title {
+    font-weight: 600;
+    color: var(--text-dark); /* Using global dark text variable */
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.conversation-preview {
+    color: var(--text-subtle); /* Using global subtle text variable */
+    font-size: 0.9em;
+    white-space: nowrap; /* Prevent text wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Add ellipsis for overflowing text */
+}
+
+.conversation-time {
+    font-size: 0.8em;
+    color: #b2bec3; /* Specific grey for timestamps */
+}
+
+.unread-badge {
+    background: #e17055; /* Specific color for unread badge */
+    color: var(--white);
+    border-radius: 50%;
+    min-width: 20px; /* Use min-width instead of fixed width to accommodate two-digit numbers */
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7em;
+    font-weight: bold;
+    padding: 0 5px; /* Add horizontal padding for better look */
+}
+
+.chat-area {
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-header {
+    padding: 20px;
+    border-bottom: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.chat-header-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--border-color);
+    flex-shrink: 0;
+}
+
+.chat-header-info {
+    flex: 1;
+}
+
+.chat-header-title {
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 2px; /* Reduce margin */
+}
+
+.chat-header-subtitle {
+    font-size: 0.9em;
+    color: var(--text-subtle);
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto; /* Enable scrolling for messages */
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.message-bubble { /* General style for message bubbles */
+    max-width: 80%;
+    padding: 15px;
+    border-radius: 15px;
+    position: relative;
+    word-wrap: break-word; /* Ensure long words wrap */
+}
+
+.message-outgoing { /* Messages sent by the current user (vendor) */
+    background: var(--primary-color); /* Primary color for outgoing messages */
+    color: var(--white);
+    align-self: flex-end; /* Align to the right */
+    border-bottom-right-radius: 5px; /* Tweak border radius for chat bubble effect */
+}
+
+.message-incoming { /* Messages received from the other party (client) */
+    background: var(--background-light); /* Light background for incoming messages */
+    color: var(--text-dark);
+    align-self: flex-start; /* Align to the left */
+    border-bottom-left-radius: 5px; /* Tweak border radius for chat bubble effect */
+}
+
+.message-time {
+    font-size: 0.8em;
+    margin-top: 5px;
+    display: block;
+    text-align: right;
+    color: rgba(255,255,255,0.7); /* Lighter color for time in outgoing bubbles */
+}
+
+.message-incoming .message-time {
+    color: var(--text-subtle); /* Time color for incoming bubbles */
+}
+
+.chat-input {
+    padding: 20px;
+    border-top: 2px solid var(--border-color);
+    background: var(--background-light);
+    flex-shrink: 0; /* Prevent input area from shrinking */
+}
+
+.message-form {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end; /* Align send button with textarea */
+}
+
+.message-input {
+    flex: 1;
+    padding: 12px 20px;
+    border: 2px solid var(--border-color);
+    border-radius: 25px; /* Pill-shaped input */
+    font-size: 16px;
+    resize: none; /* Disable manual resize */
+    min-height: 50px; /* Minimum height */
+    max-height: 150px; /* Max height to prevent excessive expansion */
+    box-sizing: border-box; /* Include padding in dimensions */
+    overflow-y: auto; /* Enable scrollbar if text overflows */
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.message-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.2);
+}
+
+.send-button {
+    background: var(--primary-color);
+    color: var(--white);
+    border: none;
+    border-radius: 50%; /* Circular button */
+    width: 50px;
+    height: 50px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0; /* Prevent shrinking */
+}
+
+.send-button:hover {
+    background: var(--secondary-color); /* Change color on hover */
+    transform: translateY(-1px);
+}
+
+.send-button svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.no-conversation {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-subtle);
+    font-size: 1.1em;
+}
+
+.no-conversation h3 {
+    color: var(--text-dark);
+    margin-bottom: 10px;
+}
+
+/* Responsive adjustments for chat interface */
+@media (max-width: 768px) {
+    .chat-container {
+        grid-template-columns: 1fr; /* Stack sidebar and chat area vertically */
+        height: auto; /* Allow height to adjust */
+        min-height: calc(100vh - 120px); /* Ensure minimum height */
+    }
+
+    .conversations-sidebar {
+        height: 300px; /* Give sidebar a fixed height on smaller screens */
+        flex-shrink: 0;
+    }
+
+    .chat-area {
+        height: auto; /* Allow chat area to expand */
+        min-height: 400px; /* Minimum height for chat messages */
+    }
+
+    .message-bubble {
+        max-width: 90%; /* Allow messages to take more width on small screens */
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-container {
+        padding: 10px; /* Reduce overall padding */
+    }
+
+    .conversations-sidebar, .chat-area {
+        border-radius: 8px; /* Slightly smaller border radius */
+    }
+
+    .conversations-header, .chat-header, .chat-input {
+        padding: 15px; /* Reduce padding in headers/footers */
+    }
+
+    .message-input {
+        padding: 10px 15px; /* Adjust input padding */
+        min-height: 45px;
+    }
+
+    .send-button {
+        width: 45px;
+        height: 45px;
+    }
+}
