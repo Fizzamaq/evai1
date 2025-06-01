@@ -16,7 +16,7 @@ $vendor = new Vendor($pdo); // Pass PDO
 $vendor->verifyVendorAccess();
 
 // Re-fetch vendor_data to ensure all details are current after verification
-$vendor_data = $vendor->getVendorByUserId($_SESSION['user_id']); 
+$vendor_data = $vendor->getVendorByUserId($_SESSION['user_id']);
 if (!$vendor_data) {
     // This case should ideally be caught by verifyVendorAccess, but as a fallback
     $_SESSION['error_message'] = "Vendor profile not found. Please complete your vendor registration.";
@@ -43,11 +43,11 @@ $stats = [
     <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/dashboard.css">
     <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/vendor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script> 
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <?php include 'header.php'; // Includes the main site header ?>
+    <?php include 'vendor_header.php'; // Includes the vendor-specific header ?>
 
     <div class="vendor-dashboard">
         <div class="dashboard-header">
@@ -82,7 +82,7 @@ $stats = [
                 <i class="fas fa-images"></i> Go to My Portfolio
             </a>
         </div>
-        
+
         <div class="dashboard-sections">
             <div class="section-card upcoming-bookings">
                 <h2>Upcoming Bookings</h2>
