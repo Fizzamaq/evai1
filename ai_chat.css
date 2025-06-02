@@ -1,70 +1,159 @@
 /* assets/css/ai_chat.css */
 
-.ai-chat-container {
-    max-width: 800px;
+.ai-recommendation-container {
+    max-width: 900px; /* Slightly wider container for the form and results */
     margin: var(--spacing-lg) auto;
     padding: var(--spacing-lg);
     background: var(--white);
     border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1); /* More refined shadow */
     box-sizing: border-box;
 }
 
-.ai-chat-container h2 {
+.ai-recommendation-container h1 {
     text-align: center;
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
     color: var(--text-dark);
+    font-size: 2.5em; /* Adjusted heading size */
 }
 
-.ai-chat-form {
-    margin-top: var(--spacing-lg);
-    padding-top: var(--spacing-md);
-    border-top: 1px solid var(--border-color);
-}
-
-.ai-results {
-    margin-top: var(--spacing-xl);
-    animation: fadeIn 0.5s ease;
-}
-
-.ai-results h3 {
+.ai-recommendation-container .subtitle {
     text-align: center;
-    margin-bottom: var(--spacing-lg);
-    color: var(--text-dark);
-}
-
-.vendor-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-md);
-}
-
-.vendor-card {
-    padding: var(--spacing-md);
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    background: var(--background-light);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.vendor-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-}
-
-.vendor-card h4 {
-    margin-top: 0;
-    margin-bottom: var(--spacing-xs);
-    color: var(--primary-color);
+    color: var(--text-subtle);
+    margin-bottom: var(--spacing-xl); /* More space below subtitle */
     font-size: 1.1em;
 }
 
-.vendor-card p {
+.ai-event-form {
+    padding: var(--spacing-md);
+    background: var(--background-light);
+    border-radius: 10px;
+    box-shadow: inset 0 1px 5px rgba(0,0,0,0.05); /* Subtle inner shadow for the form block */
+    margin-bottom: var(--spacing-lg);
+}
+
+.ai-event-form .form-group {
+    margin-bottom: var(--spacing-lg); /* More space between form groups */
+}
+
+.ai-event-form .form-row {
+    margin-bottom: var(--spacing-lg); /* More space for form rows */
+}
+
+/* Specific styling for select[multiple] in this context */
+.ai-event-form select[multiple] {
+    min-height: 180px; /* Make multi-select taller */
+}
+
+.ai-event-form .btn-large {
+    width: auto; /* Allow button to size based on content, not full width */
+    display: block; /* Make it a block element to center with margin auto */
+    margin: 0 auto; /* Center the button */
+    padding: 15px 30px; /* Slightly more padding for the main CTA button */
+    font-size: 1.1em;
+}
+
+.ai-recommendations-results {
+    margin-top: var(--spacing-xxl); /* More space before results */
+    animation: fadeIn 0.8s ease-out; /* Smoother fade-in animation */
+}
+
+.ai-recommendations-results h2 {
+    text-align: center;
+    margin-bottom: var(--spacing-md);
+    color: var(--text-dark);
+    font-size: 2.2em;
+}
+
+.ai-recommendations-results .subtitle {
+    text-align: center;
+    color: var(--text-subtle);
+    margin-bottom: var(--spacing-xl);
+}
+
+.vendor-recommendations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Responsive grid for vendor cards */
+    gap: var(--spacing-lg); /* Space between cards */
+    padding: var(--spacing-md); /* Padding around the grid */
+}
+
+.vendor-card-item {
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1); /* Consistent card shadow */
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    text-decoration: none;
+    color: inherit; /* Inherit text color */
+    display: flex;
+    flex-direction: column;
+}
+
+.vendor-card-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.18);
+}
+
+.vendor-card-image {
+    width: 100%;
+    height: 180px; /* Fixed height for consistent images */
+    background-size: cover;
+    background-position: center;
+    background-color: var(--border-color); /* Placeholder background */
+    flex-shrink: 0;
+}
+
+.vendor-card-content {
+    padding: var(--spacing-md);
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.vendor-card-content h3 {
+    font-size: 1.3em;
+    margin-top: 0;
+    margin-bottom: var(--spacing-xs);
+    color: var(--primary-color);
+}
+
+.vendor-card-content .vendor-city {
     font-size: 0.9em;
     color: var(--text-subtle);
-    margin-bottom: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
 }
+
+.vendor-card-rating {
+    color: var(--warning-color);
+    font-size: 1em;
+    margin-bottom: var(--spacing-md);
+}
+
+.vendor-card-rating i {
+    margin-right: 3px;
+}
+
+.vendor-card-rating span {
+    font-size: 0.8em;
+    color: var(--text-subtle);
+    margin-left: 5px;
+}
+
+.vendor-services {
+    font-size: 0.85em;
+    color: var(--text-dark);
+    line-height: 1.4;
+    margin-bottom: var(--spacing-md);
+}
+
+.vendor-card-item .btn {
+    margin-top: auto; /* Push button to bottom */
+    width: calc(100% - (var(--spacing-md) * 2)); /* Button full width minus padding */
+    align-self: center; /* Center horizontally in column */
+    margin-bottom: var(--spacing-md);
+}
+
 
 /* Animation for results */
 @keyframes fadeIn {
@@ -74,10 +163,35 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    .ai-chat-container {
+    .ai-recommendation-container {
         padding: var(--spacing-md);
     }
-    .vendor-cards {
-        grid-template-columns: 1fr; /* Stack vendor cards on small screens */
+    .ai-recommendation-container h1 {
+        font-size: 2em;
+    }
+    .ai-event-form .form-row {
+        grid-template-columns: 1fr; /* Stack form rows */
+    }
+    .vendor-recommendations-grid {
+        grid-template-columns: 1fr; /* Stack vendor cards */
+    }
+    .vendor-card-image {
+        height: 200px; /* Adjust image height for single column */
+    }
+}
+
+@media (max-width: 480px) {
+    .ai-recommendation-container {
+        padding: var(--spacing-sm);
+    }
+    .ai-recommendation-container h1 {
+        font-size: 1.8em;
+    }
+    .ai-recommendations-results h2 {
+        font-size: 1.6em;
+    }
+    .ai-event-form .btn-large {
+        padding: 12px 25px; /* Adjust button padding for smaller screens */
+        font-size: 1em;
     }
 }
