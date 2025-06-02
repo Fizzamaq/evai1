@@ -16,7 +16,12 @@ class Vendor {
             if ($existingVendor) {
                 // If profile exists, update it
                 error_log("Vendor.registerVendor: Updating existing vendor profile ID: " . $existingVendor['id']);
-                return $this->updateVendor($existingVendor['id'], $data);
+                $update_successful = $this->updateVendor($existingVendor['id'], $data);
+                if ($update_successful) {
+                    return $existingVendor['id']; // Corrected: Return the actual vendor_profile_id
+                } else {
+                    return false; // Update failed
+                }
             } else {
                 // If no profile exists, create a new one
                 error_log("Vendor.registerVendor: Creating new vendor profile for user_id: " . $user_id);
@@ -209,43 +214,45 @@ class Vendor {
     // NEW METHOD: Update vendor's service offerings (delete existing and insert new ones)
     public function updateVendorServiceOfferings($vendor_profile_id, $service_ids_array) {
         try {
+            error_log("DEBUG: updateVendorServiceOfferings - Starting transaction for Vendor ID: " . $vendor_profile_id);
             $this->conn->beginTransaction();
 
-            // 1. Delete all existing offerings for this vendor
-            $stmt = $this->conn->prepare("DELETE FROM vendor_service_offerings WHERE vendor_id = ?"); //
-            $stmt->execute([$vendor_profile_id]);
-            error_log("Vendor.updateVendorServiceOfferings: Deleted existing offerings for vendor ID: " . $vendor_profile_id);
+            error_log("DEBUG: updateVendorServiceOfferings - Service IDs to insert: " . print_r($service_ids_array, true));
 
+            // 1. Delete all existing offerings for this vendor
+            $stmt_delete = $this->conn->prepare("DELETE FROM vendor_service_offerings WHERE vendor_id = ?");
+            $stmt_delete->execute([$vendor_profile_id]);
+            $deleted_rows = $stmt_delete->rowCount();
+            error_log("DEBUG: updateVendorServiceOfferings - Deleted " . $deleted_rows . " existing offerings.");
 
             // 2. Insert new offerings
+            $inserted_count = 0;
             if (!empty($service_ids_array)) {
-                $insert_sql = "INSERT INTO vendor_service_offerings (vendor_id, service_id) VALUES (?, ?)"; //
+                $insert_sql = "INSERT INTO vendor_service_offerings (vendor_id, service_id) VALUES (?, ?)";
                 $insert_stmt = $this->conn->prepare($insert_sql);
                 foreach ($service_ids_array as $service_id) {
-                    // Basic validation to ensure service_id is an integer (optional but good practice)
                     $service_id = (int)$service_id; 
-                    if ($service_id > 0) {
+                    if ($service_id > 0) { // Ensure service ID is valid
                         $insert_stmt->execute([$vendor_profile_id, $service_id]);
+                        $inserted_count++;
                     }
                 }
-                error_log("Vendor.updateVendorServiceOfferings: Inserted " . count($service_ids_array) . " new offerings for vendor ID: " . $vendor_profile_id);
-            } else {
-                error_log("Vendor.updateVendorServiceOfferings: No new offerings to insert for vendor ID: " . $vendor_profile_id);
             }
+            error_log("DEBUG: updateVendorServiceOfferings - Attempted to insert " . $inserted_count . " new offerings.");
 
             $this->conn->commit();
+            error_log("DEBUG: updateVendorServiceOfferings - Transaction committed successfully.");
             return true;
         } catch (PDOException $e) {
             $this->conn->rollBack();
-            error_log("Vendor.updateVendorServiceOfferings error: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
-            return false;
+            error_log("ERROR: Vendor.updateVendorServiceOfferings PDO Exception: " . $e->getMessage() . " (Code: " . $e->getCode() . ") SQLSTATE: " . $e->errorInfo[0]);
+            throw new Exception("Database error updating services: " . $e->getMessage()); // Re-throw to be caught by process_profile.php
         } catch (Exception $e) {
             $this->conn->rollBack();
-            error_log("Vendor.updateVendorServiceOfferings general error: " . $e->getMessage());
-            return false;
+            error_log("ERROR: Vendor.updateVendorServiceOfferings General Exception: " . $e->getMessage());
+            throw $e; // Re-throw
         }
     }
-
 
     // Add portfolio item
     public function addPortfolioItem($vendor_id, $data) {
@@ -253,7 +260,7 @@ class Vendor {
             $stmt = $this->conn->prepare("INSERT INTO vendor_portfolios 
                 (vendor_id, title, description, event_type_id, image_url, 
                  video_url, project_date, client_testimonial, is_featured)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"); //
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             
             return $stmt->execute([
                 $vendor_id,
@@ -281,7 +288,7 @@ class Vendor {
                 LEFT JOIN event_types et ON vp.event_type_id = et.id
                 WHERE vp.vendor_id = ?
                 ORDER BY vp.display_order, vp.created_at DESC
-            "); //
+            ");
             $stmt->execute([$vendor_id]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -301,7 +308,7 @@ class Vendor {
                 end_time = VALUES(end_time),
                 status = VALUES(status),
                 updated_at = NOW()
-        "); //
+        ");
         
         return $stmt->execute([
             $vendorId,
@@ -326,7 +333,7 @@ class Vendor {
                 vendor_id = ? AND
                 date BETWEEN ? AND ? // Query by date
             ORDER BY date, start_time
-        "); //
+        ");
         
         $stmt->execute([$vendorId, $startDate, $endDate]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -344,7 +351,7 @@ class Vendor {
                 WHERE ar.event_id = ? AND ar.service_id = ?
                 ORDER BY ar.total_score DESC
                 LIMIT ?
-            "); //
+            ");
             $stmt->execute([$event_id, $service_id, $limit]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
