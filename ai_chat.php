@@ -7,8 +7,10 @@ error_reporting(E_ALL);
 session_start();
 require_once '../includes/config.php';
 require_once '../includes/ai_functions.php'; // For AI_Assistant class
-require_once '../classes/Event.class.php';   // For Event class (if saving event later)
+require_once '../classes/Event.class.php';   // For Event class (if needed for some helper function)
 require_once '../classes/User.class.php';    // For User data
+require_once '../classes/Vendor.class.php';  // For Vendor data (e.g., fetching categories/services)
+
 
 // Retrieve user_id immediately after session_start and require authentication.
 $user_id = $_SESSION['user_id'] ?? null;
@@ -39,522 +41,212 @@ if ($user_type == 2) { // Assuming 2 is the user_type_id for vendors
 }
 
 $ai_assistant = new AI_Assistant($pdo);
-$event_class = new Event($pdo); // Instantiate Event class
+$event_class = new Event($pdo);
+$vendor_class = new Vendor($pdo); // Instantiate Vendor class to fetch services and categories
 
-// --- AI Chat Session Management ---
-$session_id = $_GET['session_id'] ?? null;
-$current_session = null;
-$messages = []; // Array to store chat history
+$recommended_vendors = [];
+$form_data = $_SESSION['ai_form_data'] ?? []; // Retain form data on reload/error
+$form_errors = $_SESSION['ai_form_errors'] ?? []; // Retain errors
+unset($_SESSION['ai_form_data'], $_SESSION['ai_form_errors']);
 
-// Function to fetch chat session from DB or create a new one
-function getOrCreateChatSession($pdo, $user_id, $session_id = null) {
-    error_log("Debug: Inside getOrCreateChatSession() for user: " . $user_id . ", session: " . ($session_id ?? 'new')); // DEBUG
-    if ($session_id) {
-        $stmt = $pdo->prepare("SELECT * FROM ai_chat_sessions WHERE id = ? AND user_id = ?");
-        $stmt->execute([$session_id, $user_id]);
-        $session = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($session) {
-            error_log("Debug: Existing session found: " . $session['id']); // DEBUG
-            return $session;
-        }
-    }
+// Fetch necessary data for form dropdowns
+$event_types = dbFetchAll("SELECT id, type_name FROM event_types WHERE is_active = TRUE ORDER BY type_name ASC");
+$all_services = dbFetchAll("SELECT id, service_name FROM vendor_services WHERE is_active = TRUE ORDER BY service_name ASC");
+$vendor_categories = $vendor_class->getAllVendorCategories(); // For grouping services
 
-    error_log("Debug: Creating new session for user: " . $user_id); // DEBUG
-    $session_token = bin2hex(random_bytes(16)); // Generate a unique token
-    $stmt = $pdo->prepare("INSERT INTO ai_chat_sessions (user_id, session_token, current_step, status) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$user_id, $session_token, 'start', 'active']); // 'start' is the initial step
-    $new_session_id = $pdo->lastInsertId();
-
-    error_log("Debug: New session created with ID: " . $new_session_id); // DEBUG
-    return [
-        'id' => $new_session_id,
-        'user_id' => $user_id,
-        'session_token' => $session_token,
-        'event_data' => null,
-        'current_step' => 'start',
-        'completed_steps' => null,
-        'context_data' => null, // Ensure context_data is initialized as null
-        'status' => 'active',
-        'created_at' => date('Y-m-d H:i:s'),
-        'updated_at' => date('Y-m-d H:i:s')
+// --- Handle Form Submission ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['get_recommendations'])) {
+    $event_details_input = [
+        'event_type_id' => filter_var($_POST['event_type_id'] ?? '', FILTER_VALIDATE_INT),
+        'budget_min' => filter_var($_POST['budget_min'] ?? '', FILTER_VALIDATE_FLOAT),
+        'budget_max' => filter_var($_POST['budget_max'] ?? '', FILTER_VALIDATE_FLOAT),
+        'event_date' => $_POST['event_date'] ?? '',
+        'location_string' => trim($_POST['location_string'] ?? ''),
+        'service_ids' => $_POST['services'] ?? [] // Array of selected service IDs (already correctly named here)
     ];
-}
 
-// Function to save a message to DB
-function saveMessage($pdo, $session_id, $message_type, $message_content, $intent = null, $entities = null) {
-    error_log("Debug: Inside saveMessage() for type: " . $message_type); // DEBUG
-    $stmt = $pdo->prepare("INSERT INTO ai_chat_messages (session_id, message_type, message_content, intent, entities) VALUES (?, ?, ?, ?, ?)");
-    $stmt->execute([$session_id, $message_type, $message_content, $intent, $entities ? json_encode($entities) : null]);
-    error_log("Debug: Message saved."); // DEBUG
-}
+    $validation_errors = [];
 
-// Function to get messages for a session
-function getMessages($pdo, $session_id) {
-    error_log("Debug: Inside getMessages()"); // DEBUG
-    $stmt = $pdo->prepare("SELECT * FROM ai_chat_messages WHERE session_id = ? ORDER BY created_at ASC");
-    $stmt->execute([$session_id]);
-    $msgs = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    error_log("Debug: Fetched " . count($msgs) . " messages."); // DEBUG
-    return $msgs;
-}
-
-// Function to update session state (e.g., current_step, event_data)
-function updateSession($pdo, $session_id, $data) {
-    error_log("Debug: Inside updateSession() for session ID: " . $session_id); // DEBUG
-    $set_clauses = [];
-    $params = [];
-    foreach ($data as $key => $value) {
-        $set_clauses[] = "`$key` = ?"; // Use backticks around key to prevent SQL keywords issues
-        $params[] = is_array($value) ? json_encode($value) : $value;
+    if (empty($event_details_input['event_type_id'])) {
+        $validation_errors[] = "Event Type is required.";
     }
-    $params[] = $session_id;
-
-    $sql = "UPDATE ai_chat_sessions SET " . implode(', ', $set_clauses) . " WHERE id = ?";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    error_log("Debug: Session updated. SQL: " . $sql . ", Params: " . json_encode($params)); // DEBUG
-}
-
-// --- IMPORTANT: Handle AJAX POST requests first, before any HTML output ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['message_content'])) {
-    error_log("Debug: POST request for message received."); // DEBUG
-    header('Content-Type: application/json');
-
-    $current_session = getOrCreateChatSession($pdo, $user_id, $session_id); // Ensure session is loaded for POST
-    // Initialize $context_data from the loaded session. This variable will hold the session's context.
-    $context_data = json_decode($current_session['context_data'] ?? '{}', true);
-
-    error_log("Debug: POST start - current_session context_data: " . ($current_session['context_data'] ?? 'NULL')); // DEBUG
-    error_log("Debug: POST start - local \$context_data variable initialized to: " . json_encode($context_data)); // DEBUG
-
-    $user_message_content = trim($_POST['message_content']);
-    saveMessage($pdo, $current_session['id'], 'user', $user_message_content);
-
-    $ai_response_content = '';
-    $next_step = $current_session['current_step'];
-    $event_data = json_decode($current_session['event_data'] ?? '{}', true);
-
-    error_log("Debug: Current Step before switch: " . $current_session['current_step']); // DEBUG
-    switch ($current_session['current_step']) {
-        case 'start':
-            $ai_response_content = "Hello! I'm your Event Planning AI. What type of event are you planning?";
-            $next_step = 'ask_event_type';
-            break;
-
-        case 'ask_event_type':
-            $event_data['event_type_name'] = $user_message_content;
-            
-            $stmt = $pdo->prepare("SELECT id FROM event_types WHERE LOWER(type_name) LIKE ?");
-            error_log("Debug: Event type lookup param: " . strtolower($user_message_content)); // DEBUG
-            try {
-                $stmt->execute(['%' . strtolower($user_message_content) . '%']);
-                $matched_type = $stmt->fetch(PDO::FETCH_ASSOC);
-            } catch (PDOException $e) {
-                error_log("PDOException during event type lookup: " . $e->getMessage()); // DEBUG
-                $matched_type = false;
-            }
-
-            if ($matched_type) {
-                $event_data['event_type_id'] = $matched_type['id'];
-                $ai_response_content = "Got it, a " . htmlspecialchars($user_message_content) . ". And for how many guests do you expect?";
-                $next_step = 'ask_guest_count';
-            } else {
-                $ai_response_content = "Hmm, I'm not familiar with that event type. Could you describe it briefly, or choose from common types like 'Wedding', 'Birthday Party', 'Corporate Event'?";
-                $next_step = 'ask_event_type';
-            }
-            break;
-
-        case 'ask_guest_count':
-            if (is_numeric($user_message_content) && (int)$user_message_content > 0) {
-                $event_data['guest_count'] = (int)$user_message_content;
-                $ai_response_content = "Perfect! What's your approximate budget for this event (e.g., $5000 - $10000)?";
-                $next_step = 'ask_budget';
-            } else {
-                $ai_response_content = "Please provide a valid number for the guest count (e.g., '50', '200').";
-                $next_step = 'ask_guest_count';
-            }
-            break;
-
-        case 'ask_budget':
-            if (preg_match('/\$?(\d+)\s*(?:-\s*\$?(\d+))?/', $user_message_content, $matches)) {
-                $budget_min = (float)$matches[1];
-                $budget_max = isset($matches[2]) ? (float)$matches[2] : $budget_min;
-                
-                $event_data['budget_min'] = $budget_min;
-                $event_data['budget_max'] = $budget_max;
-                
-                $ai_response_content = "Okay, understood your budget. When is the event date? (e.g.,YYYY-MM-DD)";
-                $next_step = 'ask_event_date';
-            } else {
-                $ai_response_content = "Please provide a valid budget, for example, '$5000' or '$5000 - $10000'.";
-                $next_step = 'ask_budget';
-            }
-            break;
-
-        case 'ask_event_date':
-            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $user_message_content)) {
-                $event_data['event_date'] = $user_message_content;
-                $ai_response_content = "Great! Do you have a specific location or venue in mind? (e.g., 'The Grand Ballroom, New York' or 'My backyard')";
-                $next_step = 'ask_location';
-            } else {
-                $ai_response_content = "Please provide the date in يَYYYY-MM-DD format (e.g., 2025-06-15).";
-                $next_step = 'ask_event_date';
-            }
-            break;
-        
-        case 'ask_location':
-            $event_data['location_string'] = $user_message_content;
-            $ai_response_content = "Got it. Now, could you tell me about any specific services you think you'll need? (e.g., 'Catering', 'Photography', 'Music', 'Decorations')";
-            $next_step = 'ask_services';
-            break;
-
-        case 'ask_services':
-            $event_data['special_requirements'] = ($event_data['special_requirements'] ?? '') . "\nServices requested: " . $user_message_content;
-            
-            $ai_response_content = "Understood. I have enough information to create a draft event plan. Would you like to save this event plan now? (Yes/No)";
-            $next_step = 'confirm_save';
-            break;
-
-        case 'confirm_save':
-            if (strtolower($user_message_content) === 'yes') {
-                error_log("Debug: User confirmed save."); // DEBUG
-
-                // --- MODIFIED: Prepare services_needed_array based on special_requirements ---
-                $services_from_chat = [];
-                $service_names_string = $event_data['special_requirements'] ?? '';
-                error_log("Debug: Service extraction - special_requirements string: " . $service_names_string); // DEBUG
-
-                // Attempt to extract service names from the string
-                // Use a broader regex to catch various forms and keywords
-                preg_match_all('/(photography|videography|catering|plated dinner|floral arrangements|venue decor|event planning|live band|dj services|ballroom rental|garden venue|day-of coordination|audio\/visual equipment|music|decorations)/i', $service_names_string, $matches);
-                $extracted_keywords = $matches[0];
-                error_log("Debug: Service extraction - Extracted keywords: " . json_encode($extracted_keywords)); // DEBUG
-                
-                // Fetch all vendor services to map names to IDs
-                $all_vendor_services = dbFetchAll("SELECT id, service_name FROM vendor_services");
-                $service_map_name_to_id = [];
-                foreach ($all_vendor_services as $svc) {
-                    $service_map_name_to_id[strtolower(str_replace([' ', '-', '/'], ['_', '_', '_'], $svc['service_name']))] = $svc['id'];
-                }
-                error_log("Debug: Service extraction - Service Map (normalized keys): " . json_encode($service_map_name_to_id)); // DEBUG
-
-                foreach ($extracted_keywords as $keyword) {
-                    // Normalize keyword for lookup
-                    $normalized_keyword = strtolower(str_replace([' ', '-', '/'], ['_', '_', '_'], $keyword)); 
-                    
-                    // Specific re-mapping for common variations from chat to DB names
-                    if ($normalized_keyword === 'decorations') {
-                        $normalized_keyword = 'venue_decor_&_styling'; // Correctly map 'decorations' from chat to DB service name
-                    } elseif ($normalized_keyword === 'audio_visual_equipment') {
-                        $normalized_keyword = 'audio/visual_equipment'; // Keep slash for DB match if it exists
-                    }
-                    
-                    if (isset($service_map_name_to_id[$normalized_keyword])) {
-                        $services_from_chat[] = [
-                            'service_id' => $service_map_name_to_id[$normalized_keyword],
-                            'priority' => 'medium',
-                            'budget_allocated' => null,
-                            'specific_requirements' => $keyword, // Store original keyword as specific requirement
-                            'status' => 'needed'
-                        ];
-                    } else {
-                        error_log("Debug: Service keyword '{$keyword}' (normalized: {$normalized_keyword}) not found in service map.");
-                    }
-                }
-                error_log("Debug: Service extraction - Final services_from_chat array: " . json_encode($services_from_chat)); // DEBUG
-                // --- END MODIFIED SERVICE EXTRACTION ---
-
-                $event_to_save = [
-                    'user_id' => $user_id,
-                    'title' => ($event_data['event_type_name'] ?? 'AI Planned') . ' Event' . (isset($event_data['event_date']) ? ' on ' . $event_data['event_date'] : ''),
-                    'description' => 'Planned with AI Assistant. ' . ($event_data['special_requirements'] ?? ''),
-                    'event_type_id' => $event_data['event_type_id'] ?? 1,
-                    'event_date' => $event_data['event_date'] ?? date('Y-m-d', strtotime('+1 month')),
-                    'event_time' => null,
-                    'end_date' => null,
-                    'end_time' => null,
-                    'location_string' => $event_data['location_string'] ?? '',
-                    'venue_name' => null,
-                    'venue_address' => null,
-                    'venue_city' => null,
-                    'venue_state' => null,
-                    'venue_country' => null,
-                    'venue_postal_code' => null,
-                    'guest_count' => $event_data['guest_count'] ?? null,
-                    'budget_min' => $event_data['budget_min'] ?? null,
-                    'budget_max' => $event_data['budget_max'] ?? null,
-                    'status' => 'planning',
-                    'special_requirements' => $event_data['special_requirements'] ?? null,
-                    'ai_preferences' => json_encode(['conversation_plan' => $event_data]),
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s'),
-                    'services_needed_array' => $services_from_chat // MODIFIED: Pass the extracted services
-                ];
-
-                try {
-                    error_log("Debug: Calling Event->createEvent() with event_to_save: " . json_encode($event_to_save)); // DEBUG
-                    $new_event_id = $event_class->createEvent($event_to_save);
-                    
-                    if ($new_event_id) {
-                        $ai_response_content = "Great! Your event has been saved! You can view it here: <a href='" . BASE_URL . "public/event.php?id=" . $new_event_id . "'>View Event</a>. Would you like me to suggest some vendors for this event?";
-                        $next_step = 'ask_vendor_suggestions';
-                        $context_data['event_id'] = $new_event_id; // MODIFIED: Update the local $context_data array
-                        error_log("Debug: confirm_save - local \$context_data updated with event_id: " . $context_data['event_id']); // DEBUG
-                    } else {
-                        $ai_response_content = "I encountered an error saving your event. Please try again later. Or would you like to continue planning?";
-                        $next_step = 'confirm_save';
-                        error_log("Debug: Event save returned false."); // DEBUG
-                    }
-                } catch (Exception $e) {
-                    error_log("AI Chat - Save Event Error: " . $e->getMessage()); // Logs to server error log
-                    $ai_response_content = "Oops! Something went wrong while trying to save your event. Error: " . htmlspecialchars($e->getMessage()) . ". Would you like to try again?";
-                    $next_step = 'confirm_save';
-                    error_log("Debug: Caught Exception during event save: " . $e->getMessage()); // DEBUG
-                }
-            } else {
-                $ai_response_content = "Okay, I won't save it as an event for now. What else can I help you with? Or would you like to restart planning?";
-                $next_step = 'restart_or_continue';
-                error_log("Debug: User declined save."); // DEBUG
-            }
-            break;
-        
-        case 'ask_vendor_suggestions':
-            $context_data = json_decode($current_session['context_data'] ?? '{}', true); // Re-initialize from loaded session
-            $event_id_for_vendors = $context_data['event_id'] ?? null;
-            
-            error_log("Debug: ask_vendor_suggestions - current_session context_data (from loaded session): " . json_encode($context_data)); // DEBUG
-            error_log("Debug: ask_vendor_suggestions - parsed event_id_for_vendors: " . ($event_id_for_vendors ?? 'NULL')); // DEBUG
-
-            if (strtolower($user_message_content) === 'yes') {
-                if ($event_id_for_vendors) {
-                    error_log("Debug: ask_vendor_suggestions - event_id_for_vendors is valid: " . $event_id_for_vendors); // DEBUG
-                    $event_details_for_ai = $event_class->getEventById($event_id_for_vendors, $user_id); // Fetch full event details
-                    
-                    if ($event_details_for_ai) {
-                        error_log("Debug: Event details fetched for vendor recommendation: " . json_encode($event_details_for_ai)); // DEBUG
-                        // Phase 1: Get raw vendor recommendations from the database
-                        $recommended_vendors = $ai_assistant->getVendorRecommendations($event_id_for_vendors);
-                        error_log("Debug: Recommended vendors from DB: " . json_encode($recommended_vendors)); // DEBUG
-
-                        if (!empty($recommended_vendors)) {
-                            // Phase 2: Use OpenAI to summarize vendor recommendations
-                            error_log("Debug: Calling OpenAI for vendor summary..."); // DEBUG
-                            $ai_response_content = $ai_assistant->generateVendorSummary($recommended_vendors, $event_details_for_ai);
-                            error_log("Debug: OpenAI vendor summary generated."); // DEBUG
-                            $next_step = 'end_chat';
-                        } else {
-                            $ai_response_content = "I couldn't find any suitable vendors for your event based on the current criteria. Would you like to adjust your plan or search manually?";
-                            $next_step = 'restart_or_continue';
-                            error_log("Debug: No suitable vendors found from DB."); // DEBUG
-                        }
-                    } else {
-                        $ai_response_content = "I couldn't retrieve the event details to suggest vendors. Would you like to start a new plan?";
-                        $next_step = 'restart_or_continue';
-                        error_log("Debug: Failed to fetch event details for vendor recommendation."); // DEBUG
-                    }
-                } else {
-                    $ai_response_content = "I couldn't find the event details to suggest vendors. Would you like to start a new plan?";
-                    $next_step = 'restart_or_continue';
-                    error_log("Debug: event_id_for_vendors is NULL or empty."); // DEBUG
-                }
-            } else {
-                $ai_response_content = "Okay, no vendor suggestions for now. What else can I help you with?";
-                $next_step = 'restart_or_continue';
-                error_log("Debug: User declined vendor suggestions."); // DEBUG
-            }
-            break;
-
-        case 'restart_or_continue':
-            if (strtolower($user_message_content) === 'restart') {
-                updateSession($pdo, $current_session['id'], ['current_step' => 'start', 'event_data' => null, 'context_data' => null]);
-                $ai_response_content = "Okay, let's start fresh! What type of event are you planning?";
-                $next_step = 'ask_event_type';
-            } else {
-                $ai_response_content = "Alright, let me know if you need anything else.";
-                $next_step = 'end_chat';
-            }
-            break;
-
-        case 'end_chat':
-            $ai_response_content = "It was great chatting with you! Feel free to come back anytime. Goodbye!";
-            $next_step = 'end_chat';
-            break;
-
-        default:
-            $ai_response_content = "I'm not sure how to respond to that. Can you please rephrase?";
-            break;
+    if (empty($event_details_input['event_date'])) {
+        $validation_errors[] = "Event Date is required.";
+    } elseif (strtotime($event_details_input['event_date']) < strtotime('today')) {
+        $validation_errors[] = "Event date cannot be in the past.";
+    }
+    if (empty($event_details_input['location_string'])) {
+        $validation_errors[] = "Event Location is required.";
+    }
+    if (!empty($event_details_input['budget_min']) && !is_numeric($event_details_input['budget_min'])) {
+        $validation_errors[] = "Minimum budget must be a valid number.";
+    }
+    if (!empty($event_details_input['budget_max']) && !is_numeric($event_details_input['budget_max'])) {
+        $validation_errors[] = "Maximum budget must be a valid number.";
+    }
+    if (is_numeric($event_details_input['budget_min']) && is_numeric($event_details_input['budget_max']) && $event_details_input['budget_min'] > $event_details_input['budget_max']) {
+        $validation_errors[] = "Minimum budget cannot be greater than maximum budget.";
+    }
+    if (empty($event_details_input['service_ids'])) {
+        $validation_errors[] = "At least one preferred service is required.";
     }
 
-    saveMessage($pdo, $current_session['id'], 'ai', $ai_response_content);
-    // MODIFIED: Use the updated $context_data variable directly
-    updateSession($pdo, $current_session['id'], ['current_step' => $next_step, 'event_data' => json_encode($event_data), 'context_data' => json_encode($context_data)]);
+    if (!empty($validation_errors)) {
+        $_SESSION['ai_form_data'] = $_POST;
+        $_SESSION['ai_form_errors'] = $validation_errors;
+        header("Location: " . BASE_URL . "public/ai_chat.php");
+        exit();
+    }
 
-    $updated_messages = getMessages($pdo, $current_session['id']);
-    echo json_encode(['success' => true, 'messages' => $updated_messages, 'current_step' => $next_step]);
-    exit();
+    try {
+        // Fetch full event type name for context (not strictly needed by getVendorRecommendationsFromForm but good for overall context)
+        $selected_event_type = dbFetch("SELECT type_name FROM event_types WHERE id = ?", [$event_details_input['event_type_id']]);
+        
+        // Prepare event data for AI Assistant - CORRECTED KEY HERE
+        $event_data_for_ai = [
+            'event_type_name' => $selected_event_type['type_name'] ?? 'General Event',
+            'budget_min' => $event_details_input['budget_min'] ?? 0,
+            'budget_max' => $event_details_input['budget_max'] ?? 0,
+            'event_date' => $event_details_input['event_date'],
+            'location_string' => $event_details_input['location_string'],
+            'service_ids' => $event_details_input['service_ids'] // <--- CORRECTED: Pass service_ids directly
+        ];
+
+        $recommended_vendors = $ai_assistant->getVendorRecommendationsFromForm($event_data_for_ai);
+
+    } catch (Exception $e) {
+        $_SESSION['ai_form_data'] = $_POST;
+        $_SESSION['ai_form_errors'] = ["An error occurred during recommendations: " . htmlspecialchars($e->getMessage())];
+        header("Location: " . BASE_URL . "public/ai_chat.php");
+        exit();
+    }
 }
 
-// --- Main page load logic (initial setup) ---
-// Initialize session if not set via POST, and retrieve messages
-$current_session = getOrCreateChatSession($pdo, $user_id, $session_id);
-$messages = getMessages($pdo, $current_session['id']);
-
-// Initial AI greeting for new sessions (if no POST or initial load)
-if (empty($messages) && $current_session['current_step'] === 'start') {
-    $initial_ai_message = "Hello! I'm your Event Planning AI. What type of event are you planning?";
-    saveMessage($pdo, $current_session['id'], 'ai', $initial_ai_message);
-    updateSession($pdo, $current_session['id'], ['current_step' => 'ask_event_type']);
-    $messages = getMessages($pdo, $current_session['id']); // Refresh messages to include initial greeting
-}
 
 // INCLUDE HEADER AND FOOTER ONLY FOR NON-AJAX REQUESTS (Normal page load)
 include 'header.php';
 ?>
-<div class="ai-chat-wrapper">
-    <div class="ai-chat-header">
-        <h2>EventCraftAI Assistant</h2>
-        <button id="downloadChatBtn" class="btn btn-secondary btn-sm">Download Chat</button>
-    </div>
-    <div class="ai-chat-messages" id="ai-chat-messages">
-        <?php foreach ($messages as $message): ?>
-            <div class="message-bubble <?= $message['message_type'] === 'user' ? 'user-message' : 'ai-message' ?>">
-                <div class="message-content"><?= nl2br(htmlspecialchars($message['message_content'])) ?></div>
-                <div class="message-time"><?= date('H:i', strtotime($message['created_at'])) ?></div>
+<div class="ai-recommendation-container">
+    <div class="ai-form-section">
+        <h1>Find Your Perfect Event Vendors with AI</h1>
+        <p class="subtitle">Tell us about your event, and our AI will suggest the best vendors for your needs.</p>
+
+        <?php if (!empty($form_errors)): ?>
+            <div class="alert error">
+                <ul>
+                    <?php foreach ($form_errors as $error): ?>
+                        <li><?= htmlspecialchars($error) ?></li>
+                    <?php endforeach; ?>
+                </ul>
             </div>
-        <?php endforeach; ?>
+        <?php endif; ?>
+
+        <form action="<?= BASE_URL ?>public/ai_chat.php" method="POST" class="ai-event-form">
+            <div class="form-group">
+                <label for="event_type_id">Event Type <span class="required">*</span></label>
+                <select id="event_type_id" name="event_type_id" required>
+                    <option value="">Select event type</option>
+                    <?php foreach ($event_types as $type): ?>
+                        <option value="<?= htmlspecialchars($type['id']) ?>"
+                            <?= (isset($form_data['event_type_id']) && $form_data['event_type_id'] == $type['id']) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($type['type_name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="budget_min">Minimum Budget ($)</label>
+                    <input type="number" id="budget_min" name="budget_min" min="0" step="100"
+                           value="<?= htmlspecialchars($form_data['budget_min'] ?? '') ?>" placeholder="e.g., 5000">
+                </div>
+                <div class="form-group">
+                    <label for="budget_max">Maximum Budget ($)</label>
+                    <input type="number" id="budget_max" name="budget_max" min="0" step="100"
+                           value="<?= htmlspecialchars($form_data['budget_max'] ?? '') ?>" placeholder="e.g., 10000">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="event_date">Event Date <span class="required">*</span></label>
+                    <input type="date" id="event_date" name="event_date" required
+                           value="<?= htmlspecialchars($form_data['event_date'] ?? '') ?>">
+                </div>
+                <div class="form-group">
+                    <label for="location_string">Event Location <span class="required">*</span></label>
+                    <input type="text" id="location_string" name="location_string" required
+                           value="<?= htmlspecialchars($form_data['location_string'] ?? '') ?>"
+                           placeholder="e.g., Lahore, Pakistan or The Grand Ballroom">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="services">Preferred Services <span class="required">*</span></label>
+                <select id="services" name="services[]" multiple size="8" required>
+                    <?php
+                    $selected_services_from_form = $form_data['services'] ?? [];
+                    foreach ($vendor_categories as $category): ?>
+                        <optgroup label="<?= htmlspecialchars($category['category_name']) ?>">
+                            <?php
+                            // Filter all_services by current category_id
+                            $stmt_category_services = $pdo->prepare("SELECT id, service_name FROM vendor_services WHERE category_id = ? AND is_active = TRUE ORDER BY service_name ASC");
+                            $stmt_category_services->execute([$category['id']]);
+                            $services_in_category = $stmt_category_services->fetchAll(PDO::FETCH_ASSOC);
+
+                            foreach ($services_in_category as $service): ?>
+                                <option value="<?= htmlspecialchars($service['id']) ?>"
+                                    <?= in_array($service['id'], $selected_services_from_form) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($service['service_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endforeach; ?>
+                </select>
+                <small class="form-text-muted">Hold CTRL/CMD to select multiple services.</small>
+            </div>
+
+            <button type="submit" name="get_recommendations" class="btn btn-primary btn-large">Get Recommendations</button>
+        </form>
     </div>
-    <div class="ai-chat-input">
-        <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
-        <button id="sendMessageBtn" class="btn btn-primary">Send</button>
-    </div>
+
+    <?php if (!empty($recommended_vendors)): ?>
+        <div class="ai-recommendations-results">
+            <h2>Top Recommended Vendors</h2>
+            <p class="subtitle">Based on your preferences, here are the best matches:</p>
+
+            <div class="vendor-recommendations-grid">
+                <?php foreach ($recommended_vendors as $vendor_item): ?>
+                    <div class="vendor-card-item">
+                        <div class="vendor-card-image" style="background-image: url('<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($vendor_item['profile_image'] ?: 'default-avatar.jpg') ?>')"></div>
+                        <div class="vendor-card-content">
+                            <h3><?= htmlspecialchars($vendor_item['business_name']) ?></h3>
+                            <p class="vendor-city"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($vendor_item['business_city']) ?></p>
+                            <div class="vendor-card-rating">
+                                <?php
+                                $rating = round($vendor_item['rating'] * 2) / 2;
+                                for ($i = 1; $i <= 5; $i++):
+                                    if ($rating >= $i) { echo '<i class="fas fa-star"></i>'; }
+                                    elseif ($rating > ($i - 1) && $rating < $i) { echo '<i class="fas fa-star-half-alt"></i>'; }
+                                    else { echo '<i class="far fa-star"></i>'; }
+                                endfor;
+                                ?>
+                                <span><?= number_format($vendor_item['rating'], 1) ?> (<?= $vendor_item['total_reviews'] ?> Reviews)</span>
+                            </div>
+                            <?php if (!empty($vendor_item['offered_services_names'])): ?>
+                                <p class="vendor-services">Services: <?= htmlspecialchars($vendor_item['offered_services_names']) ?></p>
+                            <?php endif; ?>
+                            <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_item['id']) ?>" class="btn btn-sm btn-secondary">View Profile</a>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <?php if (empty($recommended_vendors)): ?>
+                <div class="empty-state">No vendors found matching your criteria. Try adjusting your preferences.</div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
 </div>
 
 <?php include 'footer.php'; ?>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const chatMessagesContainer = document.getElementById('ai-chat-messages');
-    const messageInput = document.getElementById('messageInput');
-    const sendMessageBtn = document.getElementById('sendMessageBtn');
-    const downloadChatBtn = document.getElementById('downloadChatBtn');
-    const currentSessionId = <?= json_encode($current_session['id']) ?>;
-
-    function scrollToBottom() {
-        chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
-    }
-
-    function addMessageToDisplay(message) {
-        const messageBubble = document.createElement('div');
-        messageBubble.classList.add('message-bubble');
-        messageBubble.classList.add(message.message_type === 'user' ? 'user-message' : 'ai-message');
-        
-        const content = document.createElement('div');
-        content.classList.add('message-content');
-        content.innerHTML = message.message_content.replace(/\n/g, '<br>');
-        
-        const time = document.createElement('div');
-        time.classList.add('message-time');
-        time.textContent = new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        messageBubble.appendChild(content);
-        messageBubble.appendChild(time);
-        chatMessagesContainer.appendChild(messageBubble);
-        scrollToBottom();
-    }
-
-    // Initial scroll on page load
-    scrollToBottom();
-
-    // Send message logic
-    sendMessageBtn.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keydown', function(event) {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            sendMessage();
-        }
-    });
-
-    function sendMessage() {
-        const messageContent = messageInput.value.trim();
-        if (messageContent === '') return;
-
-        addMessageToDisplay({
-            message_type: 'user',
-            message_content: messageContent,
-            created_at: new Date().toISOString()
-        });
-
-        messageInput.value = '';
-        messageInput.style.height = 'auto';
-
-        const formData = new URLSearchParams();
-        formData.append('message_content', messageContent);
-
-        fetch('<?= BASE_URL ?>public/ai_chat.php?session_id=' + currentSessionId, { // Use BASE_URL
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.text().then(text => {
-                    console.error('HTTP Error:', response.status, response.statusText, text);
-                    throw new Error('Network response was not ok: ' + response.statusText + ' - ' + text);
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                chatMessagesContainer.innerHTML = '';
-                data.messages.forEach(msg => addMessageToDisplay(msg));
-            } else {
-                console.error('Error from server (data.success is false):', data.error);
-                addMessageToDisplay({
-                    message_type: 'ai',
-                    message_content: 'Sorry, I encountered an error: ' + (data.error || 'Unknown server error.'),
-                    created_at: new Date().toISOString()
-                });
-                if (data.redirect) {
-                    alert(data.error || 'You have been logged out.');
-                    window.location.href = data.redirect;
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Fetch error (caught by JS):', error);
-            addMessageToDisplay({
-                message_type: 'ai',
-                message_content: 'Network error or unable to get response. Please try again. Check console for details.',
-                created_at: new Date().toISOString()
-            });
-        });
-    }
-
-    messageInput.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = (this.scrollHeight) + 'px';
-    });
-
-    downloadChatBtn.addEventListener('click', function() {
-        const chatHistory = [];
-        document.querySelectorAll('.message-bubble').forEach(bubble => {
-            const sender = bubble.classList.contains('user-message') ? 'You' : 'AI';
-            const time = bubble.querySelector('.message-time').textContent;
-            const content = bubble.querySelector('.message-content').innerText;
-            chatHistory.push(`${time} - ${sender}: ${content}`);
-        });
-
-        const chatText = chatHistory.join('\n');
-        const blob = new Blob([chatText], { type: 'text/plain;charset=utf-8' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'eventcraftai_chat_log.txt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(a.href);
-    });
-
-});
