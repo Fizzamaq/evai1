@@ -21,7 +21,12 @@
     <header class="main-header">
         <div class="container">
             <a href="<?= BASE_URL ?>public/index.php" class="logo">EventCraftAI</a>
-            <nav class="main-nav">
+            
+            <div id="mobile-menu-toggle" class="mobile-menu-icon">
+                <i class="fas fa-bars"></i>
+            </div>
+
+            <nav class="main-nav" id="main-nav-links">
                 <?php if (isset($_SESSION['user_id'])): ?>
                     <?php
                     // Determine which dashboard link to show based on user type
@@ -39,9 +44,8 @@
                     <?php if ($user_type == 1): // Customer specific links ?>
                         <a href="<?= BASE_URL ?>public/events.php">My Events</a>
                         <a href="<?= BASE_URL ?>public/ai_chat.php">AI Assistant</a>
+                        <a href="<?= BASE_URL ?>public/chat.php">Messages</a>
                     <?php elseif ($user_type == 2): // Vendor specific links ?>
-                        <!-- Portfolio and Availability links are removed as requested -->
-                        <!-- Reports link is removed as requested -->
                         <a href="<?= BASE_URL ?>public/vendor_chat.php">Messages</a>
                     <?php endif; ?>
                     <a href="<?= BASE_URL ?>public/profile.php">Profile</a>
