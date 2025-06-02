@@ -197,8 +197,7 @@
 }
 
 .category-icon {
-    font-size: 3.5em; /* Slightly larger icon */
-    /*margin-bottom: var(--spacing-sm);*/
+    font-size: 3.5em;
     margin-bottom: 20px;
     color: var(--secondary-color); /* Use secondary color for category icons */
     transition: transform 0.8s ease;
@@ -357,7 +356,7 @@
 
 /* Styling for the CTA bottom section */
 .cta-bottom-section {
-    background-image: url('../images/cta_bg.jpg'); /* Background image for the CTA section */
+    background-image: url('../images/hero6.jpg'); /* Background image for the CTA section */
     background-size: cover;
     background-position: center;
     color: var(--white); /* Text color for contrast */
