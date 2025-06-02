@@ -195,8 +195,15 @@ unset($_SESSION['profile_error'], $_SESSION['profile_success']);
                     </div>
                 <?php endforeach; ?>
             </div>
+        <?php endif; ?>
+        <button type="submit" name="save_profile_changes" class="btn btn-primary">Save All Changes</button>
+    </form>
 
-            <h2 style="margin-top: 40px;">Add New Portfolio Item</h2> <p>Add new pictures and details to showcase your work on your public profile. This will appear on your public vendor profile page.</p>
+    <?php if ($is_vendor): ?>
+        <h2 style="margin-top: 40px;">Add New Portfolio Item</h2>
+        <p>Add new pictures and details to showcase your work on your public profile. This will appear on your public vendor profile page.</p>
+        
+        <form action="process_profile.php" method="post" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="portfolio_title">Item Title <span class="required">*</span></label>
                 <input type="text" id="portfolio_title" name="portfolio_title" required>
@@ -238,9 +245,8 @@ unset($_SESSION['profile_error'], $_SESSION['profile_success']);
                     <label for="portfolio_is_featured">Feature this item on my profile</label>
                 </div>
             </div>
-
-        <?php endif; ?>
-
-        <button type="submit" name="save_profile_changes" class="btn btn-primary">Save All Changes</button> </form>
+            <button type="submit" name="add_portfolio_item" class="btn btn-primary">Add Portfolio Item</button>
+        </form>
+    <?php endif; ?>
 </div>
 <?php include 'footer.php'; ?>
