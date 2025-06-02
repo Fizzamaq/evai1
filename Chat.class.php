@@ -28,14 +28,20 @@ class Chat {
                 VALUES (?, ?, ?)");
 
             // Bind event_id. PDO automatically handles NULL correctly for INT type.
-            $stmt->execute([$event_id, $user_id, $vendor_id]);
+            $result = $stmt->execute([$event_id, $user_id, $vendor_id]);
 
-            $conversation_id = $this->conn->lastInsertId();
-
-            return $conversation_id;
+            if ($result) {
+                $conversation_id = $this->conn->lastInsertId();
+                return $conversation_id;
+            } else {
+                // Log specific PDO error if execution failed
+                error_log("Chat.class.php startConversation PDO error: " . implode(" ", $stmt->errorInfo()));
+                return false;
+            }
 
         } catch (PDOException $e) {
-            error_log("Start conversation error: " . $e->getMessage());
+            // Log the full PDOException message
+            error_log("Chat.class.php startConversation Exception: " . $e->getMessage());
             return false;
         }
     }
@@ -64,7 +70,7 @@ class Chat {
             $stmt->execute($params);
             return $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            error_log("Get conversation by participants error: " . $e->getMessage());
+            error_log("Chat.class.php getConversationByParticipants error: " . $e->getMessage());
             return false;
         }
     }
@@ -90,7 +96,7 @@ class Chat {
 
             return $this->conn->lastInsertId();
         } catch (PDOException $e) {
-            error_log("Send message error: " . $e->getMessage());
+            error_log("Chat.class.php sendMessage error: " . $e->getMessage());
             return false;
         }
     }
@@ -103,7 +109,7 @@ class Chat {
                 WHERE id = ?");
             return $stmt->execute([$conversation_id]);
         } catch (PDOException $e) {
-            error_log("Update conversation time error: " . $e->getMessage());
+            error_log("Chat.class.php updateConversationTime error: " . $e->getMessage());
             return false;
         }
     }
@@ -118,7 +124,7 @@ class Chat {
             $stmt->execute([$conversation_id, $limit, $offset]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            error_log("Get messages error: " . $e->getMessage());
+            error_log("Chat.class.php getMessages error: " . $e->getMessage());
             return false;
         }
     }
@@ -159,7 +165,7 @@ class Chat {
             $stmt->execute([$user_id, $user_id, $user_id, $user_id, $user_id, $limit]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            error_log("Get conversations error: " . $e->getMessage());
+            error_log("Chat.class.php getUserConversations error: " . $e->getMessage());
             return false;
         }
     }
@@ -172,7 +178,7 @@ class Chat {
                 WHERE conversation_id = ? AND sender_id != ? AND is_read = FALSE");
             return $stmt->execute([$conversation_id, $user_id]);
         } catch (PDOException $e) {
-            error_log("Mark messages as read error: " . $e->getMessage());
+            error_log("Chat.class.php markMessagesAsRead error: " . $e->getMessage());
             return false;
         }
     }
@@ -192,7 +198,7 @@ class Chat {
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             return $result['unread_count'] ?? 0;
         } catch (PDOException $e) {
-            error_log("Get unread count error: " . $e->getMessage());
+            error_log("Chat.class.php getUnreadCount error: " . $e->getMessage());
             return 0;
         }
     }
