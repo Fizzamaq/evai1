@@ -113,24 +113,6 @@ class Vendor {
             return false;
         }
     }
-    
-    // NEW METHOD: Get a single portfolio item by its ID
-    public function getPortfolioItemById($item_id, $vendor_id) {
-        try {
-            $stmt = $this->conn->prepare("
-                SELECT vp.*, et.type_name as event_type_name
-                FROM vendor_portfolios vp
-                LEFT JOIN event_types et ON vp.event_type_id = et.id
-                WHERE vp.id = ? AND vp.vendor_id = ?
-            ");
-            $stmt->execute([$item_id, $vendor_id]);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Vendor.getPortfolioItemById error: " . $e->getMessage());
-            return false;
-        }
-    }
-
 
     // Update vendor profile (assuming vendor_id is the primary key of vendor_profiles)
     public function updateVendor($vendor_profile_id, $data) {
@@ -206,7 +188,7 @@ class Vendor {
                 $data['description'] ?? null
             ]);
         } catch (PDOException $e) {
-            error_log("Add service offering error: . " . $e->getMessage());
+            error_log("Add service offering error: " . $e->getMessage());
             return false;
         }
     }
@@ -296,47 +278,6 @@ class Vendor {
             return false;
         }
     }
-    
-    // NEW METHOD: Update a portfolio item
-    public function updatePortfolioItem($item_id, $vendor_id, $data) {
-        try {
-            $sql = "UPDATE vendor_portfolios SET
-                        title = ?,
-                        description = ?,
-                        event_type_id = ?,
-                        video_url = ?,
-                        project_date = ?,
-                        client_testimonial = ?,
-                        is_featured = ?,
-                        updated_at = NOW()";
-            $params = [
-                $data['title'],
-                $data['description'] ?? null,
-                $data['event_type_id'] ?? null,
-                $data['video_url'] ?? null,
-                $data['project_date'] ?? null,
-                $data['client_testimonial'] ?? null,
-                $data['is_featured'] ?? false
-            ];
-
-            // Only update image_url if a new image is provided
-            if (isset($data['image_url']) && $data['image_url'] !== null) {
-                $sql .= ", image_url = ?";
-                $params[] = $data['image_url'];
-            }
-
-            $sql .= " WHERE id = ? AND vendor_id = ?";
-            $params[] = $item_id;
-            $params[] = $vendor_id;
-
-            $stmt = $this->conn->prepare($sql);
-            return $stmt->execute($params);
-
-        } catch (PDOException $e) {
-            error_log("Update portfolio item error: " . $e->getMessage());
-            return false;
-        }
-    }
 
     // Get vendor portfolio
     public function getVendorPortfolio($vendor_id) {
@@ -352,17 +293,6 @@ class Vendor {
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log("Get portfolio error: " . $e->getMessage());
-            return false;
-        }
-    }
-    
-    // NEW METHOD: Delete a portfolio item
-    public function deletePortfolioItem($item_id, $vendor_id) {
-        try {
-            $stmt = $this->conn->prepare("DELETE FROM vendor_portfolios WHERE id = ? AND vendor_id = ?");
-            return $stmt->execute([$item_id, $vendor_id]);
-        } catch (PDOException $e) {
-            error_log("Delete portfolio item error: " . $e->getMessage());
             return false;
         }
     }
@@ -489,8 +419,7 @@ class Vendor {
 
     // Get count of upcoming bookings for a vendor
     public function getUpcomingEvents($vendorId) {
-        // FIX: Removed 'b.' alias as the table is not aliased in this query
-        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ? AND service_date >= CURDATE() AND status != 'cancelled'");
+        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ? AND service_date >= CURDATE() AND status != 'cancelled'"); //
         $stmt->execute([$vendorId]);
         return $stmt->fetchColumn();
     }
@@ -588,7 +517,8 @@ class Vendor {
                 ORDER BY vp.rating DESC, vp.total_reviews DESC
                 LIMIT ?
             ");
-            $stmt->bindParam(1, $limit, PDO::PARAM_INT);
+            $stmt->bindParam(1, $categoryId, PDO::PARAM_INT);
+            $stmt->bindParam(2, $limit, PDO::PARAM_INT);
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
