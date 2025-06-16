@@ -1,10 +1,5 @@
 <?php
-// public/header.php
 // This file assumes session_start() is handled by config.php
-
-// Prevent duplicate inclusion of the header content
-if (!defined('HEADER_INCLUDED')) {
-    define('HEADER_INCLUDED', true);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -51,7 +46,6 @@ if (!defined('HEADER_INCLUDED')) {
                         <a href="<?= BASE_URL ?>public/ai_chat.php">AI Assistant</a>
                         <a href="<?= BASE_URL ?>public/chat.php">Messages</a>
                     <?php elseif ($user_type == 2): // Vendor specific links ?>
-                        <a href="<?= BASE_URL ?>public/vendor_portfolio.php">Portfolio</a>
                         <a href="<?= BASE_URL ?>public/vendor_chat.php">Messages</a>
                     <?php endif; ?>
                     <a href="<?= BASE_URL ?>public/profile.php">Profile</a>
@@ -65,6 +59,3 @@ if (!defined('HEADER_INCLUDED')) {
         </div>
     </header>
     <main class="container main-content-area">
-<?php
-} // End of HEADER_INCLUDED check
-?>
