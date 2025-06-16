@@ -206,7 +206,7 @@ class Vendor {
                 $data['description'] ?? null
             ]);
         } catch (PDOException $e) {
-            error_log("Add service offering error: " . $e->getMessage());
+            error_log("Add service offering error: . " . $e->getMessage());
             return false;
         }
     }
@@ -489,7 +489,8 @@ class Vendor {
 
     // Get count of upcoming bookings for a vendor
     public function getUpcomingEvents($vendorId) {
-        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ? AND service_date >= CURDATE() AND status != 'cancelled'"); //
+        // FIX: Removed 'b.' alias as the table is not aliased in this query
+        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ? AND service_date >= CURDATE() AND status != 'cancelled'");
         $stmt->execute([$vendorId]);
         return $stmt->fetchColumn();
     }
@@ -587,8 +588,7 @@ class Vendor {
                 ORDER BY vp.rating DESC, vp.total_reviews DESC
                 LIMIT ?
             ");
-            $stmt->bindParam(1, $categoryId, PDO::PARAM_INT);
-            $stmt->bindParam(2, $limit, PDO::PARAM_INT);
+            $stmt->bindParam(1, $limit, PDO::PARAM_INT);
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
