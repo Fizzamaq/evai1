@@ -71,11 +71,8 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
                 <p><strong>Member Since:</strong> <?= date('F Y', strtotime($profile['created_at'])) ?></p>
                 
                 <a href="edit_profile.php" class="btn">Edit Profile</a>
-                <?php /* The "View Public Portfolio" button is removed from here:
                 <?php if ($is_vendor): ?>
-                    <a href="vendor_portfolio.php" class="btn btn-secondary" style="margin-left: 10px;">View Public Portfolio</a>
-                <?php endif; ?>
-                */ ?>
+                    <a href="vendor_portfolio.php" class="btn btn-secondary" style="margin-left: 10px;">View Public Portfolio</a> <?php endif; ?>
             </div>
         </div>
 
@@ -98,7 +95,7 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
                     <h2>Services Offered</h2>
                     <?php if (!empty($vendor_services_offered)): ?>
                         <?php foreach ($vendor_services_offered as $category_name => $services): ?>
-                            <h4><?= htmlspecialchars($category_name) ?></h4>
+                            <h4><?= htmlspecialchars($category['category_name']) ?></h4>
                             <ul>
                                 <?php foreach ($services as $service): ?>
                                     <li><?= htmlspecialchars($service['service_name']) ?></li>
@@ -111,7 +108,7 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
                 </div>
             </div>
 
-            <?php /* The portfolio display section is also removed from here, as it's now fully on vendor_portfolio.php
+            <?php /*
             <div class="profile-section" style="margin-top: 30px;">
                 <h2>My Portfolio Items</h2>
                 <?php if (!empty($portfolio_items)): ?>
