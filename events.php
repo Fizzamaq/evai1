@@ -1,9 +1,9 @@
 <?php
 // public/events.php
-// session_start(); // Removed: handled by config.php
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';
 require_once '../classes/Event.class.php';
+require_once '../classes/Booking.class.php'; // Needed to check for bookings
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -12,13 +12,13 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // Pass PDO to class constructors
-$user = new User($pdo); 
-$event = new Event($pdo); 
+$user = new User($pdo);
+$event = new Event($pdo);
+$booking_obj = new Booking($pdo); // Instantiate Booking class
 
 $user_data = $user->getUserById($_SESSION['user_id']);
-$user_events = $event->getUserEvents($_SESSION['user_id']);
 
-// Handle event deletion
+// Handle event deletion (still applicable for AI-created events)
 if (isset($_POST['delete_event'])) {
     $event_id = $_POST['event_id'];
     if ($event->deleteEvent($event_id, $_SESSION['user_id'])) {
@@ -30,6 +30,29 @@ if (isset($_POST['delete_event'])) {
     header('Location: ' . BASE_URL . 'public/events.php');
     exit();
 }
+
+// --- Modified logic to fetch only AI-created events with bookings ---
+try {
+    // Select events where ai_preferences is NOT NULL and there is at least one booking
+    $stmt = $pdo->prepare("
+        SELECT e.*, et.type_name
+        FROM events e
+        JOIN event_types et ON e.event_type_id = et.id
+        WHERE e.user_id = :user_id
+          AND e.ai_preferences IS NOT NULL
+          AND e.status != 'deleted' -- Exclude deleted events
+          AND EXISTS (SELECT 1 FROM bookings b WHERE b.event_id = e.id)
+        ORDER BY e.event_date ASC, e.created_at DESC
+    ");
+    $stmt->execute([':user_id' => $_SESSION['user_id']]);
+    $user_events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log("Error fetching AI-created and booked events: " . $e->getMessage());
+    $_SESSION['error_message'] = "Failed to load events. Please try again.";
+    $user_events = []; // Ensure $user_events is an empty array on error
+}
+// --- End of modified logic ---
+
 
 // Retrieve messages from session if any
 $success_message = $_SESSION['success_message'] ?? null;
@@ -50,39 +73,38 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
 </head>
 <body>
     <?php include 'header.php'; ?>
-    
+
     <div class="events-container">
         <div class="events-header">
             <div>
                 <h1>My Events</h1>
-                <p>Manage and track all your events</p>
+                <p>Track your AI-planned and booked events.</p>
             </div>
             <div>
-                <a href="create_event.php" class="btn btn-primary create-event-btn">+ Create New Event</a>
-                <a href="ai_chat.php" class="btn btn-secondary create-event-btn">AI Assistant</a>
+                <a href="ai_chat.php" class="btn btn-primary">Plan New Event with AI</a>
             </div>
         </div>
-        
+
         <?php if (isset($success_message)): ?>
             <div class="alert success"><?php echo htmlspecialchars($success_message); ?></div>
         <?php endif; ?>
-        
+
         <?php if (isset($error_message)): ?>
             <div class="alert error"><?php echo htmlspecialchars($error_message); ?></div>
         <?php endif; ?>
-        
+
         <?php if (empty($user_events)): ?>
             <div class="empty-state">
-                <h3>No Events Yet</h3>
-                <p>Start planning your first event!</p>
-                <a href="create_event.php" class="btn btn-primary create-event-btn" style="display: inline-block; margin-top: 20px;">Create Your First Event</a>
+                <h3>No AI-Planned & Booked Events Yet</h3>
+                <p>Your AI-assisted event plans will appear here once you've chosen vendors.</p>
+                <a href="ai_chat.php" class="btn btn-primary create-event-btn" style="display: inline-block; margin-top: 20px;">Start Planning with AI</a>
             </div>
         <?php else: ?>
             <div class="events-grid">
                 <?php foreach ($user_events as $event_item): ?>
                     <div class="event-card">
                         <div class="event-title"><?php echo htmlspecialchars($event_item['title']); ?></div>
-                        
+
                         <div class="event-meta">
                             <span><i class="fas fa-calendar-alt"></i> <?php echo date('M j, Y', strtotime($event_item['event_date'])); ?></span>
                             <span><i class="fas fa-users"></i> <?php echo $event_item['guest_count'] ?: 'TBD'; ?> guests</span>
@@ -91,11 +113,11 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
                                 <?php echo $event_item['status'] ?: 'Planning'; ?>
                             </span>
                         </div>
-                        
+
                         <div class="event-description">
                             <?php echo htmlspecialchars(substr($event_item['description'] ?: 'No description available.', 0, 120)) . (strlen($event_item['description'] ?: '') > 120 ? '...' : ''); ?>
                         </div>
-                        
+
                         <div class="event-actions">
                             <a href="event.php?id=<?php echo $event_item['id']; ?>" class="btn btn-primary btn-sm">View Details</a>
                             <a href="edit_event.php?id=<?php echo $event_item['id']; ?>" class="btn btn-secondary btn-sm">Edit</a>
@@ -109,9 +131,9 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
             </div>
         <?php endif; ?>
     </div>
-    
+
     <?php include 'footer.php'; ?>
-    
+
     <script>
         // Add smooth animations (if desired, this is a basic example)
         document.addEventListener('DOMContentLoaded', function() {
