@@ -11,53 +11,38 @@ if (!isset($_SESSION['vendor_id'])) {
     exit();
 }
 
-// Handle calendar updates
+// Handle calendar updates (POST request) - This part remains the same as it's an API endpoint for FullCalendar
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Assuming $_POST['dates'] contains a JSON string or similar structure
-    // For FullCalendar, availability updates usually come as individual event objects.
-    // This needs to be clarified based on how FullCalendar sends data for updates.
-    // Let's assume a simplified single update:
-    $date = $_POST['date'] ?? null;
-    $start_time = $_POST['start_time'] ?? null;
-    $end_time = $_POST['end_time'] ?? null;
-    $status = $_POST['status'] ?? 'available';
+    // It's better to read input from php://input for AJAX POST requests
+    $data = json_decode(file_get_contents('php://input'), true);
 
-    if ($date && $start_time && $end_time) {
-        try {
-            $vendor->updateAvailability($_SESSION['vendor_id'], $date, $start_time, $end_time, $status);
-            // For a real API endpoint, you'd usually return JSON success/error.
-            // For a direct page, redirect or show message.
-            $_SESSION['success_message'] = "Availability updated successfully!";
-        } catch (Exception $e) {
-            $_SESSION['error_message'] = "Error updating availability: " . $e->getMessage();
-        }
-    } else {
-         $_SESSION['error_message'] = "Invalid availability data provided.";
+    // Ensure required data is present
+    if (!isset($data['date']) || !isset($data['start_time']) || !isset($data['end_time']) || !isset($data['status'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Missing availability data.']);
+        exit();
     }
-    header('Location: ' . $_SERVER['REQUEST_URI']); // Redirect to avoid re-submission
-    exit();
+
+    try {
+        $vendor->updateAvailability(
+            $_SESSION['vendor_id'],
+            $data['date'],
+            $data['start_time'],
+            $data['end_time'],
+            $data['status']
+        );
+        http_response_code(200);
+        echo json_encode(['success' => true, 'message' => 'Availability updated successfully!']);
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => "Error updating availability: " . $e->getMessage()]);
+    }
+    exit(); // Important to exit after AJAX response
 }
 
-// Fetch current month's availability for display
-$start_date_display = date('Y-m-01');
-$end_date_display = date('Y-m-t');
-$events = $vendor->getAvailability($_SESSION['vendor_id'], $start_date_display, $end_date_display);
 
-// Format events for FullCalendar if needed
-$fullCalendarEvents = array_map(function($event) {
-    return [
-        'id' => $event['id'],
-        'title' => ucfirst($event['status']),
-        'start' => $event['date'] . 'T' . $event['start_time'], // Combine date and time
-        'end' => $event['date'] . 'T' . $event['end_time'],     // Combine date and time
-        'allDay' => false,
-        'status' => $event['status'], // Custom property for styling
-        'classNames' => ['fc-event-' . $event['status']]
-    ];
-}, $events);
-
-// Convert PHP array to JSON for JavaScript
-$jsonEvents = json_encode($fullCalendarEvents);
+// The initial PHP fetch for $fullCalendarEvents and $jsonEvents is no longer needed here
+// because the JavaScript will now fetch events directly via the FullCalendar event source function.
 
 ?>
 
@@ -67,16 +52,17 @@ $jsonEvents = json_encode($fullCalendarEvents);
     <title>Availability Manager</title>
     <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/vendor.css">
     <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/style.css">
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script> <style>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <style>
+        /* Specific page styles for vendor_availability.php calendar */
         #calendar {
             max-width: 1000px;
             margin: 20px auto;
             padding: 20px;
             background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 12px; /* Increased border radius for eye-catchy look */
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15); /* More pronounced shadow */
         }
-
         .fc-event {
             cursor: pointer;
             padding: 3px;
@@ -84,22 +70,86 @@ $jsonEvents = json_encode($fullCalendarEvents);
             font-size: 0.9em;
         }
 
-        .fc-event-available {
-            background: #c8e6c9;
-            border-color: #a5d6a7;
-            color: #1b5e20;
+        /* Modal specific styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000; /* Ensure it's on top */
         }
-
-        .fc-event-booked {
-            background: #ffcdd2;
-            border-color: #ef9a9a;
-            color: #b71c1c;
+        .modal-content {
+            background: var(--white);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            position: relative;
         }
-
-        .fc-event-blocked {
-            background: #e0e0e0;
-            border-color: #bdbdbd;
-            color: #424242;
+        .modal-content h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+            font-size: 1.5em;
+        }
+        .modal-buttons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-around;
+            gap: 10px;
+            flex-wrap: wrap; /* Allow buttons to wrap */
+        }
+        .modal-buttons .btn {
+            flex-grow: 1;
+            font-size: 0.9em;
+            padding: 10px 15px;
+            border-radius: 8px;
+        }
+        .date-range-display {
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--text-dark);
+        }
+        .status-options {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            text-align: left;
+            padding: 10px 0;
+            border-top: 1px dashed var(--border-color);
+            border-bottom: 1px dashed var(--border-color);
+        }
+        .status-options label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+        .status-options input[type="radio"] {
+            transform: scale(1.2); /* Make radio buttons slightly larger */
+            margin-right: 5px; /* Adjust spacing */
+        }
+        .modal-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: var(--text-subtle);
+        }
+        .modal-close-btn:hover {
+            color: var(--error-color);
         }
     </style>
 </head>
@@ -108,91 +158,247 @@ $jsonEvents = json_encode($fullCalendarEvents);
 
     <div id="calendar"></div>
 
+    <div id="availability-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <button class="modal-close-btn" id="modal-close-btn">&times;</button>
+            <h3>Set Availability Status</h3>
+            <p class="date-range-display">
+                <span id="modal-date-range"></span>
+                <span id="modal-time-range"></span>
+            </p>
+            <div class="status-options">
+                <label>
+                    <input type="radio" name="availability_status" value="available" checked> Available
+                </label>
+                <label>
+                    <input type="radio" name="availability_status" value="booked"> Booked
+                </label>
+                <label>
+                    <input type="radio" name="availability_status" value="blocked"> Blocked
+                </label>
+                <label>
+                    <input type="radio" name="availability_status" value="holiday"> Holiday
+                </label>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" id="modal-save-btn">Save</button>
+                <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         const calendarEl = document.getElementById('calendar');
-        if (calendarEl) {
-            const calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'dayGridMonth',
-                events: <?= $jsonEvents ?>, // Pass events as JSON
-                selectable: true, // Allow selecting dates
-                select: function(info) {
-                    // Prompt user for availability status
-                    const status = prompt('Set availability for ' + info.startStr + ' to ' + info.endStr + '\n(available, booked, blocked):');
-                    if (status && ['available', 'booked', 'blocked'].includes(status.toLowerCase())) {
-                        // Send data to server for update
-                        fetch('vendor_availability.php', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                            },
-                            body: new URLSearchParams({
-                                date: info.startStr.split('T')[0], // Extract date
-                                start_time: info.startStr.split('T')[1] || '00:00:00', // Extract time or default
-                                end_time: info.endStr.split('T')[1] || '23:59:59',   // Extract time or default
-                                status: status.toLowerCase()
-                            })
-                        }).then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                alert('Availability updated!');
-                                calendar.refetchEvents(); // Refresh calendar events
-                            } else {
-                                alert('Error updating availability: ' + data.error);
-                            }
-                        }).catch(error => {
-                            console.error('Error:', error);
-                            alert('An error occurred during update.');
-                        });
-                    }
-                    calendar.unselect(); // Deselect the dates
-                },
-                eventClick: function(info) {
-                    // Handle click on an existing event (e.g., edit or delete)
-                    // Example: alert('Event: ' + info.event.title + ' on ' + info.event.startStr);
-                    if (confirm('Do you want to change the status of this ' + info.event.title + ' slot?')) {
-                        const newStatus = prompt('New status (available, booked, blocked):', info.event.extendedProps.status);
-                        if (newStatus && ['available', 'booked', 'blocked'].includes(newStatus.toLowerCase())) {
-                            fetch('vendor_availability.php', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                },
-                                body: new URLSearchParams({
-                                    date: info.event.startStr.split('T')[0],
-                                    start_time: info.event.startStr.split('T')[1] || '00:00:00',
-                                    end_time: info.event.endStr.split('T')[1] || '23:59:59',
-                                    status: newStatus.toLowerCase()
-                                })
-                            }).then(response => response.json())
-                            .then(data => {
-                                if (data.success) {
-                                    alert('Status updated!');
-                                    calendar.refetchEvents();
-                                } else {
-                                    alert('Error updating status: ' + data.error);
-                                }
-                            }).catch(error => {
-                                console.error('Error:', error);
-                                alert('An error occurred during status update.');
-                            });
+        const modal = document.getElementById('availability-modal');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        const modalSaveBtn = document.getElementById('modal-save-btn');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn');
+        const modalDateRange = document.getElementById('modal-date-range');
+        const modalTimeRange = document.getElementById('modal-time-range');
+
+        let selectedStart = null;
+        let selectedEnd = null;
+        let currentEventId = null; // To store event ID if editing an existing event
+
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            selectable: true, // Allow selecting dates
+            editable: true, // Allow dragging/resizing events
+            selectMirror: true, // Shows a placeholder as you drag
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            // FIX: Define events as a function that fetches from the API endpoint
+            events: function(fetchInfo, successCallback, failureCallback) {
+                // Construct the URL with start and end dates from FullCalendar's fetchInfo
+                const url = `<?= BASE_URL ?>public/availability.php?vendor_id=<?= $_SESSION['vendor_id'] ?>&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`;
+
+                fetch(url)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok: ' + response.statusText);
                         }
-                    }
-                },
-                eventContent: function(arg) {
-                    // Customize event display
-                    let statusClass = '';
-                    if (arg.event.extendedProps.status === 'available') {
-                        statusClass = 'fc-event-available';
-                    } else if (arg.event.extendedProps.status === 'booked') {
-                        statusClass = 'fc-event-booked';
-                    } else if (arg.event.extendedProps.status === 'blocked') {
-                        statusClass = 'fc-event-blocked';
-                    }
-                    return { html: `<div class="${statusClass}">${arg.event.title}</div>` };
+                        return response.json();
+                    })
+                    .then(data => {
+                        // FullCalendar expects an array of event objects.
+                        // Our PHP endpoint already formats it correctly.
+                        successCallback(data);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching availability:', error);
+                        alert('Failed to load calendar events: ' + error.message);
+                        failureCallback(error); // Notify FullCalendar of the error
+                    });
+            },
+            // Handle date range selection
+            select: function(info) {
+                selectedStart = info.startStr; // This is already an ISO string
+                selectedEnd = info.endStr;     // This is already an ISO string
+                currentEventId = null; // No event ID for new selection
+
+                // Populate modal with date range
+                modalDateRange.textContent = formatDateForModal(info.start, info.end); // Pass Date objects to format
+                modalTimeRange.textContent = formatTimeForModal(info.start, info.end); // Pass Date objects to format
+
+                // Reset radio buttons to 'available' for new selections
+                document.querySelector('input[name="availability_status"][value="available"]').checked = true;
+
+                modal.style.display = 'flex'; // Show the modal
+            },
+            // Handle clicking an existing event
+            eventClick: function(info) {
+                selectedStart = info.event.startStr; // This is already an ISO string
+                selectedEnd = info.event.endStr;     // This is already an ISO string
+                currentEventId = info.event.id; // Get the ID of the clicked event
+
+                // Populate modal with event details
+                modalDateRange.textContent = formatDateForModal(info.event.start, info.event.end); // Pass Date objects to format
+                modalTimeRange.textContent = formatTimeForModal(info.event.start, info.event.end); // Pass Date objects to format
+
+                // Set radio button based on existing status
+                const existingStatus = info.event.extendedProps.status;
+                if (existingStatus) {
+                    document.querySelector(`input[name="availability_status"][value="${existingStatus}"]`).checked = true;
+                } else {
+                    document.querySelector('input[name="availability_status"][value="available"]').checked = true;
                 }
+
+                modal.style.display = 'flex'; // Show the modal
+            },
+            // Handle event dragging (change date/time of existing event)
+            eventDrop: function(info) {
+                const newDate = info.event.start.toISOString().slice(0, 10);
+                const newStartTime = info.event.start.toTimeString().slice(0, 8);
+                const newEndTime = info.event.end ? info.event.end.toTimeString().slice(0, 8) : '23:59:59'; // Default end of day if no specific end time
+
+                updateAvailabilityOnServer(
+                    newDate,
+                    newStartTime,
+                    newEndTime,
+                    info.event.extendedProps.status || 'available' // Use existing status or default
+                );
+            },
+            // Handle event resizing (change duration of existing event)
+            eventResize: function(info) {
+                const newDate = info.event.start.toISOString().slice(0, 10);
+                const newStartTime = info.event.start.toTimeString().slice(0, 8);
+                const newEndTime = info.event.end ? info.event.end.toTimeString().slice(0, 8) : '23:59:59'; // Default end of day if no specific end time
+
+                updateAvailabilityOnServer(
+                    newDate,
+                    newStartTime,
+                    newEndTime,
+                    info.event.extendedProps.status || 'available' // Use existing status or default
+                );
+            },
+            // Customize how events are rendered in the calendar
+            eventContent: function(arg) {
+                let statusClass = '';
+                if (arg.event.extendedProps.status === 'available') {
+                    statusClass = 'fc-event-available';
+                } else if (arg.event.extendedProps.status === 'booked') {
+                    statusClass = 'fc-event-booked';
+                } else if (arg.event.extendedProps.status === 'blocked') {
+                    statusClass = 'fc-event-blocked';
+                } else if (arg.event.extendedProps.status === 'holiday') {
+                    statusClass = 'fc-event-holiday'; // New class for Holiday
+                }
+                return { html: `<div class="${statusClass}">${arg.event.title}</div>` };
+            }
+        });
+        calendar.render();
+
+        // Modal button event listeners
+        modalCloseBtn.addEventListener('click', hideModal);
+        modalCancelBtn.addEventListener('click', hideModal);
+
+        modalSaveBtn.addEventListener('click', function() {
+            const selectedStatus = document.querySelector('input[name="availability_status"]:checked').value;
+            const startDate = selectedStart.slice(0, 10); // Extract date part
+            const startTime = selectedStart.slice(11, 19) || '00:00:00'; // Extract time or default
+            const endDate = selectedEnd.slice(0, 10); // Extract date part
+            const endTime = selectedEnd.slice(11, 19) || '23:59:59'; // Extract time or default
+
+            // FullCalendar treats a selected *day* as starting at 00:00:00 and ending at 00:00:00 of the *next* day.
+            // For `dayGridMonth` selection of a single day, info.endStr is the next day's 00:00:00.
+            // Adjust `endDate` to be the same as `startDate` if it's just a single day selection.
+            const adjustedEndDate = (startDate === endDate && startTime === '00:00:00' && endTime === '00:00:00') ? startDate : endDate;
+
+            // Send data to server
+            updateAvailabilityOnServer(startDate, startTime, adjustedEndDate, selectedStatus); // Pass adjustedEndDate
+            hideModal();
+        });
+
+        function hideModal() {
+            modal.style.display = 'none';
+            calendar.unselect(); // Deselect any dates on the calendar
+        }
+
+        function updateAvailabilityOnServer(date, startTime, endTime, status) {
+            fetch('vendor_availability.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json', // Send as JSON
+                },
+                body: JSON.stringify({ // Stringify the object to JSON
+                    date: date,
+                    start_time: startTime,
+                    end_time: endTime,
+                    status: status
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Availability updated!');
+                    calendar.refetchEvents(); // Refresh calendar events
+                } else {
+                    alert('Error updating availability: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred during update.');
             });
-            calendar.render();
+        }
+
+        // Functions to format dates and times for modal display
+        function formatDateForModal(start, end) {
+            // FullCalendar passes Date objects directly to these functions
+            const startDate = new Date(start);
+            const endDate = new Date(end); // FullCalendar's end date for day-selection is exclusive, so subtract one day for display
+
+            const displayEndDate = new Date(endDate);
+            // Only adjust end date for full-day selections (where time is 00:00:00)
+            if (start.getHours() === 0 && start.getMinutes() === 0 && end.getHours() === 0 && end.getMinutes() === 0 && startDate.getTime() !== endDate.getTime()) {
+                displayEndDate.setDate(displayEndDate.getDate() - 1);
+            }
+
+            if (startDate.getTime() === displayEndDate.getTime()) {
+                return startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            } else {
+                return `${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${displayEndDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+            }
+        }
+
+        function formatTimeForModal(start, end) {
+            const startDate = new Date(start);
+            const endDate = new Date(end);
+
+            // Check if it's an all-day event (start and end times are midnight and it's a date range)
+            if (startDate.getHours() === 0 && startDate.getMinutes() === 0 && endDate.getHours() === 0 && endDate.getMinutes() === 0 && startDate.getTime() !== endDate.getTime()) {
+                return ''; // All-day event, no time range to display
+            } else if (startDate.getTime() === endDate.getTime()) {
+                // If it's a single day click with a time range, or an all-day slot represented by same start/end date
+                 return `${startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+            } else {
+                // Multi-day timed event or other specific scenarios
+                 return `${startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+            }
         }
     });
     </script>
