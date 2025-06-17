@@ -37,7 +37,7 @@ class Event {
 
             $execute_params = [
                 ':user_id' => $data['user_id'],
-                ':event_type_id' => $data['event_type_id'], // MODIFIED: Changed from $data['event_type'] to $data['event_type_id']
+                ':event_type_id' => $data['event_type_id'],
                 ':title' => $data['title'],
                 ':description' => $data['description'],
                 ':event_date' => $data['event_date'],
@@ -49,7 +49,7 @@ class Event {
                 ':venue_city' => $data['venue_city'] ?? null,
                 ':venue_state' => $data['venue_state'] ?? null,
                 ':venue_country' => $data['venue_country'] ?? null,
-                ':venue_postal_code' => $data['venue_postal_code'] ?? null,
+                ':venue_postal_code' => $data['postal_code'] ?? null, // Changed from business_postal_code for consistency
                 ':guest_count' => $data['guest_count'],
                 ':budget_min' => $data['budget_min'],
                 ':budget_max' => $data['budget_max'],
@@ -72,8 +72,8 @@ class Event {
 
             // Handle services (insert into event_service_requirements)
             if (!empty($data['services_needed_array'])) {
-                $service_req_sql = "INSERT INTO event_service_requirements 
-                                    (event_id, service_id, priority, budget_allocated, specific_requirements, status) 
+                $service_req_sql = "INSERT INTO event_service_requirements
+                                    (event_id, service_id, priority, budget_allocated, specific_requirements, status)
                                     VALUES (?, ?, ?, ?, ?, ?)";
                 $service_stmt = $this->conn->prepare($service_req_sql);
 
@@ -115,10 +115,10 @@ class Event {
     public function getUserEvents($user_id) {
         try {
             // Join with event_types to get type_name for display
-            $sql = "SELECT e.*, et.type_name 
-                    FROM events e 
+            $sql = "SELECT e.*, et.type_name
+                    FROM events e
                     JOIN event_types et ON e.event_type_id = et.id
-                    WHERE e.user_id = :user_id 
+                    WHERE e.user_id = :user_id
                     ORDER BY e.event_date ASC, e.created_at DESC";
             $stmt = $this->conn->prepare($sql);
             $stmt->bindParam(':user_id', $user_id);
@@ -138,8 +138,8 @@ class Event {
     public function getEventById($event_id, $user_id = null) {
         try {
             // Join with event_types to get type_name
-            $sql = "SELECT e.*, et.type_name 
-                    FROM events e 
+            $sql = "SELECT e.*, et.type_name
+                    FROM events e
                     JOIN event_types et ON e.event_type_id = et.id
                     WHERE e.id = :event_id";
             if ($user_id) {
@@ -168,7 +168,7 @@ class Event {
         try {
             $this->conn->beginTransaction();
 
-            $sql = "UPDATE events SET 
+            $sql = "UPDATE events SET
                 title = :title,
                 description = :description,
                 event_type_id = :event_type_id,
@@ -228,8 +228,8 @@ class Event {
                        ->execute([$event_id]);
 
             if (!empty($data['services_needed_array'])) {
-                $service_req_sql = "INSERT INTO event_service_requirements 
-                                    (event_id, service_id, priority) 
+                $service_req_sql = "INSERT INTO event_service_requirements
+                                    (event_id, service_id, priority)
                                     VALUES (?, ?, ?)";
                 $service_stmt = $this->conn->prepare($service_req_sql);
                 foreach ($data['services_needed_array'] as $service_id) {
@@ -252,7 +252,7 @@ class Event {
      */
     public function deleteEvent($event_id, $user_id) {
         try {
-            $sql = "UPDATE events SET status = 'deleted', updated_at = NOW() 
+            $sql = "UPDATE events SET status = 'deleted', updated_at = NOW()
                     WHERE id = :event_id AND user_id = :user_id";
             $stmt = $this->conn->prepare($sql);
             $stmt->bindParam(':event_id', $event_id);
@@ -271,8 +271,8 @@ class Event {
      */
     public function searchEvents($user_id, $criteria = []) {
         try {
-            $sql = "SELECT e.*, et.type_name 
-                    FROM events e 
+            $sql = "SELECT e.*, et.type_name
+                    FROM events e
                     JOIN event_types et ON e.event_type_id = et.id
                     WHERE e.user_id = :user_id";
             $params = [':user_id' => $user_id];
@@ -287,9 +287,22 @@ class Event {
                 $params[':event_type_id'] = $criteria['event_type_id'];
             }
 
+            // FIX: Robustly handle 'status' criteria (array or single string)
             if (!empty($criteria['status'])) {
-                $sql .= " AND e.status = :status";
-                $params[':status'] = $criteria['status'];
+                if (is_array($criteria['status'])) {
+                    $named_placeholders = [];
+                    $status_in_params = [];
+                    foreach ($criteria['status'] as $idx => $status_val) {
+                        $placeholder = ':status_' . $idx;
+                        $named_placeholders[] = $placeholder;
+                        $status_in_params[$placeholder] = $status_val;
+                    }
+                    $sql .= " AND e.status IN (" . implode(',', $named_placeholders) . ")";
+                    $params = array_merge($params, $status_in_params);
+                } else {
+                    $sql .= " AND e.status = :status_single";
+                    $params[':status_single'] = $criteria['status'];
+                }
             }
 
             if (!empty($criteria['date_from'])) {
@@ -323,13 +336,13 @@ class Event {
      */
     public function getUpcomingEvents($user_id, $limit = 5) {
         try {
-            $sql = "SELECT e.*, et.type_name 
-                    FROM events e 
+            $sql = "SELECT e.*, et.type_name
+                    FROM events e
                     JOIN event_types et ON e.event_type_id = et.id
-                    WHERE e.user_id = :user_id 
-                    AND e.event_date >= CURDATE() 
+                    WHERE e.user_id = :user_id
+                    AND e.event_date >= CURDATE()
                     AND e.status != 'deleted'
-                    ORDER BY e.event_date ASC 
+                    ORDER BY e.event_date ASC
                     LIMIT :limit";
 
             $stmt = $this->conn->prepare($sql);
@@ -350,15 +363,15 @@ class Event {
      */
     public function getUserEventStats($user_id) {
         try {
-            $sql = "SELECT 
+            $sql = "SELECT
                         COUNT(*) as total_events,
                         SUM(CASE WHEN status = 'planning' THEN 1 ELSE 0 END) as planning_events,
                         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_events,
                         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_events,
                         SUM(CASE WHEN event_date >= CURDATE() THEN 1 ELSE 0 END) as upcoming_events,
                         AVG( (budget_min + budget_max) / 2 ) as avg_budget,
-                        SUM( (budget_min + budget_max) / 2 ) as total_budget 
-                    FROM events 
+                        SUM( (budget_min + budget_max) / 2 ) as total_budget
+                    FROM events
                     WHERE user_id = :user_id AND status != 'deleted'";
 
             $stmt = $this->conn->prepare($sql);
@@ -388,7 +401,7 @@ class Event {
     public function getEventsByService($service_id, $location = null) {
         try {
             $sql = "SELECT e.*, et.type_name
-                    FROM events e 
+                    FROM events e
                     JOIN event_service_requirements esr ON e.id = esr.event_id
                     JOIN event_types et ON e.event_type_id = et.id
                     WHERE esr.service_id = :service_id
