@@ -129,7 +129,18 @@
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     display: flex; /* Use flexbox for internal layout */
     flex-direction: column; /* Stack image and description vertically */
+    height: auto; /* Allow height to adjust */
 }
+
+/* Make entire content area clickable, excluding action buttons where present */
+.portfolio-item-link-area {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; /* Allow the clickable area to expand */
+    text-decoration: none; /* Remove underline from link */
+    color: inherit; /* Inherit text color */
+}
+
 
 .portfolio-item-card:hover {
     transform: translateY(-5px); /* Lift effect on hover */
@@ -253,6 +264,14 @@
 
 .portfolio-meta-info i {
     color: var(--primary-color);
+}
+
+/* New style for project charges summary on card */
+.project-charges-summary {
+    font-weight: 600;
+    color: var(--secondary-color) !important; /* Make it stand out */
+    margin-bottom: var(--spacing-sm) !important;
+    font-size: 1em !important;
 }
 
 
