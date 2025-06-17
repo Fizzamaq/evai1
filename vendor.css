@@ -322,3 +322,30 @@
     font-size: 0.8em;
     border-radius: 6px;
 }
+/* New styles for portfolio actions */
+.portfolio-actions-footer {
+    display: flex;
+    justify-content: space-around; /* Distribute space around items */
+    align-items: center;
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--border-color);
+    gap: var(--spacing-xs); /* Small gap between buttons */
+}
+
+.portfolio-actions-footer .btn {
+    flex-grow: 1; /* Allows buttons to take equal width */
+    text-align: center;
+}
+
+.portfolio-actions-footer form {
+    flex-grow: 1;
+    display: flex; /* Make the form a flex container */
+    justify-content: center; /* Center the button within the form */
+}
+
+.portfolio-actions-footer .btn-sm {
+    padding: 8px 12px;
+    font-size: 0.8em;
+    border-radius: 6px;
+}
