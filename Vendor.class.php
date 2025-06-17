@@ -269,7 +269,7 @@ class Vendor {
                 $data['image_url'] ?? null,
                 $data['video_url'] ?? null,
                 $data['project_date'] ?? null,
-                $data['project_charges'] ?? null, // Added project_charges
+                $data['project_charges'] ?? null,
                 $data['client_testimonial'] ?? null,
                 $data['is_featured'] ?? false
             ]);
@@ -349,7 +349,7 @@ class Vendor {
 
             $query .= "video_url = ?,
                 project_date = ?,
-                project_charges = ?,  -- Added project_charges
+                project_charges = ?,
                 client_testimonial = ?,
                 is_featured = ?,
                 updated_at = NOW()
@@ -358,7 +358,7 @@ class Vendor {
             $params = array_merge($params, [
                 $data['video_url'] ?? null,
                 $data['project_date'] ?? null,
-                $data['project_charges'] ?? null, // Added project_charges
+                $data['project_charges'] ?? null,
                 $data['client_testimonial'] ?? null,
                 $data['is_featured'] ?? false,
                 $portfolioItemId,
@@ -416,14 +416,14 @@ class Vendor {
         $stmt = $this->conn->prepare("
             SELECT
                 id,
-                date, // Select 'date' column
+                date, -- Select 'date' column
                 start_time,
                 end_time,
                 status
             FROM vendor_availability
             WHERE
                 vendor_id = ? AND
-                date BETWEEN ? AND ? // Query by date
+                date BETWEEN ? AND ?
             ORDER BY date, start_time
         ");
 
