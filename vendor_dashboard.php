@@ -75,15 +75,6 @@ $stats = [
             </div>
         </div>
 
-        <!--{{-- Removed: Quick action card for portfolio --}}-->
-        <!-- <div class="section-card quick-action-card">-->
-        <!--    <h2>Manage Your Public Portfolio</h2>-->
-        <!--    <p>Showcase your best work and attract more clients by updating your portfolio.</p>-->
-        <!--    <a href="<?= BASE_URL ?>public/vendor_portfolio.php" class="btn btn-primary">-->
-        <!--        <i class="fas fa-images"></i> Go to My Portfolio-->
-        <!--    </a>-->
-        <!--</div> --}}-->
-
         <div class="dashboard-sections">
             <div class="section-card upcoming-bookings">
                 <h2>Upcoming Bookings</h2>
@@ -107,7 +98,9 @@ $stats = [
             </div>
 
             <div class="section-card calendar-widget">
-                <h2>Availability Calendar</h2>
+                <h2>Availability Calendar
+                    <a href="<?= BASE_URL ?>public/vendor_availability.php" class="btn btn-sm btn-info" style="float:right; margin-left: 10px;">Manage Availability</a>
+                </h2>
                 <div id="availability-calendar"></div>
             </div>
         </div>
