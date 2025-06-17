@@ -2,7 +2,7 @@
 // classes/Vendor.class.php
 class Vendor {
     private $conn;
-    
+
     public function __construct($pdo) {
         $this->conn = $pdo;
     }
@@ -18,20 +18,20 @@ class Vendor {
                 error_log("Vendor.registerVendor: Updating existing vendor profile ID: " . $existingVendor['id']);
                 $update_successful = $this->updateVendor($existingVendor['id'], $data);
                 if ($update_successful) {
-                    return $existingVendor['id']; // Corrected: Return the actual vendor_profile_id
+                    return $existingVendor['id'];
                 } else {
-                    return false; // Update failed
+                    return false;
                 }
             } else {
                 // If no profile exists, create a new one
                 error_log("Vendor.registerVendor: Creating new vendor profile for user_id: " . $user_id);
-                $query = "INSERT INTO vendor_profiles 
-                    (user_id, business_name, business_license, tax_id, website, 
-                     business_address, business_city, business_state, business_country, 
-                     business_postal_code, service_radius, min_budget, max_budget, 
-                     experience_years) 
+                $query = "INSERT INTO vendor_profiles
+                    (user_id, business_name, business_license, tax_id, website,
+                     business_address, business_city, business_state, business_country,
+                     business_postal_code, service_radius, min_budget, max_budget,
+                     experience_years)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                
+
                 $params = [
                     $user_id,
                     $data['business_name'],
@@ -48,13 +48,13 @@ class Vendor {
                     $data['max_budget'] ?? null,
                     $data['experience_years'] ?? null
                 ];
-                
+
                 error_log("Vendor.registerVendor (INSERT): Query: " . $query);
                 error_log("Vendor.registerVendor (INSERT): Params: " . print_r($params, true));
 
                 $stmt = $this->conn->prepare($query);
                 $result = $stmt->execute($params);
-                
+
                 if ($result) {
                     $lastId = $this->conn->lastInsertId();
                     error_log("Vendor.registerVendor (INSERT): Success, new ID: " . $lastId);
@@ -79,7 +79,6 @@ class Vendor {
             $stmt = $this->conn->prepare("SELECT * FROM vendor_profiles WHERE user_id = ?");
             $stmt->execute([$user_id]);
             $vendorData = $stmt->fetch(PDO::FETCH_ASSOC);
-            // error_log("Vendor.getVendorByUserId: Fetched data: " . print_r($vendorData, true)); // Too verbose for regular use
             return $vendorData;
         } catch (PDOException $e) {
             error_log("Vendor.getVendorByUserId error: " . $e->getMessage() . " (Code: " . $e->getCode() . ")");
@@ -91,11 +90,11 @@ class Vendor {
     public function getVendorProfileById($vendor_id) {
         try {
             $stmt = $this->conn->prepare("
-                SELECT 
-                    vp.*, 
-                    u.email, 
-                    u.first_name, 
-                    u.last_name, 
+                SELECT
+                    vp.*,
+                    u.email,
+                    u.first_name,
+                    u.last_name,
                     up.profile_image,
                     GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS offered_services_names
                 FROM vendor_profiles vp
@@ -117,7 +116,7 @@ class Vendor {
     // Update vendor profile (assuming vendor_id is the primary key of vendor_profiles)
     public function updateVendor($vendor_profile_id, $data) {
         try {
-            $query = "UPDATE vendor_profiles SET 
+            $query = "UPDATE vendor_profiles SET
                 business_name = ?,
                 business_license = ?,
                 tax_id = ?,
@@ -133,7 +132,7 @@ class Vendor {
                 experience_years = ?,
                 updated_at = NOW()
                 WHERE id = ?";
-            
+
             $params = [
                 $data['business_name'],
                 $data['business_license'] ?? null,
@@ -153,7 +152,7 @@ class Vendor {
 
             error_log("Vendor.updateVendor (UPDATE): Query: " . $query);
             error_log("Vendor.updateVendor (UPDATE): Params: " . print_r($params, true));
-            
+
             $stmt = $this->conn->prepare($query);
             $result = $stmt->execute($params);
 
@@ -176,10 +175,10 @@ class Vendor {
     // Add vendor service offering
     public function addServiceOffering($vendor_id, $service_id, $data) {
         try {
-            $stmt = $this->conn->prepare("INSERT INTO vendor_service_offerings 
+            $stmt = $this->conn->prepare("INSERT INTO vendor_service_offerings
                 (vendor_id, service_id, price_range_min, price_range_max, description)
                 VALUES (?, ?, ?, ?, ?)");
-            
+
             return $stmt->execute([
                 $vendor_id,
                 $service_id,
@@ -197,12 +196,12 @@ class Vendor {
     public function getVendorServices($vendor_id) {
         try {
             $stmt = $this->conn->prepare("
-                SELECT vso.*, vs.service_name, vc.category_name 
+                SELECT vso.*, vs.service_name, vc.category_name
                 FROM vendor_service_offerings vso
                 JOIN vendor_services vs ON vso.service_id = vs.id
                 JOIN vendor_categories vc ON vs.category_id = vc.id
                 WHERE vso.vendor_id = ? AND vso.is_active = TRUE
-            "); //
+            ");
             $stmt->execute([$vendor_id]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -231,8 +230,8 @@ class Vendor {
                 $insert_sql = "INSERT INTO vendor_service_offerings (vendor_id, service_id) VALUES (?, ?)";
                 $insert_stmt = $this->conn->prepare($insert_sql);
                 foreach ($service_ids_array as $service_id) {
-                    $service_id = (int)$service_id; 
-                    if ($service_id > 0) { // Ensure service ID is valid
+                    $service_id = (int)$service_id;
+                    if ($service_id > 0) {
                         $insert_stmt->execute([$vendor_profile_id, $service_id]);
                         $inserted_count++;
                     }
@@ -246,22 +245,22 @@ class Vendor {
         } catch (PDOException $e) {
             $this->conn->rollBack();
             error_log("ERROR: Vendor.updateVendorServiceOfferings PDO Exception: " . $e->getMessage() . " (Code: " . $e->getCode() . ") SQLSTATE: " . $e->errorInfo[0]);
-            throw new Exception("Database error updating services: " . $e->getMessage()); // Re-throw to be caught by process_profile.php
+            throw new Exception("Database error updating services: " . $e->getMessage());
         } catch (Exception $e) {
             $this->conn->rollBack();
             error_log("ERROR: Vendor.updateVendorServiceOfferings General Exception: " . $e->getMessage());
-            throw $e; // Re-throw
+            throw $e;
         }
     }
 
     // Add portfolio item
     public function addPortfolioItem($vendor_id, $data) {
         try {
-            $stmt = $this->conn->prepare("INSERT INTO vendor_portfolios 
-                (vendor_id, title, description, event_type_id, image_url, 
-                 video_url, project_date, client_testimonial, is_featured)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            
+            $stmt = $this->conn->prepare("INSERT INTO vendor_portfolios
+                (vendor_id, title, description, event_type_id, image_url,
+                 video_url, project_date, project_charges, client_testimonial, is_featured)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
             return $stmt->execute([
                 $vendor_id,
                 $data['title'],
@@ -270,6 +269,7 @@ class Vendor {
                 $data['image_url'] ?? null,
                 $data['video_url'] ?? null,
                 $data['project_date'] ?? null,
+                $data['project_charges'] ?? null, // Added project_charges
                 $data['client_testimonial'] ?? null,
                 $data['is_featured'] ?? false
             ]);
@@ -297,10 +297,102 @@ class Vendor {
         }
     }
 
+    /**
+     * Retrieves a single portfolio item by its ID.
+     * @param int $portfolioItemId The ID of the portfolio item.
+     * @return array|false The portfolio item data if found, false otherwise.
+     */
+    public function getPortfolioItemById($portfolioItemId) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT vp.*, et.type_name as event_type_name
+                FROM vendor_portfolios vp
+                LEFT JOIN event_types et ON vp.event_type_id = et.id
+                WHERE vp.id = ?
+            ");
+            $stmt->execute([$portfolioItemId]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Get portfolio item by ID error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Updates an existing portfolio item.
+     * @param int $portfolioItemId The ID of the portfolio item to update.
+     * @param int $vendorId The ID of the vendor owning the item (for security).
+     * @param array $data New data for the portfolio item.
+     * @return bool True on success, false on failure.
+     */
+    public function updatePortfolioItem($portfolioItemId, $vendorId, $data) {
+        try {
+            $query = "UPDATE vendor_portfolios SET
+                title = ?,
+                description = ?,
+                event_type_id = ?,";
+
+            $params = [
+                $data['title'],
+                $data['description'] ?? null,
+                $data['event_type_id'] ?? null,
+            ];
+
+            // Only update image_url if a new one is provided (not null)
+            if (isset($data['image_url']) && $data['image_url'] !== null) {
+                 $query .= "image_url = ?,";
+                 $params[] = $data['image_url'];
+            } else if (isset($data['image_url']) && $data['image_url'] === null) {
+                // If explicitly set to null, it means remove the image
+                 $query .= "image_url = NULL,";
+            }
+
+            $query .= "video_url = ?,
+                project_date = ?,
+                project_charges = ?,  -- Added project_charges
+                client_testimonial = ?,
+                is_featured = ?,
+                updated_at = NOW()
+                WHERE id = ? AND vendor_id = ?";
+
+            $params = array_merge($params, [
+                $data['video_url'] ?? null,
+                $data['project_date'] ?? null,
+                $data['project_charges'] ?? null, // Added project_charges
+                $data['client_testimonial'] ?? null,
+                $data['is_featured'] ?? false,
+                $portfolioItemId,
+                $vendorId
+            ]);
+
+            $stmt = $this->conn->prepare($query);
+            return $stmt->execute($params);
+        } catch (PDOException $e) {
+            error_log("Update portfolio item error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Deletes a portfolio item.
+     * @param int $portfolioItemId The ID of the portfolio item to delete.
+     * @param int $vendorId The ID of the vendor owning the item (for security).
+     * @return bool True on success, false on failure.
+     */
+    public function deletePortfolioItem($portfolioItemId, $vendorId) {
+        try {
+            $stmt = $this->conn->prepare("DELETE FROM vendor_portfolios WHERE id = ? AND vendor_id = ?"); // Ensure vendor ownership
+            return $stmt->execute([$portfolioItemId, $vendorId]);
+        } catch (PDOException $e) {
+            error_log("Delete portfolio item error: " . $e->getMessage());
+            return false;
+        }
+    }
+
     // Set vendor availability (Unified method)
     public function updateAvailability($vendorId, $date, $start_time, $end_time, $status) {
         $stmt = $this->conn->prepare("
-            INSERT INTO vendor_availability 
+            INSERT INTO vendor_availability
             (vendor_id, date, start_time, end_time, status)
             VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
@@ -309,7 +401,7 @@ class Vendor {
                 status = VALUES(status),
                 updated_at = NOW()
         ");
-        
+
         return $stmt->execute([
             $vendorId,
             $date, // Use 'date' column for the specific day
@@ -322,19 +414,19 @@ class Vendor {
     // Get vendor availability (Unified method)
     public function getAvailability($vendorId, $startDate, $endDate) {
         $stmt = $this->conn->prepare("
-            SELECT 
+            SELECT
                 id,
                 date, // Select 'date' column
                 start_time,
                 end_time,
                 status
             FROM vendor_availability
-            WHERE 
+            WHERE
                 vendor_id = ? AND
                 date BETWEEN ? AND ? // Query by date
             ORDER BY date, start_time
         ");
-        
+
         $stmt->execute([$vendorId, $startDate, $endDate]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -359,7 +451,7 @@ class Vendor {
             return false;
         }
     }
- 
+
     /**
      * Verifies if the current session user is a vendor and has a complete vendor profile.
      * Redirects if conditions are not met.
@@ -369,14 +461,14 @@ class Vendor {
         if (!defined('BASE_URL')) {
             error_log("BASE_URL not defined in config.php. Cannot perform vendor access verification.");
             // Fallback to a generic error or login page if BASE_URL is not set
-            header('Location: /login.php'); // Absolute path fallback
+            header('Location: /login.php');
             exit();
         }
 
         // 1. Check if user is logged in at all
         if (!isset($_SESSION['user_id'])) {
             // Not logged in, redirect to login page
-            header('Location: ' . BASE_URL . 'public/login.php'); 
+            header('Location: ' . BASE_URL . 'public/login.php');
             exit();
         }
 
@@ -384,7 +476,7 @@ class Vendor {
         // This relies on $_SESSION['user_type'] being set correctly during login.
         if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] != 2) {
             // User is logged in but not a vendor, redirect to their general dashboard
-            header('Location: ' . BASE_URL . 'public/dashboard.php'); 
+            header('Location: ' . BASE_URL . 'public/dashboard.php');
             exit();
         }
 
@@ -397,7 +489,7 @@ class Vendor {
             // User is of type 'vendor' but no vendor_profiles entry exists.
             // Redirect them to a page where they can complete their vendor profile.
             $_SESSION['error_message'] = "Your vendor profile is incomplete. Please register your business details to access vendor features.";
-            header('Location: ' . BASE_URL . 'public/edit_profile.php'); // Redirect to edit_profile or a dedicated vendor onboarding page
+            header('Location: ' . BASE_URL . 'public/edit_profile.php');
             exit();
         }
     }
@@ -412,14 +504,14 @@ class Vendor {
 
     // Get total booking count for a vendor
     public function getBookingCount($vendorId) {
-        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ?"); //
+        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ?");
         $stmt->execute([$vendorId]);
         return $stmt->fetchColumn();
     }
 
     // Get count of upcoming bookings for a vendor
     public function getUpcomingEvents($vendorId) {
-        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ? AND service_date >= CURDATE() AND status != 'cancelled'"); //
+        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM bookings WHERE vendor_id = ? AND service_date >= CURDATE() AND status != 'cancelled'");
         $stmt->execute([$vendorId]);
         return $stmt->fetchColumn();
     }
@@ -433,7 +525,7 @@ class Vendor {
 
     // Get a list of upcoming bookings for a vendor
     public function getUpcomingBookings($vendorId) {
-        $stmt = $this->conn->prepare("SELECT b.*, e.title as event_title FROM bookings b JOIN events e ON b.event_id = e.id WHERE b.vendor_id = ? AND b.service_date >= CURDATE() ORDER BY b.service_date ASC LIMIT 5"); //
+        $stmt = $this->conn->prepare("SELECT b.*, e.title as event_title FROM bookings b JOIN events e ON b.event_id = e.id WHERE b.vendor_id = ? AND b.service_date >= CURDATE() ORDER BY b.service_date ASC LIMIT 5");
         $stmt->execute([$vendorId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -447,11 +539,11 @@ class Vendor {
     public function getFeaturedVendorsForHomepage($limit = 8) {
         try {
             $stmt = $this->conn->prepare("
-                SELECT 
-                    vp.id, 
-                    vp.business_name, 
+                SELECT
+                    vp.id,
+                    vp.business_name,
                     vp.business_city,
-                    vp.rating, 
+                    vp.rating,
                     vp.total_reviews,
                     up.profile_image,
                     GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS offered_services
@@ -499,11 +591,11 @@ class Vendor {
     public function getVendorsByCategoryId($categoryId, $limit = 10) {
         try {
             $stmt = $this->conn->prepare("
-                SELECT 
-                    vp.id, 
-                    vp.business_name, 
+                SELECT
+                    vp.id,
+                    vp.business_name,
                     vp.business_city,
-                    vp.rating, 
+                    vp.rating,
                     vp.total_reviews,
                     up.profile_image,
                     GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS offered_services
