@@ -26,7 +26,7 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
     if ($vendor_data) {
         // Fetch the services offered by this vendor
         $vendor_services_offered_raw = $vendor->getVendorServices($vendor_data['id']);
-        
+
         // Group services by category for display
         foreach ($vendor_services_offered_raw as $service) {
             $vendor_services_offered[$service['category_name']][] = $service;
@@ -44,7 +44,7 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your Profile</title>
     <link rel="stylesheet" href="../assets/css/style.css">
-    <?php /* if ($is_vendor): ?> 
+    <?php /* if ($is_vendor): ?>
     <link rel="stylesheet" href="../assets/css/vendor_profile.css">
     <?php endif; */ ?>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -53,7 +53,17 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
 <body>
     <div class="profile-container">
         <h1>Your Profile</h1>
+
+        <?php if (isset($_SESSION['profile_success'])): ?>
+            <div class="alert success" id="profile-success-alert"><?= htmlspecialchars($_SESSION['profile_success']) ?></div>
+            <?php unset($_SESSION['profile_success']); ?>
+        <?php endif; ?>
         
+        <?php if (isset($_SESSION['profile_error'])): ?>
+            <div class="alert error" id="profile-error-alert"><?= htmlspecialchars($_SESSION['profile_error']) ?></div>
+            <?php unset($_SESSION['profile_error']); ?>
+        <?php endif; ?>
+
         <div class="profile-section">
             <div class="profile-pic">
                 <?php if (!empty($profile['profile_image'])): ?>
@@ -64,15 +74,13 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
                     </div>
                 <?php endif; ?>
             </div>
-            
+
             <div class="profile-info">
                 <h2><?= htmlspecialchars($profile['first_name'] . ' ' . $profile['last_name']) ?></h2>
                 <p><strong>Email:</strong> <?= htmlspecialchars($profile['email']) ?></p>
                 <p><strong>Member Since:</strong> <?= date('F Y', strtotime($profile['created_at'])) ?></p>
-                
+
                 <a href="edit_profile.php" class="btn">Edit Profile</a>
-                <?php if ($is_vendor): ?>
-                    <a href="vendor_portfolio.php" class="btn btn-secondary" style="margin-left: 10px;">View Public Portfolio</a> <?php endif; ?>
             </div>
         </div>
 
@@ -95,7 +103,7 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
                     <h2>Services Offered</h2>
                     <?php if (!empty($vendor_services_offered)): ?>
                         <?php foreach ($vendor_services_offered as $category_name => $services): ?>
-                            <h4><?= htmlspecialchars($category['category_name']) ?></h4>
+                            <h4><?= htmlspecialchars($category_name) ?></h4>
                             <ul>
                                 <?php foreach ($services as $service): ?>
                                     <li><?= htmlspecialchars($service['service_name']) ?></li>
@@ -156,3 +164,22 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
         <?php endif; ?>
     </div>
 <?php include 'footer.php'; ?>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const successAlert = document.getElementById('profile-success-alert');
+        const errorAlert = document.getElementById('profile-error-alert');
+
+        if (successAlert) {
+            setTimeout(function() {
+                successAlert.style.display = 'none';
+            }, 5000); // 5000 milliseconds = 5 seconds
+        }
+
+        if (errorAlert) {
+            setTimeout(function() {
+                errorAlert.style.display = 'none';
+            }, 5000); // 5000 milliseconds = 5 seconds
+        }
+    });
+</script>
