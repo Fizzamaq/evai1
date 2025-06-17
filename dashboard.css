@@ -23,8 +23,8 @@
 .dashboard-header h1 {
     font-size: 2em;
     margin-bottom: var(--spacing-xs);
-    color: #40bbc4;
-    
+    color: var(--primary-color); /* Changed from fixed color to primary variable */
+
 }
 
 .dashboard-header p {
@@ -56,6 +56,7 @@
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
     text-align: center;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid var(--border-color); /* Added subtle border */
 }
 
 .stat-card:hover {
@@ -87,6 +88,7 @@
     padding: var(--spacing-md);
     border-radius: 12px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--border-color); /* Added subtle border */
 }
 
 .section-card h2 {
@@ -95,7 +97,18 @@
     border-bottom: 1px solid var(--border-color);
     padding-bottom: var(--spacing-sm);
     margin-bottom: var(--spacing-md);
+    display: flex; /* Make h2 a flex container */
+    justify-content: space-between; /* Space out title and button */
+    align-items: center; /* Vertically align items */
 }
+
+.section-card h2 .btn { /* Style for button inside h2 */
+    font-size: 0.7em; /* Smaller button font */
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);;
+    padding: 6px 12px;
+    border-radius: 6px;
+}
+
 
 .list-item {
     padding: var(--spacing-sm) 0;
