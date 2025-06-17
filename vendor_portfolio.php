@@ -62,7 +62,6 @@ try {
                 <p>Manage and view your public portfolio items</p>
             </div>
             <div>
-                <a href="vendor_dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
                 <a href="<?= BASE_URL ?>public/add_portfolio_item.php" class="btn btn-primary">Add New Portfolio Item</a>
             </div>
         </div>
@@ -86,36 +85,49 @@ try {
                 <div class="portfolio-grid">
                     <?php foreach ($portfolio_items as $item): ?>
                         <div class="portfolio-item-card">
-                            <div class="portfolio-image-wrapper">
-                                <?php if ($item['image_url']): ?>
-                                    <img src="<?= BASE_URL . htmlspecialchars($item['image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
-                                <?php else: ?>
-                                    <div class="portfolio-placeholder">
-                                        <i class="fas fa-image"></i>
-                                        <span>No Image</span>
+                            <a href="<?= BASE_URL ?>public/view_portfolio_item.php?id=<?= $item['id'] ?>" class="portfolio-item-link-area">
+                                <div class="portfolio-image-wrapper">
+                                    <?php if ($item['image_url']): ?>
+                                        <img src="<?= BASE_URL . htmlspecialchars($item['image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                                    <?php else: ?>
+                                        <div class="portfolio-placeholder">
+                                            <i class="fas fa-image"></i>
+                                            <span>No Image</span>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div class="portfolio-item-overlay">
+                                        <?php if (!empty($item['video_url'])): ?>
+                                            <a href="<?= htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-light-overlay"><i class="fas fa-video"></i> Watch Video</a>
+                                        <?php endif; ?>
+                                        <?php if (!empty($item['client_testimonial'])): ?>
+                                            <p class="testimonial-overlay">"<?= htmlspecialchars(substr($item['client_testimonial'], 0, 100)) ?><?= (strlen($item['client_testimonial']) > 100) ? '...' : '' ?>"</p>
+                                        <?php endif; ?>
                                     </div>
-                                <?php endif; ?>
-                                <div class="portfolio-item-overlay">
-                                    <?php if (!empty($item['video_url'])): ?>
-                                        <a href="<?= htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-light-overlay"><i class="fas fa-video"></i> Watch Video</a>
-                                    <?php endif; ?>
-                                    <?php if (!empty($item['client_testimonial'])): ?>
-                                        <p class="testimonial-overlay">"<?= htmlspecialchars(substr($item['client_testimonial'], 0, 100)) ?><?= (strlen($item['client_testimonial']) > 100) ? '...' : '' ?>"</p>
-                                    <?php endif; ?>
                                 </div>
+                                <div class="portfolio-description-content">
+                                    <h3><?= htmlspecialchars($item['title']) ?></h3>
+                                    <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 150)) ?><?= (strlen($item['description'] ?? '') > 150) ? '...' : '' ?></p>
+                                    <?php if (!empty($item['project_charges'])): ?>
+                                        <p class="project-charges-summary">Charges: PKR <?= number_format($item['project_charges'], 0) ?></p>
+                                    <?php endif; ?>
+                                    <div class="portfolio-meta-info">
+                                        <?php if ($item['event_type_name']): ?>
+                                            <span><i class="fas fa-tag"></i> <?= htmlspecialchars($item['event_type_name']); ?></span>
+                                        <?php endif; ?>
+                                        <?php if ($item['project_date']): ?>
+                                            <span><i class="fas fa-calendar-alt"></i> <?= date('M Y', strtotime($item['project_date'])); ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </a>
+                            <div class="portfolio-actions-footer">
+                                <a href="<?= BASE_URL ?>public/edit_portfolio_item.php?id=<?= $item['id'] ?>" class="btn btn-sm btn-secondary">Edit</a>
+                                <form method="POST" action="<?= BASE_URL ?>public/process_portfolio_item.php" onsubmit="return confirm('Are you sure you want to delete this portfolio item?');">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="item_id" value="<?= $item['id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
                             </div>
-                            <div class="portfolio-description-content">
-                                <h3><?= htmlspecialchars($item['title']) ?></h3>
-                                <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 150)) ?><?= (strlen($item['description'] ?? '') > 150) ? '...' : '' ?></p>
-                                <div class="portfolio-meta-info">
-                                    <?php if ($item['event_type_name']): ?>
-                                        <span><i class="fas fa-tag"></i> <?= htmlspecialchars($item['event_type_name']); ?></span>
-                                    <?php endif; ?>
-                                    <?php if ($item['project_date']): ?>
-                                        <span><i class="fas fa-calendar-alt"></i> <?= date('M Y', strtotime($item['project_date'])); ?></span>
-                                    <?php endif; ?>
-                                </div>
-                                </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
