@@ -92,23 +92,13 @@ try {
                 throw new Exception("Failed to save vendor profile data."); // Changed message to 'save' as it's for both create/update
             }
             // Ensure vendor_profile_id is set for subsequent actions in this request
-            $vendor_profile_id = $vendor_profile_id_returned; 
+            $vendor_profile_id = $vendor_profile_id_returned;
 
             // Handle vendor services offered
             $services_offered = $_POST['services_offered'] ?? [];
             if (!is_array($services_offered)) {
                 $services_offered = [];
             }
-
-            // Debugging: Check received services_offered (Temporarily uncomment to log to error_log)
-            /*
-            error_log('$_POST[\'services_offered\'] received: ' . print_r($_POST['services_offered'], true));
-            error_log('Final $services_offered array: ' . print_r($services_offered, true));
-            error_log('Vendor Profile ID before update: ' . var_export($vendor_profile_id, true)); // Confirm it's correct now
-            */
-            // Do NOT put exit() here unless you want to stop processing completely.
-            // Rely on error_log or $_SESSION['profile_error'] for feedback.
-
 
             // Add explicit try-catch for service offerings update
             try {
@@ -126,48 +116,8 @@ try {
         }
 
         $_SESSION['profile_success'] = "Profile updated successfully!";
-        header("Location: " . BASE_URL . "public/edit_profile.php");
+        header("Location: " . BASE_URL . "public/profile.php"); // Redirect to profile.php
         exit();
-
-    } elseif (isset($_POST['add_portfolio_item'])) { // --- Handle NEW Portfolio Item Submission ---
-        // This block only runs if the "Add Portfolio Item" button was pressed
-        
-        // This check is valid here, as adding a portfolio item ALWAYS requires an existing vendor_profile_id
-        if (!$is_vendor || !$vendor_profile_id) {
-            throw new Exception("Access denied or vendor profile not found to add portfolio item.");
-        }
-
-        // Basic validation for portfolio item fields
-        if (empty(trim($_POST['portfolio_title'] ?? ''))) {
-            throw new Exception("Portfolio Item Title is required.");
-        }
-
-        $portfolio_image_url = null;
-        if (isset($_FILES['portfolio_image_upload']) && $_FILES['portfolio_image_upload']['error'] === UPLOAD_ERR_OK) {
-            $uploaded_portfolio_filename = $uploader->handleUpload($_FILES['portfolio_image_upload'], 'vendors/');
-            $portfolio_image_url = 'assets/uploads/vendors/' . $uploaded_portfolio_filename;
-        } else if (isset($_FILES['portfolio_image_upload']) && $_FILES['portfolio_image_upload']['error'] !== UPLOAD_ERR_NO_FILE) {
-            throw new Exception("Portfolio image upload error: " . $_FILES['portfolio_image_upload']['error']);
-        }
-
-        $portfolio_data = [
-            'title' => trim($_POST['portfolio_title']),
-            'description' => trim($_POST['portfolio_description'] ?? ''),
-            'event_type_id' => !empty($_POST['portfolio_event_type_id']) ? (int)$_POST['portfolio_event_type_id'] : null,
-            'image_url' => $portfolio_image_url,
-            'video_url' => trim($_POST['portfolio_video_url'] ?? ''), 
-            'project_date' => !empty($_POST['portfolio_project_date']) ? $_POST['portfolio_project_date'] : null,
-            'client_testimonial' => trim($_POST['portfolio_testimonial'] ?? ''),
-            'is_featured' => isset($_POST['portfolio_is_featured']) ? 1 : 0
-        ];
-
-        if (!$vendor_obj->addPortfolioItem($vendor_profile_id, $portfolio_data)) {
-            throw new Exception("Failed to add new portfolio item. Database error.");
-        } else {
-            $_SESSION['profile_success'] = "New portfolio item added successfully!"; // Unified success message
-            header("Location: " . BASE_URL . "public/edit_profile.php");
-            exit();
-        }
 
     } else { // No specific submit button pressed (e.g., direct access or unexpected POST)
         throw new Exception("Invalid form submission detected.");
