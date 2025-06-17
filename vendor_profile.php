@@ -1,49 +1,47 @@
 <?php
 // public/vendor_profile.php
 require_once '../includes/config.php';
-require_once '../classes/User.class.php'; // Needed for default-avatar.jpg path, or if you display reviewer info
-require_once '../classes/Vendor.class.php'; // Crucial for fetching vendor data
-require_once '../classes/Review.class.php'; // For fetching reviews
-require_once '../classes/Event.class.php'; // To fetch user's events for the chat link
+require_once '../classes/User.class.php';
+require_once '../classes/Vendor.class.php';
+require_once '../classes/Review.class.php';
+require_once '../classes/Event.class.php';
 
-include 'header.php'; // Include the main site header
+include 'header.php';
 
 // Ensure vendor ID is provided in the URL
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    // Redirect to a vendors list page or show an error
     $_SESSION['error_message'] = "Invalid vendor ID provided.";
-    header('Location: ' . BASE_URL . 'public/index.php'); // Or vendors.php if you have one
+    header('Location: ' . BASE_URL . 'public/index.php');
     exit();
 }
 
 $vendor_id = (int)$_GET['id'];
 
 $vendor = new Vendor($pdo);
-$review = new Review($pdo); // Instantiate Review class
-$event = new Event($pdo); // Instantiate Event class
+$review = new Review($pdo);
+$event = new Event($pdo);
 
 // Fetch main vendor profile data including user and user_profile data
 $vendor_profile = $vendor->getVendorProfileById($vendor_id);
 
 if (!$vendor_profile) {
     $_SESSION['error_message'] = "Vendor not found.";
-    header('Location: ' . BASE_URL . 'public/index.php'); // Or vendors.php
+    header('Location: ' . BASE_URL . 'public/index.php');
     exit();
 }
 
 // Fetch vendor's portfolio items
-$portfolio_items = $vendor->getVendorPortfolio($vendor_profile['id']); // Pass vendor_profiles.id
+$portfolio_items = $vendor->getVendorPortfolio($vendor_profile['id']);
 
 // Fetch vendor's reviews
-$vendor_reviews = $review->getReviewsForEntity($vendor_profile['user_id'], 'vendor'); // Pass user_id for reviewed_id
+$vendor_reviews = $review->getReviewsForEntity($vendor_profile['user_id'], 'vendor');
 
 // Fetch logged-in user's events for chat initiation
-// This is not used for a dropdown anymore but might be useful for a future "link to event" feature on chat.php
 $user_events = [];
 if (isset($_SESSION['user_id'])) {
     $user_events = $event->getUserEvents($_SESSION['user_id']);
 }
-
+$vendor_profile_id_js = $vendor_profile['id'];
 ?>
 
 <!DOCTYPE html>
@@ -56,6 +54,7 @@ if (isset($_SESSION['user_id'])) {
     <link rel="stylesheet" href="../assets/css/vendor_profile.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
 </head>
 <body>
     <div class="vendor-profile-container">
@@ -72,24 +71,29 @@ if (isset($_SESSION['user_id'])) {
                 <p class="tagline">Providing exceptional services for your events.</p>
                 <div class="rating-display">
                     <?php
-                    $rating = round($vendor_profile['rating'] * 2) / 2; // Round to nearest 0.5
+                    $rating = round($vendor_profile['rating'] * 2) / 2;
                     for ($i = 1; $i <= 5; $i++):
                         if ($rating >= $i) {
-                            echo '<i class="fas fa-star"></i>'; // Full star
+                            echo '<i class="fas fa-star"></i>';
                         } elseif ($rating > ($i - 1) && $rating < $i) {
-                            echo '<i class="fas fa-star-half-alt"></i>'; // Half star
+                            echo '<i class="fas fa-star-half-alt"></i>';
                         } else {
-                            echo '<i class="far fa-star"></i>'; // Empty star
+                            echo '<i class="far fa-star"></i>';
                         }
                     endfor;
                     ?>
                     <span><?= number_format($vendor_profile['rating'], 1) ?? 'N/A' ?> (<?= $vendor_profile['total_reviews'] ?? 0 ?> reviews)</span>
                 </div>
                 <div class="contact-buttons">
-                    <?php if (isset($_SESSION['user_id'])): // Only allow contact if logged in ?>
+                    <?php if (isset($_SESSION['user_id'])): ?>
                         <a href="<?= BASE_URL ?>public/chat.php?vendor_id=<?= htmlspecialchars($vendor_profile['user_id']) ?>" class="btn btn-primary">
                             <i class="fas fa-comment"></i> Message Vendor
                         </a>
+                        <?php if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 1): ?>
+                            <a href="<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>" class="btn btn-success" id="book-now-btn">
+                                <i class="fas fa-calendar-check"></i> Book Now
+                            </a>
+                        <?php endif; ?>
                     <?php else: ?>
                         <a href="<?= BASE_URL ?>public/login.php" class="btn btn-primary">Login to Message</a>
                     <?php endif; ?>
@@ -119,6 +123,19 @@ if (isset($_SESSION['user_id'])) {
             </div>
         </div>
 
+        <?php if (isset($_SESSION['user_id']) && $_SESSION['user_type'] == 1): ?>
+        <div class="profile-section availability-section">
+            <h2>Availability Overview</h2>
+            <div id="public-availability-calendar"></div>
+            <div class="calendar-legend">
+                <span class="legend-item"><span class="legend-color available-color"></span> Available</span>
+                <span class="legend-item"><span class="legend-color booked-color"></span> Booked</span>
+                <span class="legend-item"><span class="legend-color blocked-color"></span> Blocked</span>
+                <span class="legend-item"><span class="legend-color holiday-color"></span> Holiday</span>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div class="profile-section">
             <h2>Portfolio</h2>
             <?php if (!empty($portfolio_items)): ?>
@@ -127,8 +144,8 @@ if (isset($_SESSION['user_id'])) {
                         <div class="portfolio-item-card">
                             <a href="<?= BASE_URL ?>public/view_portfolio_item.php?id=<?= $item['id'] ?>" class="portfolio-item-link-area">
                                 <div class="portfolio-image-wrapper">
-                                    <?php if ($item['image_url']): ?>
-                                        <img src="<?= BASE_URL . htmlspecialchars($item['image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                                    <?php if (!empty($item['image_url'])): ?>
+                                        <img src="<?= BASE_URL ?>assets/uploads/vendors/<?= htmlspecialchars(basename($item['image_url'])) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
                                     <?php else: ?>
                                         <div class="portfolio-placeholder">
                                             <i class="fas fa-image"></i>
@@ -151,10 +168,10 @@ if (isset($_SESSION['user_id'])) {
                                         <p class="project-charges-summary">Charges: PKR <?= number_format($item['project_charges'], 0) ?></p>
                                     <?php endif; ?>
                                     <div class="portfolio-meta-info">
-                                        <?php if ($item['event_type_name']): ?>
+                                        <?php if (!empty($item['event_type_name'])): ?>
                                             <span><i class="fas fa-tag"></i> <?= htmlspecialchars($item['event_type_name']); ?></span>
                                         <?php endif; ?>
-                                        <?php if ($item['project_date']): ?>
+                                        <?php if (!empty($item['project_date'])): ?>
                                             <span><i class="fas fa-calendar-alt"></i> <?= date('M Y', strtotime($item['project_date'])); ?></span>
                                         <?php endif; ?>
                                     </div>
@@ -202,6 +219,86 @@ if (isset($_SESSION['user_id'])) {
 
     </div>
 
-    <?php include 'footer.php'; // Include the main site footer ?>
+    <?php include 'footer.php'; ?>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const calendarEl = document.getElementById('public-availability-calendar');
+            const bookNowBtn = document.getElementById('book-now-btn');
+            const vendorProfileId = <?= json_encode($vendor_profile_id_js) ?>;
+
+            if (calendarEl) {
+                const calendar = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'dayGridMonth',
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: ''
+                    },
+                    events: function(fetchInfo, successCallback, failureCallback) {
+                        fetch(`<?= BASE_URL ?>public/availability.php?vendor_id=${vendorProfileId}&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Network response was not ok');
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                const formattedEvents = data.map(event => {
+                                    let eventColor = '';
+                                    if (event.status === 'available') {
+                                        eventColor = '#4CAF50';
+                                    } else if (event.status === 'booked') {
+                                        eventColor = '#F44336';
+                                    } else if (event.status === 'blocked') {
+                                        eventColor = '#B0BEC5';
+                                    } else if (event.status === 'holiday') {
+                                        eventColor = '#FF9800';
+                                    }
+
+                                    return {
+                                        id: event.id,
+                                        title: '',
+                                        start: event.date + 'T' + event.start_time,
+                                        end: event.date + 'T' + event.end_time,
+                                        allDay: false,
+                                        display: 'background',
+                                        color: eventColor,
+                                        extendedProps: {
+                                            status: event.status
+                                        }
+                                    };
+                                });
+                                successCallback(formattedEvents);
+                            })
+                            .catch(error => {
+                                console.error('Error fetching availability:', error);
+                                // The message display removal was requested by the user previously.
+                                // const calendarContainer = document.getElementById('public-availability-calendar');
+                                // if (calendarContainer) {
+                                //     calendarContainer.innerHTML = '<p class="text-subtle">Failed to load calendar. Please try again.</p>';
+                                // }
+                                failureCallback(error);
+                            });
+                    },
+                    eventContent: function(arg) {
+                        return { html: `<div></div>` };
+                    },
+                    selectable: false,
+                    editable: false,
+                    eventClick: function(info) {
+                        info.jsEvent.preventDefault();
+                        const clickedDate = info.event.startStr.slice(0, 10);
+                        if (bookNowBtn && info.event.extendedProps.status === 'available') {
+                            bookNowBtn.href = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=${vendorProfileId}&prefill_date=${clickedDate}`;
+                        } else if (bookNowBtn) {
+                            bookNowBtn.href = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=${vendorProfileId}`;
+                        }
+                    }
+                });
+                calendar.render();
+            }
+        });
+    </script>
 </body>
 </html>
