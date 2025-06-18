@@ -2,33 +2,32 @@
 
 /* Hero Section */
 .hero {
-    /* REMOVED: background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); */
-    background-image: url('../images/hero1.jpg'); /* REPLACE 'your_hero_image.jpg' with your actual image filename */
-    background-size: cover; /* Cover the entire area */
-    background-position: center; /* Center the image */
-    background-repeat: no-repeat; /* Do not repeat the image */
-    background-color: var(--primary-color); /* Fallback color if image doesn't load */
+    background-image: url('../images/hero1.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: var(--primary-color);
     
     color: var(--white);
-    padding: 100px 0; /* More vertical padding for a grander feel */
+    padding: 100px 0;
     text-align: center;
     position: relative;
-    overflow: hidden; /* Hide overflow from any subtle background animations */
-    min-height: 60vh; /* Ensure it takes a decent height */
+    overflow: hidden;
+    min-height: 60vh;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .hero-content {
-    z-index: 1; /* Ensure content is above any background effects */
-    max-width: 1000px; /* Increased max-width for wider content */
+    z-index: 1;
+    max-width: 1000px;
     margin: 0 auto;
     padding: var(--spacing-md);
 }
 
 .hero-content h1 {
-    font-size: 3.5em; /* Larger, more impactful heading */
+    font-size: 3.5em;
     margin-bottom: var(--spacing-md);
     font-weight: 700;
     line-height: 1.2;
@@ -43,20 +42,71 @@
     color: var(--white);
 }
 
+/* Search Bar Styles */
+.search-bar-container {
+    margin-bottom: var(--spacing-lg);
+    display: flex;
+    justify-content: center;
+}
+
+.search-form {
+    display: flex;
+    width: 100%;
+    max-width: 600px;
+    background-color: var(--white);
+    border-radius: 50px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+}
+
+.search-input {
+    flex-grow: 1;
+    padding: 15px 25px;
+    border: none;
+    outline: none;
+    font-size: 1.1em;
+    color: var(--text-dark);
+    background: transparent;
+    border-top-left-radius: 50px;
+    border-bottom-left-radius: 50px;
+}
+
+.search-input::placeholder {
+    color: var(--text-subtle);
+    opacity: 0.8;
+}
+
+.search-button {
+    background: var(--primary-color);
+    color: var(--white);
+    border: none;
+    padding: 15px 25px;
+    font-size: 1.2em;
+    cursor: pointer;
+    border-top-right-radius: 50px;
+    border-bottom-right-radius: 50px;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.search-button:hover {
+    background-color: var(--secondary-color);
+    transform: translateX(2px);
+}
+
 .cta-buttons {
     display: flex;
     gap: var(--spacing-md);
     justify-content: center;
-    flex-wrap: wrap; /* Allow buttons to wrap */
+    flex-wrap: wrap;
 }
 
-/* Features Section (existing, updated for new colors) */
+/* Features Section */
 .section {
     padding: var(--spacing-xl) 0;
-    background: var(--background-light); /* Use new background color */
+    background: var(--background-light);
 }
 
-.section.bg-light { /* Optional: for sections with a lighter background */
+.section.bg-light {
     background: var(--background-light);
 }
 
@@ -64,16 +114,14 @@
     text-align: center;
     margin-bottom: var(--spacing-xl);
     font-size: 2.5em;
-    color: var(--text-dark); /* Use new text color */
+    color: var(--text-dark);
 }
 
-/* Specific styling for section titles that are *not* inside a .container anymore */
 .section-title {
-    text-align: center; /* Default for all sections */
+    text-align: center;
     margin-bottom: var(--spacing-xl);
     font-size: 2.5em;
     color: var(--text-dark);
-    /* Add horizontal padding to these titles if they are not inside .container */
     padding-left: var(--spacing-md);
     padding-right: var(--spacing-md);
 }
@@ -101,16 +149,16 @@
 .feature-icon {
     font-size: 3.5em;
     margin-bottom: var(--spacing-md);
-    color: var(--primary-color); /* Use new primary color */
+    color: var(--primary-color);
 }
 
 .feature-card h3 {
-    margin-top: 0;
-    color: var(--text-dark); /* Use new text color */
     font-size: 1.4em;
+    margin-top: 0;
+    color: var(--text-dark);
 }
 
-/* How It Works Section (existing, updated for new colors) */
+/* How It Works Section */
 .steps {
     display: flex;
     justify-content: center;
@@ -132,7 +180,7 @@
 .step-number {
     width: 70px;
     height: 70px;
-    background: var(--primary-color); /* Use new primary color */
+    background: var(--primary-color);
     color: var(--white);
     border-radius: 50%;
     display: flex;
@@ -145,7 +193,7 @@
 }
 
 .step h3 {
-    color: var(--text-dark); /* Use new text color */
+    color: var(--text-dark);
     font-size: 1.3em;
 }
 
@@ -154,22 +202,19 @@
     padding-top: 100px;
     padding-bottom: 100px;
     background: var(--background-light);
-    /* Make the section itself take full viewport width and control its own padding */
     width: 100%;
-    overflow: hidden; /* Important for carousels that span full width */
+    overflow: hidden;
 }
 
-/* Swiper container for Categories */
 .categories-swiper {
     display: flex;
-    width: 100%; /* Take full width of its parent (.categories-section) */
-    max-width: 100vw; /* Ensure it can go edge-to-edge */
+    width: 100%;
+    max-width: 100vw;
     padding-bottom: 100px;
     padding-top: 100px;
     overflow: hidden;
     position: relative;
-    /* REMOVED: padding: 0 var(--spacing-md); */ /* This padding was limiting its "length" */
-    box-sizing: border-box; /* Include padding in the width calculation */
+    box-sizing: border-box;
 }
 
 .category-card {
@@ -177,7 +222,6 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    /*padding: var(--spacing-md); */
     padding-top: 50px;
     padding-bottom: 50px;
     background: var(--white);
@@ -186,8 +230,8 @@
     margin-bottom: 80px;
     box-shadow: 0 4px 10px rgba(0,0,0,0.08);
     transition: transform 0.8s ease, box-shadow 0.3s ease;
-    text-decoration: none; /* Remove underline from links */
-    height: 150px; /* Allow height to adjust */
+    text-decoration: none;
+    height: 150px;
     width: 200px;
 }
 
@@ -199,16 +243,16 @@
 .category-icon {
     font-size: 3.5em;
     margin-bottom: 20px;
-    color: var(--secondary-color); /* Use secondary color for category icons */
+    color: var(--secondary-color);
     transition: transform 0.8s ease;
 }
 
 .category-card:hover .category-icon {
-    transform: scale(1.1); /* Zoom icon on hover */
+    transform: scale(1.1);
 }
 
 .category-card h3 {
-    font-size: 1.2em; /* Slightly larger text */
+    font-size: 1.2em;
     margin: 0;
     color: var(--text-dark);
 }
@@ -217,41 +261,40 @@
 .vendor-category-section {
     padding: var(--spacing-xl) 0;
     background: var(--background-light);
-    border-top: 1px solid var(--border-color); /* Separator between categories */
+    border-top: 1px solid var(--border-color);
 }
 
 .vendor-category-section:first-of-type {
-    border-top: none; /* No top border for the first category */
+    border-top: none;
 }
 
 .vendor-category-section h2 {
-    text-align: left; /* Align category titles to the left */
+    text-align: left;
     margin-bottom: var(--spacing-lg);
     font-size: 2em;
     color: var(--text-dark);
-    padding-left: var(--spacing-md); /* Match container padding */
+    padding-left: var(--spacing-md);
 }
 
 /* Swiper container for Vendors */
-.swiper[class*="vendors-swiper-"] { /* Targets all vendor swipers */
+.swiper[class*="vendors-swiper-"] {
     width: 100%;
-    overflow: hidden; /* Ensure overflow is hidden */
-    position: relative; /* Needed for absolute positioning of overlays */
-    /* Add horizontal padding here */
-    padding: 50px var(--spacing-md); /* Add padding to the swiper container itself */
-    box-sizing: border-box; /* Include padding in the width calculation */
+    overflow: hidden;
+    position: relative;
+    padding: 50px var(--spacing-md);
+    box-sizing: border-box;
 }
 
 .vendor-card-item {
     background: var(--white);
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-    overflow: hidden; /* Ensures image corners are rounded */
+    overflow: hidden;
     transition: transform 0.8s ease, box-shadow 0.3s ease;
     text-align: left;
-    text-decoration: none; /* Remove underline from links */
-    height: 400px; /* Allow height to adjust */
-    display: flex; /* Ensure card content aligns properly */
+    text-decoration: none;
+    height: 400px;
+    display: flex;
     flex-direction: column;
 }
 
@@ -262,18 +305,48 @@
 
 .vendor-card-image {
     width: 100%;
-    height: 800px; /* Fixed height for images */
+    height: 800px;
     background-size: cover;
     background-position: center;
     border-bottom: 1px solid var(--border-color);
 }
 
+/* Swiper Lazy Preloader Styling */
+.swiper-lazy-preloader {
+    width: 42px;
+    height: 42px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    margin-left: -21px;
+    margin-top: -21px;
+    z-index: 10;
+    transform-origin: 50%;
+    animation: swiper-preloader-spin 1s infinite linear;
+    box-sizing: border-box;
+    border: 4px solid var(--primary-color);
+    border-radius: 50%;
+    border-top-color: transparent;
+}
+
+.swiper-lazy-preloader-white {
+    border-color: #fff;
+    border-top-color: transparent;
+}
+
+@keyframes swiper-preloader-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+
 .vendor-card-content {
     padding: var(--spacing-md);
-    flex-grow: 1; /* Allows content to take up available space */
+    flex-grow: 1;
     display: flex;
     flex-direction: column;
-    justify-content: space-between; /* Pushes content like services to bottom */
+    justify-content: space-between;
 }
 
 .vendor-card-content h3 {
@@ -290,7 +363,7 @@
 }
 
 .vendor-card-rating {
-    color: var(--warning-color); /* Star color */
+    color: var(--warning-color);
     font-size: 1.1em;
     margin-bottom: var(--spacing-sm);
 }
@@ -299,69 +372,74 @@
     margin-right: 3px;
 }
 
+.vendor-card-rating span {
+    font-size: 0.8em;
+    color: var(--text-subtle);
+    margin-left: 8px;
+}
+
 .vendor-card-services {
     font-size: 0.85em;
     color: var(--text-dark);
-    margin-top: auto; /* Pushes to the bottom of the flex container */
+    margin-top: auto;
 }
 
 /* Swiper Navigation Arrows - HIDDEN */
 .swiper-button-next,
 .swiper-button-prev {
-    display: none !important; /* Hide arrows completely */
+    display: none !important;
 }
 
 /* Swiper Pagination Dots */
 .swiper-pagination-bullet {
-    background: var(--text-subtle) !important; /* Default dot color */
+    background: var(--text-subtle) !important;
     opacity: 0.5;
     transition: background 0.3s ease, opacity 0.3s ease;
 }
 
 .swiper-pagination-bullet-active {
-    background: var(--primary-color) !important; /* Active dot color */
+    background: var(--primary-color) !important;
     opacity: 1;
 }
 
 /* Adjust pagination dot position */
 .swiper-pagination-bullets {
-    bottom: -5px !important; /* Move dots lower, adjust as needed */
-    padding-bottom: 20px; /* Add some space below the dots */
+    bottom: -5px !important;
+    padding-bottom: 20px;
 }
 
 
-/* NEW: Fading Overlays at Carousel Ends */
-/* Apply these to the .swiper containers for the fade effect */
+/* Fading Overlays at Carousel Ends */
 .swiper-container-fade-overlay::before,
 .swiper-container-fade-overlay::after {
     content: '';
     position: absolute;
     top: 0;
     height: 100%;
-    width: 50px; /* Width of the fade effect */
-    z-index: 10; /* Ensure it's above slides */
-    pointer-events: none; /* Allows clicks to pass through */
+    width: 50px;
+    z-index: 10;
+    pointer-events: none;
 }
 
 .swiper-container-fade-overlay::before {
     left: 0;
-    background: linear-gradient(to right, var(--background-light), rgba(255,255,255,0)); /* Fade from left */
+    background: linear-gradient(to right, var(--background-light), rgba(255,255,255,0));
 }
 
 .swiper-container-fade-overlay::after {
     right: 0;
-    background: linear-gradient(to left, var(--background-light), rgba(255,255,255,0)); /* Fade from right */
+    background: linear-gradient(to left, var(--background-light), rgba(255,255,255,0));
 }
 
 
 /* Styling for the CTA bottom section */
 .cta-bottom-section {
-    background-image: url('../images/hero6.jpg'); /* Background image for the CTA section */
+    background-image: url('../images/hero6.jpg');
     background-size: cover;
     background-position: center;
-    color: var(--white); /* Text color for contrast */
-    padding: var(--spacing-xxl) 0; /* Increased vertical padding for impact */
-    text-align: center; /* Center content horizontally */
+    color: var(--white);
+    padding: var(--spacing-xxl) 0;
+    text-align: center;
     position: relative;
     overflow: hidden;
 }
@@ -374,26 +452,26 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5); /* Semi-transparent black overlay */
+    background: rgba(0, 0, 0, 0.5);
     z-index: 1;
 }
 
 .cta-bottom-section .container {
-    position: relative; /* Ensure container content is above the overlay */
+    position: relative;
     z-index: 2;
-    /* Inherits max-width, margin, padding from .container in style.css */
 }
 
+
 .cta-bottom-section h2 {
-    color: var(--white); /* Ensure heading is white for contrast */
-    font-size: 2.8em; /* Make it more prominent */
+    color: var(--white);
+    font-size: 2.8em;
     margin-bottom: var(--spacing-md);
 }
 
 .cta-bottom-section .subtitle {
-    color: rgba(255, 255, 255, 0.9); /* Ensure subtitle is white and slightly transparent */
-    font-size: 1.4em; /* Make it more prominent */
-    margin-bottom: var(--spacing-xl); /* Space below subtitle before the button */
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.4em;
+    margin-bottom: var(--spacing-xl);
 }
 
 
@@ -405,13 +483,11 @@
     .subtitle {
         font-size: 1.3em;
     }
-    /* Swiper containers should still have horizontal padding on smaller screens */
-    /* REMOVED: .categories-swiper, .swiper[class*="vendors-swiper-"] { padding-left: var(--spacing-md); padding-right: var(--spacing-md); } */
     .category-card {
-        width: 160px; /* Adjust width for categories on medium screens */
+        width: 160px;
     }
     .vendor-card-item {
-        width: 280px; /* Adjust width for vendors on medium screens */
+        width: 280px;
     }
 }
 
@@ -425,6 +501,22 @@
     .subtitle {
         font-size: 1.1em;
         margin-bottom: var(--spacing-lg);
+    }
+    /* Search bar adjustments for smaller screens */
+    .search-form {
+        flex-direction: column;
+        border-radius: 12px;
+    }
+    .search-input {
+        border-radius: 8px;
+        padding: 12px 20px;
+        font-size: 1em;
+    }
+    .search-button {
+        border-radius: 8px;
+        margin-top: var(--spacing-sm);
+        padding: 12px 20px;
+        font-size: 1em;
     }
     .cta-buttons {
         flex-direction: column;
@@ -447,30 +539,27 @@
     .feature-card, .step {
         max-width: 100%;
     }
-    /* Swiper on mobile: allow full width and smaller horizontal padding */
     .categories-swiper,
     .swiper[class*="vendors-swiper-"] {
-        padding-left: var(--spacing-sm); /* Smaller padding on mobile */
+        padding-left: var(--spacing-sm);
         padding-right: var(--spacing-sm);
     }
     .category-card {
-        width: 140px; /* Adjust width for categories on smaller screens to fit more */
+        width: 140px;
     }
     .vendor-card-item {
-        width: 250px; /* Adjust width for vendors on smaller screens */
+        width: 250px;
     }
-    /* Adjust fade overlays for smaller screens if needed */
     .swiper-container-fade-overlay::before,
     .swiper-container-fade-overlay::after {
-        width: 30px; /* Smaller fade width on mobile */
+        width: 30px;
     }
     .swiper-pagination-bullets {
-        bottom: 0px !important; /* Adjust dots for mobile */
+        bottom: 0px !important;
     }
 
-    /* Responsive adjustments for cta-bottom-section */
     .cta-bottom-section {
-        padding: var(--spacing-xl) 0; /* Adjust padding for smaller screens */
+        padding: var(--spacing-xl) 0;
     }
     .cta-bottom-section h2 {
         font-size: 2em;
@@ -499,9 +588,9 @@
         font-size: 1.8em;
     }
     .category-card {
-        width: 120px; /* Even smaller width on very small screens */
+        width: 120px;
     }
     .vendor-card-item {
-        width: 220px; /* Even smaller width for vendors on very small screens */
+        width: 220px;
     }
 }
