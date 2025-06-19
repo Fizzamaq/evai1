@@ -210,14 +210,14 @@ unset($_SESSION['error_message'], $_SESSION['success_message']); // Clear messag
             </div>
 
             <div class="form-group">
-                <label for="portfolio_images_new[]">Add More Images (Up to 20 total)</label>
-                <input type="file" id="portfolio_images_new[]" name="portfolio_images_new[]" accept="image/*" multiple>
+                <label for="portfolio_images_new">Add More Images (Up to 20 total)</label>
+                <input type="file" id="portfolio_images_new" name="portfolio_images_new[]" accept="image/*" multiple>
                 <small class="text-muted">You can select multiple images. Max 20 images including existing ones.</small>
             </div>
 
             <div class="form-group">
                 <label for="portfolio_video_url">Video URL (e.g., YouTube link)</label>
-                <input type="url" id="portfolio_video_url" name="portfolio_video_url" value="<?= htmlspecialchars($item_to_edit['video_url'] ?? '') ?>" placeholder="http://youtube.com/watch?v=...">
+                <input type="url" id="portfolio_video_url" name="portfolio_video_url" value="<?= htmlspecialchars($item_to_edit['video_url'] ?? '') ?>" placeholder="http://youtube.com/...">
             </div>
             <div class="form-group">
                 <label for="portfolio_testimonial">Client Testimonial</label>
