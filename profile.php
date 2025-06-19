@@ -78,7 +78,8 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
             <div class="profile-info">
                 <h2><?= htmlspecialchars($profile['first_name'] . ' ' . $profile['last_name']) ?></h2>
                 <p><strong>Email:</strong> <?= htmlspecialchars($profile['email']) ?></p>
-                <p><strong>Member Since:</strong> <?= date('F Y', strtotime($profile['created_at'])) ?></p>
+                <p><strong>Member Since:</b> <?= date('F Y', strtotime($profile['created_at'])) ?>
+</p>
 
                 <a href="edit_profile.php" class="btn">Edit Profile</a>
             </div>
@@ -106,7 +107,12 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
                             <h4><?= htmlspecialchars($category_name) ?></h4>
                             <ul>
                                 <?php foreach ($services as $service): ?>
-                                    <li><?= htmlspecialchars($service['service_name']) ?></li>
+                                    <li>
+                                        <?= htmlspecialchars($service['service_name']) ?>
+                                        <?php if (!empty($service['price_range_min']) || !empty($service['price_range_max'])): ?>
+                                            (PKR <?= number_format($service['price_range_min'] ?? 0) ?> - <?= number_format($service['price_range_max'] ?? 0) ?>)
+                                        <?php endif; ?>
+                                    </li>
                                 <?php endforeach; ?>
                             </ul>
                         <?php endforeach; ?>
