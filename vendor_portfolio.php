@@ -122,7 +122,7 @@ try {
                             </a>
                             <div class="portfolio-actions-footer">
                                 <a href="<?= BASE_URL ?>public/edit_portfolio_item.php?id=<?= $item['id'] ?>" class="btn btn-sm btn-secondary">Edit</a>
-                                <form method="POST" action="<?= BASE_URL ?>public/process_portfolio.php" onsubmit="return confirm('Are you sure you want to delete this portfolio item?');">
+                                <form method="POST" action="<?= BASE_URL ?>public/process_portfolio_item.php" onsubmit="return confirm('Are you sure you want to delete this portfolio item?');">
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="portfolio_item_id" value="<?= $item['id'] ?>">
                                     <button type="submit" class="btn btn-sm btn-danger">Delete</button>
