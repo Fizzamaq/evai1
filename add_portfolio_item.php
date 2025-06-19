@@ -112,13 +112,13 @@ unset($_SESSION['error_message'], $_SESSION['success_message']);
                 <input type="number" id="project_charges" name="project_charges" step="0.01" min="0" placeholder="e.g., 50000.00">
             </div>
             <div class="form-group">
-                <label for="portfolio_images[]">Image Files (Up to 20)</label>
-                <input type="file" id="portfolio_images[]" name="portfolio_images[]" accept="image/*" multiple>
+                <label for="portfolio_images">Image Files (Up to 20)</label>
+                <input type="file" id="portfolio_images" name="portfolio_images[]" accept="image/*" multiple>
                 <small class="text-muted">You can select multiple images. Maximum 20 images allowed.</small>
             </div>
             <div class="form-group">
                 <label for="portfolio_video_url">Video URL (e.g., YouTube link)</label>
-                <input type="url" id="portfolio_video_url" name="portfolio_video_url" placeholder="http://youtube.com/watch?v=...">
+                <input type="url" id="portfolio_video_url" name="portfolio_video_url" placeholder="http://youtube.com/...">
             </div>
             <div class="form-group">
                 <label for="portfolio_testimonial">Client Testimonial</label>
