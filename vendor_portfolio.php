@@ -1,6 +1,5 @@
 <?php
-// public/vendor_portfolio.php
-session_start(); // Removed: handled by config.php
+session_start();
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';
 require_once '../classes/Vendor.class.php';
@@ -24,10 +23,11 @@ if (!$vendor_data) {
     exit();
 }
 
-// The portfolio item submission handling logic has been moved to add_portfolio_item.php
+// The portfolio item submission handling logic has been moved to process_portfolio.php
 // This block is now removed from here.
 
 // Get vendor portfolio items
+// The getVendorPortfolio method in Vendor.class.php now fetches 'main_image_url'
 $portfolio_items = $vendor->getVendorPortfolio($vendor_data['id']);
 
 // Get event types for dropdown (not strictly needed here for display, but kept if still used elsewhere)
@@ -87,8 +87,8 @@ try {
                         <div class="portfolio-item-card">
                             <a href="<?= BASE_URL ?>public/view_portfolio_item.php?id=<?= $item['id'] ?>" class="portfolio-item-link-area">
                                 <div class="portfolio-image-wrapper">
-                                    <?php if ($item['image_url']): ?>
-                                        <img src="<?= BASE_URL . htmlspecialchars($item['image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                                    <?php if (!empty($item['main_image_url'])): ?>
+                                        <img src="<?= BASE_URL . htmlspecialchars($item['main_image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
                                     <?php else: ?>
                                         <div class="portfolio-placeholder">
                                             <i class="fas fa-image"></i>
@@ -122,9 +122,9 @@ try {
                             </a>
                             <div class="portfolio-actions-footer">
                                 <a href="<?= BASE_URL ?>public/edit_portfolio_item.php?id=<?= $item['id'] ?>" class="btn btn-sm btn-secondary">Edit</a>
-                                <form method="POST" action="<?= BASE_URL ?>public/process_portfolio_item.php" onsubmit="return confirm('Are you sure you want to delete this portfolio item?');">
+                                <form method="POST" action="<?= BASE_URL ?>public/process_portfolio.php" onsubmit="return confirm('Are you sure you want to delete this portfolio item?');">
                                     <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="item_id" value="<?= $item['id'] ?>">
+                                    <input type="hidden" name="portfolio_item_id" value="<?= $item['id'] ?>">
                                     <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                                 </form>
                             </div>
