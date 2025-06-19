@@ -1,5 +1,8 @@
 <?php
 // public/process_portfolio_item.php
+// This file is now primarily used for direct DELETE actions of portfolio items.
+// Add/Edit is handled by process_portfolio.php
+
 session_start();
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';
@@ -19,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['action'])) {
 
 $user_id = $_SESSION['user_id'];
 $action = $_POST['action'];
-$item_id = $_POST['item_id'] ?? null;
+$item_id = $_POST['portfolio_item_id'] ?? null; // Changed from 'item_id' for consistency with process_portfolio.php
 
 $vendor_obj = new Vendor($pdo);
 $uploader = new UploadHandler();
@@ -39,34 +42,21 @@ if (!$item_id) {
     exit();
 }
 
-// Fetch the item to verify ownership and get image_url for deletion
-$item_to_process = $vendor_obj->getPortfolioItemById($item_id);
-if (!$item_to_process || $item_to_process['vendor_id'] != $vendor_profile_id) {
-    $_SESSION['error_message'] = "Portfolio item not found or you don't have permission to perform this action.";
-    header('Location: ' . BASE_URL . 'public/vendor_portfolio.php');
-    exit();
-}
-
 switch ($action) {
     case 'delete':
         try {
-            // Delete associated image file from server
-            if (!empty($item_to_process['image_url'])) {
-                $filename_to_delete = basename($item_to_process['image_url']);
-                $uploader->deleteFile($filename_to_delete, 'vendors/'); // Assuming 'vendors/' is the subfolder
-            }
-
+            // deletePortfolioItem method in Vendor.class.php is updated
+            // to handle fetching and deleting all associated images from the file system
+            // and relying on CASCADE DELETE for database records.
             if ($vendor_obj->deletePortfolioItem($item_id, $vendor_profile_id)) {
                 $_SESSION['success_message'] = "Portfolio item deleted successfully.";
             } else {
-                $_SESSION['error_message'] = "Failed to delete portfolio item from database.";
+                $_SESSION['error_message'] = "Failed to delete portfolio item.";
             }
         } catch (Exception $e) {
             $_SESSION['error_message'] = "Error deleting portfolio item: " . $e->getMessage();
         }
         break;
-
-    // Add more actions here if needed in the future (e.g., 'feature', 'unfeature')
 
     default:
         $_SESSION['error_message'] = "Invalid action.";
@@ -75,4 +65,3 @@ switch ($action) {
 
 header('Location: ' . BASE_URL . 'public/vendor_portfolio.php');
 exit();
-?>
