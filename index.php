@@ -52,6 +52,12 @@ $vendor_categories = $vendor->getAllVendorCategories();
         <div class="hero-content">
             <h1>Plan Perfect Events with AI Assistance</h1>
             <p class="subtitle">From weddings to corporate gatherings, streamline your event planning with smart tools and vendor connections.</p>
+            <div class="search-bar-container">
+                <form action="vendors.php" method="GET" class="search-form">
+                    <input type="text" name="search_query" class="search-input" placeholder="Search vendors by name, service, or location...">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
             <div class="cta-buttons">
                 <a href="register.php" class="btn btn-primary btn-large">Get Started</a>
                 <a href="login.php" class="btn btn-secondary btn-large">Login</a>
