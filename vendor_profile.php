@@ -41,6 +41,17 @@ $user_events = [];
 if (isset($_SESSION['user_id'])) {
     $user_events = $event->getUserEvents($_SESSION['user_id']);
 }
+
+// Fetch vendor's services offered with their price ranges
+$vendor_services_offered_raw = $vendor->getVendorServices($vendor_profile['id']);
+
+// Group services by category for display
+$vendor_services_grouped = [];
+foreach ($vendor_services_offered_raw as $service) {
+    $vendor_services_grouped[$service['category_name']][] = $service;
+}
+
+
 $vendor_profile_id_js = $vendor_profile['id'];
 ?>
 
@@ -117,10 +128,28 @@ $vendor_profile_id_js = $vendor_profile['id'];
                 <?php if (!empty($vendor_profile['min_budget']) && !empty($vendor_profile['max_budget'])): ?>
                     <p><strong>Budget Range:</strong> $<?= number_format($vendor_profile['min_budget'], 0) ?> - $<?= number_format($vendor_profile['max_budget'], 0) ?></p>
                 <?php endif; ?>
-                <?php if (!empty($vendor_profile['offered_services_names'])): ?>
-                    <p><strong>Services:</strong> <?= htmlspecialchars($vendor_profile['offered_services_names']) ?></p>
-                <?php endif; ?>
             </div>
+        </div>
+
+        <div class="profile-section">
+            <h2>Services Offered</h2>
+            <?php if (!empty($vendor_services_grouped)): ?>
+                <?php foreach ($vendor_services_grouped as $category_name => $services): ?>
+                    <h4><?= htmlspecialchars($category_name) ?></h4>
+                    <ul>
+                        <?php foreach ($services as $service): ?>
+                            <li>
+                                <?= htmlspecialchars($service['service_name']) ?>
+                                <?php if (!empty($service['price_range_min']) || !empty($service['price_range_max'])): ?>
+                                    (PKR <?= number_format($service['price_range_min'] ?? 0) ?> - <?= number_format($service['price_range_max'] ?? 0) ?>)
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <p>No services currently listed by this vendor.</p>
+            <?php endif; ?>
         </div>
 
         <?php if (isset($_SESSION['user_id']) && $_SESSION['user_type'] == 1): ?>
@@ -165,7 +194,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
                                     <h3><?= htmlspecialchars($item['title']) ?></h3>
                                     <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 150)) ?><?= (strlen($item['description'] ?? '') > 150) ? '...' : '' ?></p>
                                     <?php if (!empty($item['project_charges'])): ?>
-                                        <p class="project-charges-summary">Charges: PKR <?= number_format($item['project_charges'], 0) ?></p>
+                                        <p class="project-charges-summary">Charges: PKR <?= number_format($item['project_charges'], 2) ?></p>
                                     <?php endif; ?>
                                     <div class="portfolio-meta-info">
                                         <?php if (!empty($item['event_type_name'])): ?>
