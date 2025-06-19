@@ -94,15 +94,25 @@ try {
             // Ensure vendor_profile_id is set for subsequent actions in this request
             $vendor_profile_id = $vendor_profile_id_returned;
 
-            // Handle vendor services offered
-            $services_offered = $_POST['services_offered'] ?? [];
-            if (!is_array($services_offered)) {
-                $services_offered = [];
+            // Handle vendor services offered including price ranges
+            $services_offered_data = [];
+            if (isset($_POST['services_offered']) && is_array($_POST['services_offered'])) {
+                foreach ($_POST['services_offered'] as $service_id => $service_details) {
+                    // Only process if the checkbox for this service was actually checked
+                    if (isset($service_details['id']) && $service_details['id'] == $service_id) {
+                        $services_offered_data[] = [
+                            'service_id' => (int)$service_id,
+                            'min_price' => !empty($service_details['min_price']) ? (float)$service_details['min_price'] : null,
+                            'max_price' => !empty($service_details['max_price']) ? (float)$service_details['max_price'] : null
+                        ];
+                    }
+                }
             }
 
             // Add explicit try-catch for service offerings update
             try {
-                if (!$vendor_obj->updateVendorServiceOfferings($vendor_profile_id, $services_offered)) {
+                // Pass the structured services_offered_data to the updated method
+                if (!$vendor_obj->updateVendorServiceOfferings($vendor_profile_id, $services_offered_data)) {
                     // If method returns false, it failed.
                     throw new Exception("Database operation for updating services failed unexpectedly.");
                 }
@@ -110,7 +120,6 @@ try {
                 // Catch any exception from updateVendorServiceOfferings
                 // Append this error to existing profile_error session message
                 $_SESSION['profile_error'] = ($_SESSION['profile_error'] ?? '') . " Error saving services: " . $e->getMessage();
-                // Continue with the overall success message if other parts passed, or just show this error.
                 // For simplicity, we'll let the main success message take precedence unless this is the only error.
             }
         }
