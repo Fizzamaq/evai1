@@ -84,19 +84,25 @@ document.addEventListener('DOMContentLoaded', function() {
         // Specific validation for vendor services if it's the services step
         // This step is always the last for vendors (index 2)
         if (isVendor && stepIndex === 2) { // Assuming step 3 is index 2 for vendors
-            const serviceCheckboxes = currentStepElement.querySelectorAll('input[name="services_offered[]"]');
+            const serviceCheckboxes = currentStepElement.querySelectorAll('input[name^="services_offered["][type="checkbox"]');
             let anyServiceSelected = false;
             if (serviceCheckboxes.length > 0) {
                 serviceCheckboxes.forEach(checkbox => {
                     if (checkbox.checked) {
                         anyServiceSelected = true;
+                        // Optional: Validate price inputs if they are required when checked
+                        // const serviceId = checkbox.dataset.serviceId;
+                        // const minPriceInput = document.getElementById(`service_${serviceId}_min`);
+                        // const maxPriceInput = document.getElementById(`service_${serviceId}_max`);
+                        // Add validation for minPriceInput.value and maxPriceInput.value if needed
                     }
                 });
-                if (!anyServiceSelected) {
-                    isValid = false;
-                    // Provide visual feedback for services section if needed, e.g., a message near the checkboxes
-                    alert('Please select at least one service you offer.');
-                }
+                // The user did not specify that at least one service must be selected.
+                // If it were a requirement, uncomment the following block:
+                // if (!anyServiceSelected) {
+                //     isValid = false;
+                //     alert('Please select at least one service you offer.');
+                // }
             }
         }
 
@@ -163,6 +169,36 @@ document.addEventListener('DOMContentLoaded', function() {
             // If validation passes, form will naturally submit
         });
     }
+
+    // NEW: Add event listeners for service checkboxes to show/hide price inputs
+    const serviceCheckboxes = multiStepForm.querySelectorAll('input[name^="services_offered["][type="checkbox"]');
+
+    serviceCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const serviceId = this.dataset.serviceId;
+            const priceInputsDiv = document.getElementById(`price_inputs_${serviceId}`);
+            if (priceInputsDiv) {
+                if (this.checked) {
+                    priceInputsDiv.style.display = 'block';
+                } else {
+                    priceInputsDiv.style.display = 'none';
+                    // Clear values when unchecked
+                    priceInputsDiv.querySelectorAll('input[type="number"]').forEach(input => input.value = '');
+                }
+            }
+        });
+    });
+
+    // NEW: Initial display logic: ensure price inputs are visible for initially checked checkboxes
+    // This runs on page load to set the correct state based on existing data or form persistence
+    serviceCheckboxes.forEach(checkbox => {
+        const serviceId = checkbox.dataset.serviceId;
+        const priceInputsDiv = document.getElementById(`price_inputs_${serviceId}`);
+        if (priceInputsDiv && checkbox.checked) {
+            priceInputsDiv.style.display = 'block';
+        }
+    });
+
 
     // Initial display
     showStep(currentStep);
