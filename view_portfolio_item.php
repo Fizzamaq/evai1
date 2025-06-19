@@ -16,7 +16,7 @@ $portfolio_item_id = (int)$_GET['id'];
 
 $vendor_obj = new Vendor($pdo); // Use $vendor_obj to avoid name clash with public profile display
 
-// Fetch portfolio item data
+// Fetch portfolio item data (getPortfolioItemById now includes all images)
 $item_details = $vendor_obj->getPortfolioItemById($portfolio_item_id);
 
 if (!$item_details) {
@@ -36,8 +36,10 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($item_details['title']) ?> - Portfolio Item</title>
     <link rel="stylesheet" href="../assets/css/style.css">
-    <link rel="stylesheet" href="../assets/css/vendor_profile.css"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/vendor_profile.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <style>
         .portfolio-detail-container {
             max-width: 900px;
@@ -62,19 +64,39 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
             color: var(--text-subtle);
             font-size: 1.1em;
         }
-        .portfolio-detail-image-wrapper {
+        /* Styles for Swiper Carousel */
+        .portfolio-carousel-wrapper {
             width: 100%;
-            height: 450px; /* Larger image area */
-            overflow: hidden;
-            border-radius: 10px;
+            height: 450px; /* Consistent height for the carousel */
             margin-bottom: var(--spacing-lg);
+            position: relative; /* For navigation buttons */
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden; /* Ensures rounded corners are applied */
         }
-        .portfolio-detail-image-wrapper img {
+        .portfolio-carousel-wrapper img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
+        .swiper-button-next,
+        .swiper-button-prev {
+            color: var(--white) !important;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 1.2em;
+        }
+        .swiper-pagination-bullet {
+            background: var(--primary-color) !important;
+            opacity: 0.7 !important;
+        }
+        .swiper-pagination-bullet-active {
+            opacity: 1 !important;
+        }
+
         .portfolio-detail-section {
             margin-bottom: var(--spacing-lg);
             padding: var(--spacing-md);
@@ -125,9 +147,25 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
             <?php endif; ?>
         </div>
 
-        <?php if (!empty($item_details['image_url'])): ?>
-            <div class="portfolio-detail-image-wrapper">
-                <img src="<?= BASE_URL . htmlspecialchars($item_details['image_url']) ?>" alt="<?= htmlspecialchars($item_details['title']) ?>">
+        <?php if (!empty($item_details['images'])): ?>
+            <div class="portfolio-carousel-wrapper swiper">
+                <div class="swiper-wrapper">
+                    <?php foreach ($item_details['images'] as $image): ?>
+                        <div class="swiper-slide">
+                            <img src="<?= BASE_URL . htmlspecialchars($image['image_url']) ?>" alt="<?= htmlspecialchars($item_details['title']) ?>">
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <div class="swiper-pagination"></div>
+                <div class="swiper-button-next"></div>
+                <div class="swiper-button-prev"></div>
+            </div>
+        <?php else: ?>
+            <div class="portfolio-carousel-wrapper" style="display: flex; justify-content: center; align-items: center; background-color: var(--background-light);">
+                <div class="portfolio-placeholder" style="position: static; width: auto; height: auto; border: none;">
+                    <i class="fas fa-image" style="font-size: 4em; color: var(--text-subtle);"></i>
+                    <span style="margin-top: 10px; color: var(--text-subtle);">No Images Available</span>
+                </div>
             </div>
         <?php endif; ?>
 
@@ -174,5 +212,31 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
     </div>
 
     <?php include 'footer.php'; ?>
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Swiper only if images exist
+            if (document.querySelector('.portfolio-carousel-wrapper .swiper-slide')) {
+                new Swiper('.portfolio-carousel-wrapper', {
+                    loop: true, // Enable looping
+                    autoplay: {
+                        delay: 5000, // 5 seconds between slides
+                        disableOnInteraction: false, // Continue autoplay after user interaction
+                    },
+                    pagination: {
+                        el: '.swiper-pagination',
+                        clickable: true,
+                    },
+                    navigation: {
+                        nextEl: '.swiper-button-next',
+                        prevEl: '.swiper-button-prev',
+                    },
+                    grabCursor: true, // Show grab cursor when hovering over slides
+                    slidesPerView: 1, // Display one slide at a time
+                    spaceBetween: 0, // No space between slides
+                });
+            }
+        });
+    </script>
 </body>
 </html>
