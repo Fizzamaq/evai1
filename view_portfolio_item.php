@@ -5,6 +5,8 @@ require_once '../includes/config.php';
 require_once '../classes/User.class.php';
 require_once '../classes/Vendor.class.php';
 
+// include 'header.php';
+
 // Ensure portfolio item ID is provided in the URL
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     $_SESSION['error_message'] = "Invalid portfolio item ID provided.";
@@ -42,7 +44,7 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <style>
         .portfolio-detail-container {
-            max-width: 900px;
+            max-width: 1200px;
             margin: var(--spacing-lg) auto;
             padding: var(--spacing-md);
             background: var(--white);
@@ -64,15 +66,47 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
             color: var(--text-subtle);
             font-size: 1.1em;
         }
+        /* Styles for the main content layout: carousel right, details left */
+        .portfolio-content-layout {
+            display: flex;
+            flex-direction: column; /* Stack on small screens */
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+        }
+        @media (min-width: 768px) {
+            .portfolio-content-layout {
+                flex-direction: row; /* Side-by-side on larger screens */
+            }
+            .portfolio-details-left,
+            .portfolio-carousel-right {
+                max-width: 100%; /* Ensures flex items don't overflow */
+            }
+        }
+        .portfolio-details-left {
+            flex: 1; /* Take available space */
+        }
+        .portfolio-carousel-right {
+            flex: 1; /* Take available space */
+        }
         /* Styles for Swiper Carousel */
         .portfolio-carousel-wrapper {
             width: 100%;
-            height: 450px; /* Consistent height for the carousel */
+            /* Removed fixed height */
+            padding-bottom: 75%; /* Set aspect ratio to 4:3 (height is 75% of width) */
             margin-bottom: var(--spacing-lg);
-            position: relative; /* For navigation buttons */
+            position: relative; /* For absolute positioning of children */
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             border-radius: 10px;
             overflow: hidden; /* Ensures rounded corners are applied */
+            box-sizing: border-box;
+        }
+        /* Make swiper-wrapper fill the aspect-ratio defined space */
+        .portfolio-carousel-wrapper .swiper-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
         }
         .portfolio-carousel-wrapper img {
             width: 100%;
@@ -143,68 +177,74 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
         <div class="portfolio-detail-header">
             <h1><?= htmlspecialchars($item_details['title']) ?></h1>
             <?php if ($vendor_profile): ?>
-                <p>Project by <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_profile['id']) ?>"><?= htmlspecialchars($vendor_profile['business_name']) ?></a></p>
+                <p>Creation by <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_profile['id']) ?>"><?= htmlspecialchars($vendor_profile['business_name']) ?></a></p>
             <?php endif; ?>
         </div>
 
-        <?php if (!empty($item_details['images'])): ?>
-            <div class="portfolio-carousel-wrapper swiper">
-                <div class="swiper-wrapper">
-                    <?php foreach ($item_details['images'] as $image): ?>
-                        <div class="swiper-slide">
-                            <img src="<?= BASE_URL . htmlspecialchars($image['image_url']) ?>" alt="<?= htmlspecialchars($item_details['title']) ?>">
+        <div class="portfolio-content-layout">
+            <div class="portfolio-details-left">
+                <div class="portfolio-detail-section">
+                    <h2>Details</h2>
+                    <div class="detail-item">
+                        <p><strong>Description:</strong> <?= nl2br(htmlspecialchars($item_details['description'] ?? 'No description provided.')) ?></p>
+                    </div>
+                    <?php if (!empty($item_details['project_charges'])): ?>
+                        <div class="detail-item">
+                            <p><strong>Charges:</strong> PKR <?= number_format($item_details['project_charges'], 2) ?></p>
                         </div>
-                    <?php endforeach; ?>
+                    <?php endif; ?>
+                    <div class="detail-item">
+                        <p><strong>Event Type:</strong> <?= htmlspecialchars($item_details['event_type_name'] ?? 'N/A') ?></p>
+                    </div>
+                    <?php if (!empty($item_details['project_date'])): ?>
+                        <div class="detail-item">
+                            <p><strong>Date:</strong> <?= date('F j, Y', strtotime($item_details['project_date'])) ?></p>
+                        </div>
+                    <?php endif; ?>
+                    <?php if (!empty($item_details['video_url'])): ?>
+                        <div class="detail-item">
+                            <p><strong>Video:</strong> <a href="<?= htmlspecialchars($item_details['video_url']) ?>" target="_blank"><?= htmlspecialchars($item_details['video_url']) ?></a></p>
+                        </div>
+                    <?php endif; ?>
+                    <?php if (!empty($item_details['is_featured'])): ?>
+                        <div class="detail-item">
+                            <p><strong>Status:</strong> Featured Project</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
-                <div class="swiper-pagination"></div>
-                <div class="swiper-button-next"></div>
-                <div class="swiper-button-prev"></div>
-            </div>
-        <?php else: ?>
-            <div class="portfolio-carousel-wrapper" style="display: flex; justify-content: center; align-items: center; background-color: var(--background-light);">
-                <div class="portfolio-placeholder" style="position: static; width: auto; height: auto; border: none;">
-                    <i class="fas fa-image" style="font-size: 4em; color: var(--text-subtle);"></i>
-                    <span style="margin-top: 10px; color: var(--text-subtle);">No Images Available</span>
-                </div>
-            </div>
-        <?php endif; ?>
 
-        <div class="portfolio-detail-section">
-            <h2>Project Details</h2>
-            <div class="detail-item">
-                <p><strong>Description:</strong> <?= nl2br(htmlspecialchars($item_details['description'] ?? 'No description provided.')) ?></p>
+                <?php if (!empty($item_details['client_testimonial'])): ?>
+                    <div class="portfolio-detail-section">
+                        <h2>Client Testimonial</h2>
+                        <p class="client-testimonial-quote">"<?= nl2br(htmlspecialchars($item_details['client_testimonial'])) ?>"</p>
+                    </div>
+                <?php endif; ?>
             </div>
-            <?php if (!empty($item_details['project_charges'])): ?>
-                <div class="detail-item">
-                    <p><strong>Charges:</strong> PKR <?= number_format($item_details['project_charges'], 2) ?></p>
-                </div>
-            <?php endif; ?>
-            <div class="detail-item">
-                <p><strong>Event Type:</strong> <?= htmlspecialchars($item_details['event_type_name'] ?? 'N/A') ?></p>
+
+            <div class="portfolio-carousel-right">
+                <?php if (!empty($item_details['images'])): ?>
+                    <div class="portfolio-carousel-wrapper swiper">
+                        <div class="swiper-wrapper">
+                            <?php foreach ($item_details['images'] as $image): ?>
+                                <div class="swiper-slide">
+                                    <img src="<?= BASE_URL . htmlspecialchars($image['image_url']) ?>" alt="<?= htmlspecialchars($item_details['title']) ?>">
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="swiper-pagination"></div>
+                        <div class="swiper-button-next"></div>
+                        <div class="swiper-button-prev"></div>
+                    </div>
+                <?php else: ?>
+                    <div class="portfolio-carousel-wrapper" style="display: flex; justify-content: center; align-items: center; background-color: var(--background-light);">
+                        <div class="portfolio-placeholder" style="position: static; width: auto; height: auto; border: none;">
+                            <i class="fas fa-image" style="font-size: 4em; color: var(--text-subtle);"></i>
+                            <span style="margin-top: 10px; color: var(--text-subtle);">No Images Available</span>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
-            <?php if (!empty($item_details['project_date'])): ?>
-                <div class="detail-item">
-                    <p><strong>Project Date:</strong> <?= date('F j, Y', strtotime($item_details['project_date'])) ?></p>
-                </div>
-            <?php endif; ?>
-            <?php if (!empty($item_details['video_url'])): ?>
-                <div class="detail-item">
-                    <p><strong>Video:</strong> <a href="<?= htmlspecialchars($item_details['video_url']) ?>" target="_blank"><?= htmlspecialchars($item_details['video_url']) ?></a></p>
-                </div>
-            <?php endif; ?>
-            <?php if (!empty($item_details['is_featured'])): ?>
-                <div class="detail-item">
-                    <p><strong>Status:</strong> Featured Project</p>
-                </div>
-            <?php endif; ?>
         </div>
-
-        <?php if (!empty($item_details['client_testimonial'])): ?>
-            <div class="portfolio-detail-section">
-                <h2>Client Testimonial</h2>
-                <p class="client-testimonial-quote">"<?= nl2br(htmlspecialchars($item_details['client_testimonial'])) ?>"</p>
-            </div>
-        <?php endif; ?>
 
         <div class="back-link">
             <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_profile['id'] ?? '') ?>" class="btn btn-secondary">Back to <?= htmlspecialchars($vendor_profile['business_name'] ?? 'Vendor') ?>'s Profile</a>
