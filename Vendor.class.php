@@ -211,12 +211,13 @@ class Vendor {
     }
 
     // NEW METHOD: Update vendor's service offerings (delete existing and insert new ones)
-    public function updateVendorServiceOfferings($vendor_profile_id, $service_ids_array) {
+    // Modified to accept min_price and max_price for each service
+    public function updateVendorServiceOfferings($vendor_profile_id, $services_data_array) { // Changed parameter name
         try {
             error_log("DEBUG: updateVendorServiceOfferings - Starting transaction for Vendor ID: " . $vendor_profile_id);
             $this->conn->beginTransaction();
 
-            error_log("DEBUG: updateVendorServiceOfferings - Service IDs to insert: " . print_r($service_ids_array, true));
+            error_log("DEBUG: updateVendorServiceOfferings - Services data to insert: " . print_r($services_data_array, true));
 
             // 1. Delete all existing offerings for this vendor
             $stmt_delete = $this->conn->prepare("DELETE FROM vendor_service_offerings WHERE vendor_id = ?");
@@ -224,15 +225,18 @@ class Vendor {
             $deleted_rows = $stmt_delete->rowCount();
             error_log("DEBUG: updateVendorServiceOfferings - Deleted " . $deleted_rows . " existing offerings.");
 
-            // 2. Insert new offerings
+            // 2. Insert new offerings with price ranges
             $inserted_count = 0;
-            if (!empty($service_ids_array)) {
-                $insert_sql = "INSERT INTO vendor_service_offerings (vendor_id, service_id) VALUES (?, ?)";
+            if (!empty($services_data_array)) {
+                $insert_sql = "INSERT INTO vendor_service_offerings (vendor_id, service_id, price_range_min, price_range_max) VALUES (?, ?, ?, ?)";
                 $insert_stmt = $this->conn->prepare($insert_sql);
-                foreach ($service_ids_array as $service_id) {
-                    $service_id = (int)$service_id;
+                foreach ($services_data_array as $service_data) { // Loop through structured data
+                    $service_id = (int)$service_data['service_id'];
+                    $min_price = $service_data['min_price'];
+                    $max_price = $service_data['max_price'];
+
                     if ($service_id > 0) {
-                        $insert_stmt->execute([$vendor_profile_id, $service_id]);
+                        $insert_stmt->execute([$vendor_profile_id, $service_id, $min_price, $max_price]);
                         $inserted_count++;
                     }
                 }
@@ -253,37 +257,232 @@ class Vendor {
         }
     }
 
-    // Add portfolio item
+    /**
+     * Add a new portfolio item.
+     * Modified to return the new item ID for image association.
+     */
     public function addPortfolioItem($vendor_id, $data) {
         try {
             $stmt = $this->conn->prepare("INSERT INTO vendor_portfolios
-                (vendor_id, title, description, event_type_id, image_url,
+                (vendor_id, title, description, event_type_id,
                  video_url, project_date, project_charges, client_testimonial, is_featured)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-            return $stmt->execute([
+            $result = $stmt->execute([
                 $vendor_id,
                 $data['title'],
                 $data['description'] ?? null,
                 $data['event_type_id'] ?? null,
-                $data['image_url'] ?? null,
                 $data['video_url'] ?? null,
                 $data['project_date'] ?? null,
                 $data['project_charges'] ?? null,
                 $data['client_testimonial'] ?? null,
                 $data['is_featured'] ?? false
             ]);
+
+            if ($result) {
+                return $this->conn->lastInsertId(); // Return the ID
+            }
+            return false;
         } catch (PDOException $e) {
             error_log("Add portfolio item error: " . $e->getMessage());
             return false;
         }
     }
 
-    // Get vendor portfolio
-    public function getVendorPortfolio($vendor_id) {
+    /**
+     * Updates an existing portfolio item.
+     * Modified to remove image_url parameter, as images are now separate.
+     */
+    public function updatePortfolioItem($portfolioItemId, $vendorId, $data) {
+        try {
+            $query = "UPDATE vendor_portfolios SET
+                title = ?,
+                description = ?,
+                event_type_id = ?,
+                video_url = ?,
+                project_date = ?,
+                project_charges = ?,
+                client_testimonial = ?,
+                is_featured = ?,
+                updated_at = NOW()
+                WHERE id = ? AND vendor_id = ?"; // Ensure vendor ownership
+
+            $params = [
+                $data['title'],
+                $data['description'] ?? null,
+                $data['event_type_id'] ?? null,
+                $data['video_url'] ?? null,
+                $data['project_date'] ?? null,
+                $data['project_charges'] ?? null,
+                $data['client_testimonial'] ?? null,
+                $data['is_featured'] ?? false,
+                $portfolioItemId,
+                $vendorId
+            ];
+
+            $stmt = $this->conn->prepare($query);
+            return $stmt->execute($params);
+        } catch (PDOException $e) {
+            error_log("Update portfolio item error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+
+    /**
+     * Deletes a portfolio item.
+     * @param int $portfolioItemId The ID of the portfolio item to delete.
+     * @param int $vendorId The ID of the vendor owning the item (for security).
+     * @return bool True on success, false on failure.
+     */
+    public function deletePortfolioItem($portfolioItemId, $vendorId) {
+        try {
+            // First, get all image URLs associated with this portfolio item
+            $images = $this->getPortfolioImagesByItemId($portfolioItemId);
+
+            // Delete portfolio item and its images (ON DELETE CASCADE in DB handles portfolio_images)
+            $stmt = $this->conn->prepare("DELETE FROM vendor_portfolios WHERE id = ? AND vendor_id = ?");
+            $success = $stmt->execute([$portfolioItemId, $vendorId]);
+
+            // If successful, delete physical image files
+            if ($success) {
+                foreach ($images as $image) {
+                    // Adjust path assuming BASE_URL is something like http://example.com/ and image_url is assets/uploads/...
+                    // Need to convert 'assets/uploads/vendors/portfolio/filename.jpg' to '../assets/uploads/vendors/portfolio/filename.jpg'
+                    $physical_path = str_replace(BASE_URL, '../', $image['image_url']);
+                    if (file_exists($physical_path)) {
+                        unlink($physical_path);
+                    }
+                }
+            }
+            return $success;
+        } catch (PDOException $e) {
+            error_log("Delete portfolio item error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+
+    /**
+     * Add multiple image URLs for a portfolio item.
+     * @param int $portfolioItemId
+     * @param array $imageUrls Array of image URLs to save.
+     * @return bool True on success, false on failure.
+     */
+    public function addPortfolioImages($portfolioItemId, $imageUrls) {
+        if (empty($imageUrls)) {
+            return true; // Nothing to add
+        }
+        try {
+            $sql = "INSERT INTO portfolio_images (portfolio_item_id, image_url) VALUES ";
+            $values = [];
+            $params = [];
+            foreach ($imageUrls as $url) {
+                $values[] = "(?, ?)";
+                $params[] = $portfolioItemId;
+                $params[] = $url;
+            }
+            $sql .= implode(", ", $values);
+            $stmt = $this->conn->prepare($sql);
+            return $stmt->execute($params);
+        } catch (PDOException $e) {
+            error_log("Add portfolio images error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get all images for a specific portfolio item.
+     * @param int $portfolioItemId
+     * @return array Array of image data (id, image_url).
+     */
+    public function getPortfolioImagesByItemId($portfolioItemId) {
+        try {
+            $stmt = $this->conn->prepare("SELECT id, image_url FROM portfolio_images WHERE portfolio_item_id = ? ORDER BY created_at ASC");
+            $stmt->execute([$portfolioItemId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Get portfolio images by item ID error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Delete a specific image from a portfolio item.
+     * @param int $imageId The ID of the image record in portfolio_images.
+     * @param int $portfolioItemId The ID of the parent portfolio item (for verification).
+     * @param int $vendorId The ID of the vendor owning the item (for security).
+     * @return bool True on success, false on failure.
+     */
+    public function deletePortfolioImage($imageId, $portfolioItemId, $vendorId) {
+        try {
+            // First, get the image URL to delete the physical file
+            $stmt = $this->conn->prepare("
+                SELECT pi.image_url
+                FROM portfolio_images pi
+                JOIN vendor_portfolios vp ON pi.portfolio_item_id = vp.id
+                WHERE pi.id = ? AND pi.portfolio_item_id = ? AND vp.vendor_id = ?
+            ");
+            $stmt->execute([$imageId, $portfolioItemId, $vendorId]);
+            $image_data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($image_data) {
+                // Adjust path assuming BASE_URL is something like http://example.com/ and image_url is assets/uploads/...
+                $physical_path = str_replace(BASE_URL, '../', $image_data['image_url']);
+                // Delete from DB
+                $stmt_delete_db = $this->conn->prepare("DELETE FROM portfolio_images WHERE id = ?");
+                $success = $stmt_delete_db->execute([$imageId]);
+
+                // Delete physical file only if DB delete was successful
+                if ($success && file_exists($physical_path)) {
+                    unlink($physical_path);
+                }
+                return $success;
+            }
+            return false; // Image not found or not owned by vendor
+        } catch (PDOException $e) {
+            error_log("Delete portfolio image error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+
+    /**
+     * Retrieves a single portfolio item by its ID.
+     * Modified to include associated images.
+     */
+    public function getPortfolioItemById($portfolioItemId) {
         try {
             $stmt = $this->conn->prepare("
                 SELECT vp.*, et.type_name as event_type_name
+                FROM vendor_portfolios vp
+                LEFT JOIN event_types et ON vp.event_type_id = et.id
+                WHERE vp.id = ?
+            ");
+            $stmt->execute([$portfolioItemId]);
+            $item_details = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($item_details) {
+                $item_details['images'] = $this->getPortfolioImagesByItemId($portfolioItemId);
+            }
+            return $item_details;
+        } catch (PDOException $e) {
+            error_log("Get portfolio item by ID error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+
+    /**
+     * Get vendor portfolio (used in vendor_portfolio.php and vendor_profile.php)
+     * Modified to include only the first image if multiple exist.
+     */
+    public function getVendorPortfolio($vendor_id) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT vp.*, et.type_name as event_type_name,
+                       (SELECT image_url FROM portfolio_images WHERE portfolio_item_id = vp.id ORDER BY created_at ASC LIMIT 1) as main_image_url
                 FROM vendor_portfolios vp
                 LEFT JOIN event_types et ON vp.event_type_id = et.id
                 WHERE vp.vendor_id = ?
@@ -297,97 +496,6 @@ class Vendor {
         }
     }
 
-    /**
-     * Retrieves a single portfolio item by its ID.
-     * @param int $portfolioItemId The ID of the portfolio item.
-     * @return array|false The portfolio item data if found, false otherwise.
-     */
-    public function getPortfolioItemById($portfolioItemId) {
-        try {
-            $stmt = $this->conn->prepare("
-                SELECT vp.*, et.type_name as event_type_name
-                FROM vendor_portfolios vp
-                LEFT JOIN event_types et ON vp.event_type_id = et.id
-                WHERE vp.id = ?
-            ");
-            $stmt->execute([$portfolioItemId]);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Get portfolio item by ID error: " . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Updates an existing portfolio item.
-     * @param int $portfolioItemId The ID of the portfolio item to update.
-     * @param int $vendorId The ID of the vendor owning the item (for security).
-     * @param array $data New data for the portfolio item.
-     * @return bool True on success, false on failure.
-     */
-    public function updatePortfolioItem($portfolioItemId, $vendorId, $data) {
-        try {
-            $query = "UPDATE vendor_portfolios SET
-                title = ?,
-                description = ?,
-                event_type_id = ?,";
-
-            $params = [
-                $data['title'],
-                $data['description'] ?? null,
-                $data['event_type_id'] ?? null,
-            ];
-
-            // Only update image_url if a new one is provided (not null)
-            if (isset($data['image_url']) && $data['image_url'] !== null) {
-                 $query .= "image_url = ?,";
-                 $params[] = $data['image_url'];
-            } else if (isset($data['image_url']) && $data['image_url'] === null) {
-                // If explicitly set to null, it means remove the image
-                 $query .= "image_url = NULL,";
-            }
-
-            $query .= "video_url = ?,
-                project_date = ?,
-                project_charges = ?,
-                client_testimonial = ?,
-                is_featured = ?,
-                updated_at = NOW()
-                WHERE id = ? AND vendor_id = ?";
-
-            $params = array_merge($params, [
-                $data['video_url'] ?? null,
-                $data['project_date'] ?? null,
-                $data['project_charges'] ?? null,
-                $data['client_testimonial'] ?? null,
-                $data['is_featured'] ?? false,
-                $portfolioItemId,
-                $vendorId
-            ]);
-
-            $stmt = $this->conn->prepare($query);
-            return $stmt->execute($params);
-        } catch (PDOException $e) {
-            error_log("Update portfolio item error: " . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Deletes a portfolio item.
-     * @param int $portfolioItemId The ID of the portfolio item to delete.
-     * @param int $vendorId The ID of the vendor owning the item (for security).
-     * @return bool True on success, false on failure.
-     */
-    public function deletePortfolioItem($portfolioItemId, $vendorId) {
-        try {
-            $stmt = $this->conn->prepare("DELETE FROM vendor_portfolios WHERE id = ? AND vendor_id = ?"); // Ensure vendor ownership
-            return $stmt->execute([$portfolioItemId, $vendorId]);
-        } catch (PDOException $e) {
-            error_log("Delete portfolio item error: " . $e->getMessage());
-            return false;
-        }
-    }
 
     // Set vendor availability (Unified method)
     public function updateAvailability($vendorId, $date, $start_time, $end_time, $status) {
@@ -416,7 +524,7 @@ class Vendor {
         $stmt = $this->conn->prepare("
             SELECT
                 id,
-                date, -- Select 'date' column
+                date, // Select 'date' column
                 start_time,
                 end_time,
                 status
@@ -615,6 +723,61 @@ class Vendor {
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log("Error fetching vendors by category ID: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Search vendors by business name, city, or services offered.
+     * @param string|null $search_query The search term. If null, returns all active/verified vendors.
+     * @param int $limit Max number of results to return.
+     * @return array An array of matching vendor data.
+     */
+    public function searchVendors($search_query = null, $limit = 20) {
+        try {
+            $sql = "
+                SELECT
+                    vp.id,
+                    vp.business_name,
+                    vp.business_city,
+                    vp.rating,
+                    vp.total_reviews,
+                    up.profile_image,
+                    GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS offered_services
+                FROM vendor_profiles vp
+                JOIN users u ON vp.user_id = u.id
+                LEFT JOIN user_profiles up ON u.id = up.user_id
+                LEFT JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
+                LEFT JOIN vendor_services vs ON vso.service_id = vs.id
+                WHERE vp.verified = TRUE -- Only search verified vendors
+            ";
+
+            $params = [];
+
+            if ($search_query) {
+                $sql .= " AND (
+                    vp.business_name LIKE ? OR
+                    vp.business_city LIKE ? OR
+                    vs.service_name LIKE ?
+                )";
+                $like_param = '%' . $search_query . '%';
+                $params[] = $like_param;
+                $params[] = $like_param;
+                $params[] = $like_param;
+            }
+
+            $sql .= "
+                GROUP BY vp.id
+                ORDER BY vp.rating DESC, vp.total_reviews DESC
+                LIMIT ?
+            ";
+            $params[] = $limit;
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error searching vendors: " . $e->getMessage());
             return [];
         }
     }
