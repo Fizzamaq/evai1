@@ -214,8 +214,8 @@ class Vendor {
     // Modified to accept min_price and max_price for each service
     public function updateVendorServiceOfferings($vendor_profile_id, $services_data_array) { // Changed parameter name
         try {
-            error_log("DEBUG: updateVendorServiceOfferings - Starting transaction for Vendor ID: " . $vendor_profile_id);
-            $this->conn->beginTransaction();
+            // REMOVED: $this->conn->beginTransaction(); // Transaction managed by calling script
+            error_log("DEBUG: updateVendorServiceOfferings - Starting operations for Vendor ID: " . $vendor_profile_id);
 
             error_log("DEBUG: updateVendorServiceOfferings - Services data to insert: " . print_r($services_data_array, true));
 
@@ -243,15 +243,15 @@ class Vendor {
             }
             error_log("DEBUG: updateVendorServiceOfferings - Attempted to insert " . $inserted_count . " new offerings.");
 
-            $this->conn->commit();
-            error_log("DEBUG: updateVendorServiceOfferings - Transaction committed successfully.");
+            // REMOVED: $this->conn->commit(); // Transaction managed by calling script
+            error_log("DEBUG: updateVendorServiceOfferings - Operations completed.");
             return true;
         } catch (PDOException $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // Transaction managed by calling script
             error_log("ERROR: Vendor.updateVendorServiceOfferings PDO Exception: " . $e->getMessage() . " (Code: " . $e->getCode() . ") SQLSTATE: " . $e->errorInfo[0]);
             throw new Exception("Database error updating services: " . $e->getMessage());
         } catch (Exception $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // Transaction managed by calling script
             error_log("ERROR: Vendor.updateVendorServiceOfferings General Exception: " . $e->getMessage());
             throw $e;
         }
@@ -259,20 +259,27 @@ class Vendor {
 
     /**
      * Add a new portfolio item.
-     * Modified to return the new item ID for image association.
+     * Modified to return the new item ID for image association and to include venue fields.
      */
     public function addPortfolioItem($vendor_id, $data) {
         try {
             $stmt = $this->conn->prepare("INSERT INTO vendor_portfolios
                 (vendor_id, title, description, event_type_id,
+                 venue_name, venue_address, venue_city, venue_state, venue_country, venue_postal_code,
                  video_url, project_date, project_charges, client_testimonial, is_featured)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
             $result = $stmt->execute([
                 $vendor_id,
                 $data['title'],
                 $data['description'] ?? null,
                 $data['event_type_id'] ?? null,
+                $data['venue_name'] ?? null,
+                $data['venue_address'] ?? null,
+                $data['venue_city'] ?? null,
+                $data['venue_state'] ?? null,
+                $data['venue_country'] ?? null,
+                $data['venue_postal_code'] ?? null,
                 $data['video_url'] ?? null,
                 $data['project_date'] ?? null,
                 $data['project_charges'] ?? null,
@@ -292,7 +299,7 @@ class Vendor {
 
     /**
      * Updates an existing portfolio item.
-     * Modified to remove image_url parameter, as images are now separate.
+     * Modified to include venue fields.
      */
     public function updatePortfolioItem($portfolioItemId, $vendorId, $data) {
         try {
@@ -300,6 +307,12 @@ class Vendor {
                 title = ?,
                 description = ?,
                 event_type_id = ?,
+                venue_name = ?,
+                venue_address = ?,
+                venue_city = ?,
+                venue_state = ?,
+                venue_country = ?,
+                venue_postal_code = ?,
                 video_url = ?,
                 project_date = ?,
                 project_charges = ?,
@@ -312,6 +325,12 @@ class Vendor {
                 $data['title'],
                 $data['description'] ?? null,
                 $data['event_type_id'] ?? null,
+                $data['venue_name'] ?? null,
+                $data['venue_address'] ?? null,
+                $data['venue_city'] ?? null,
+                $data['venue_state'] ?? null,
+                $data['venue_country'] ?? null,
+                $data['venue_postal_code'] ?? null,
                 $data['video_url'] ?? null,
                 $data['project_date'] ?? null,
                 $data['project_charges'] ?? null,
@@ -337,28 +356,57 @@ class Vendor {
      * @return bool True on success, false on failure.
      */
     public function deletePortfolioItem($portfolioItemId, $vendorId) {
+        // NOTE: The portfolio_images table has ON DELETE CASCADE on portfolio_item_id,
+        // so deleting from vendor_portfolios will automatically delete associated image records.
+        // We still need to manually delete the physical image files.
         try {
             // First, get all image URLs associated with this portfolio item
             $images = $this->getPortfolioImagesByItemId($portfolioItemId);
 
-            // Delete portfolio item and its images (ON DELETE CASCADE in DB handles portfolio_images)
+            // REMOVED: $this->conn->beginTransaction(); // Transaction managed by calling script
+
+            // Delete portfolio item from database (this will cascade delete from portfolio_images)
             $stmt = $this->conn->prepare("DELETE FROM vendor_portfolios WHERE id = ? AND vendor_id = ?");
             $success = $stmt->execute([$portfolioItemId, $vendorId]);
 
-            // If successful, delete physical image files
+            // If database deletion was successful, proceed to delete physical image files
             if ($success) {
+                // Ensure UploadHandler is available. This class will use it.
+                require_once __DIR__ . '/UploadHandler.class.php';
+                $uploader = new UploadHandler();
+
                 foreach ($images as $image) {
-                    // Adjust path assuming BASE_URL is something like http://example.com/ and image_url is assets/uploads/...
-                    // Need to convert 'assets/uploads/vendors/portfolio/filename.jpg' to '../assets/uploads/vendors/portfolio/filename.jpg'
-                    $physical_path = str_replace(BASE_URL, '../', $image['image_url']);
+                    // The image_url stored in DB is relative to BASE_URL (e.g., assets/uploads/vendors/portfolio/filename.jpg)
+                    // We need the physical path for unlink. Assuming BASE_DIR is defined or inferable.
+                    // For this context, assuming BASE_URL is 'http://example.com/' and asset path is 'assets/uploads/'.
+                    // So, if image_url is 'assets/uploads/vendors/portfolio/image.jpg', we remove 'assets/'
+                    // and prepend __DIR__ . '/../' to get the full path to the web root relative to classes/
+                    $relative_path_from_web_root = str_replace(BASE_URL, '', $image['image_url']);
+                    // Construct physical path relative to the current script.
+                    // Assuming upload dir is at project_root/assets/uploads/
+                    // And current script is project_root/classes/Vendor.class.php
+                    // So, go up two directories to project_root, then into assets/uploads/
+                    $physical_path = realpath(__DIR__ . '/../../') . '/' . $relative_path_from_web_root;
+
                     if (file_exists($physical_path)) {
-                        unlink($physical_path);
+                        $uploader->deleteFile(basename($physical_path), dirname($relative_path_from_web_root) . '/');
+                    } else {
+                        error_log("File not found for deletion: " . $physical_path);
                     }
                 }
+                // REMOVED: $this->conn->commit(); // Transaction managed by calling script
+                return true;
+            } else {
+                // REMOVED: $this->conn->rollBack(); // Transaction managed by calling script
+                return false;
             }
-            return $success;
         } catch (PDOException $e) {
-            error_log("Delete portfolio item error: " . $e->getMessage());
+            // REMOVED: $this->conn->rollBack(); // Transaction managed by calling script
+            error_log("Delete portfolio item PDO error: " . $e->getMessage());
+            return false;
+        } catch (Exception $e) {
+            // REMOVED: $this->conn->rollBack(); // Transaction managed by calling script
+            error_log("Delete portfolio item general error: " . $e->getMessage());
             return false;
         }
     }
@@ -428,15 +476,25 @@ class Vendor {
             $image_data = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($image_data) {
-                // Adjust path assuming BASE_URL is something like http://example.com/ and image_url is assets/uploads/...
-                $physical_path = str_replace(BASE_URL, '../', $image_data['image_url']);
+                // Ensure UploadHandler is available.
+                require_once __DIR__ . '/UploadHandler.class.php';
+                $uploader = new UploadHandler();
+
+                // Adjust path for physical deletion (similar to deletePortfolioItem)
+                $relative_path_from_web_root = str_replace(BASE_URL, '', $image_data['image_url']);
+                $physical_path = realpath(__DIR__ . '/../../') . '/' . $relative_path_from_web_root;
+
                 // Delete from DB
-                $stmt_delete_db = $this->conn->prepare("DELETE FROM portfolio_images WHERE id = ?");
-                $success = $stmt_delete_db->execute([$imageId]);
+                $stmt_delete_db = $this->conn->prepare("DELETE FROM portfolio_images WHERE id = ? AND portfolio_item_id = ?");
+                $success = $stmt_delete_db->execute([$imageId, $portfolioItemId]);
 
                 // Delete physical file only if DB delete was successful
-                if ($success && file_exists($physical_path)) {
-                    unlink($physical_path);
+                if ($success) {
+                    if (file_exists($physical_path)) {
+                        $uploader->deleteFile(basename($physical_path), dirname($relative_path_from_web_root) . '/');
+                    } else {
+                        error_log("File not found for deletion (single image): " . $physical_path);
+                    }
                 }
                 return $success;
             }
@@ -444,13 +502,89 @@ class Vendor {
         } catch (PDOException $e) {
             error_log("Delete portfolio image error: " . $e->getMessage());
             return false;
+        } catch (Exception $e) {
+            error_log("Delete portfolio image general error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Add multiple services for a portfolio item.
+     * @param int $portfolioItemId
+     * @param array $serviceIds Array of service IDs.
+     * @return bool True on success, false on failure.
+     */
+    public function addPortfolioItemServices($portfolioItemId, $serviceIds) {
+        if (empty($serviceIds)) {
+            return true; // Nothing to add
+        }
+        try {
+            $sql = "INSERT INTO portfolio_item_services (portfolio_item_id, service_id) VALUES ";
+            $values = [];
+            $params = [];
+            foreach ($serviceIds as $service_id) {
+                $values[] = "(?, ?)";
+                $params[] = $portfolioItemId;
+                $params[] = $service_id;
+            }
+            $sql .= implode(", ", $values);
+            $stmt = $this->conn->prepare($sql);
+            return $stmt->execute($params);
+        } catch (PDOException $e) {
+            // Log error, but don't necessarily fail the whole portfolio item creation/update
+            error_log("Add portfolio item services error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Update (delete and re-insert) services for a portfolio item.
+     * @param int $portfolioItemId
+     * @param array $serviceIds Array of service IDs.
+     * @return bool True on success, false on failure.
+     */
+    public function updatePortfolioItemServices($portfolioItemId, $serviceIds) {
+        try {
+            // Delete existing services for this portfolio item
+            $stmt_delete = $this->conn->prepare("DELETE FROM portfolio_item_services WHERE portfolio_item_id = ?");
+            $stmt_delete->execute([$portfolioItemId]);
+
+            // Add new services (if any are provided)
+            $success = $this->addPortfolioItemServices($portfolioItemId, $serviceIds);
+
+            return $success; // Return success status of adding services
+        } catch (PDOException $e) {
+            error_log("Update portfolio item services error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get services associated with a portfolio item.
+     * @param int $portfolioItemId
+     * @return array Array of service data (id, service_name).
+     */
+    public function getPortfolioItemServices($portfolioItemId) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT pis.service_id, vs.service_name
+                FROM portfolio_item_services pis
+                JOIN vendor_services vs ON pis.service_id = vs.id
+                WHERE pis.portfolio_item_id = ?
+                ORDER BY vs.service_name ASC
+            ");
+            $stmt->execute([$portfolioItemId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Get portfolio item services error: " . $e->getMessage());
+            return [];
         }
     }
 
 
     /**
      * Retrieves a single portfolio item by its ID.
-     * Modified to include associated images.
+     * Modified to include associated images and services.
      */
     public function getPortfolioItemById($portfolioItemId) {
         try {
@@ -465,6 +599,7 @@ class Vendor {
 
             if ($item_details) {
                 $item_details['images'] = $this->getPortfolioImagesByItemId($portfolioItemId);
+                $item_details['services_provided'] = $this->getPortfolioItemServices($portfolioItemId); // New: Fetch services
             }
             return $item_details;
         } catch (PDOException $e) {
@@ -683,7 +818,7 @@ class Vendor {
             $stmt = $this->conn->prepare("SELECT id, category_name, icon FROM vendor_categories WHERE is_active = TRUE ORDER BY category_name ASC");
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
+        }  catch (PDOException $e) {
             error_log("Error fetching vendor categories: " . $e->getMessage());
             return [];
         }
