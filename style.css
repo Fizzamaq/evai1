@@ -30,6 +30,10 @@
     --spacing-xxl: 60px; /* Added for larger sections */
 }
 
+html { /* ADDED THIS RULE */
+    overflow-x: hidden; /* Prevents horizontal scrolling from overflowing elements */
+}
+
 body {
     font-family: var(--font-family);
     line-height: 1.6;
@@ -209,12 +213,6 @@ a:hover {
     appearance: none;
     background-color: var(--white);
     line-height: 1.5; /* Adjust line-height for readability */
-}
-
-.form-group select[multiple]:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.3); /* Purple focus ring */
 }
 
 .form-group select[multiple] option {
