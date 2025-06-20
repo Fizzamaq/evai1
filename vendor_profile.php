@@ -31,6 +31,7 @@ if (!$vendor_profile) {
 }
 
 // Fetch vendor's portfolio items
+// The getVendorPortfolio method now provides 'main_image_url'
 $portfolio_items = $vendor->getVendorPortfolio($vendor_profile['id']);
 
 // Fetch vendor's reviews
@@ -173,8 +174,8 @@ $vendor_profile_id_js = $vendor_profile['id'];
                         <div class="portfolio-item-card">
                             <a href="<?= BASE_URL ?>public/view_portfolio_item.php?id=<?= $item['id'] ?>" class="portfolio-item-link-area">
                                 <div class="portfolio-image-wrapper">
-                                    <?php if (!empty($item['image_url'])): ?>
-                                        <img src="<?= BASE_URL ?>assets/uploads/vendors/<?= htmlspecialchars(basename($item['image_url'])) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                                    <?php if (!empty($item['main_image_url'])): ?>
+                                        <img src="<?= BASE_URL . htmlspecialchars($item['main_image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
                                     <?php else: ?>
                                         <div class="portfolio-placeholder">
                                             <i class="fas fa-image"></i>
@@ -192,7 +193,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
                                 </div>
                                 <div class="portfolio-description-content">
                                     <h3><?= htmlspecialchars($item['title']) ?></h3>
-                                    <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 150)) ?><?= (strlen($item['description'] ?? '') > 150) ? '...' : '' ?></p>
+                                    <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 150)) ?><?= (strlen($item['description'] ?? '') > 150 ? '...' : '') ?></p>
                                     <?php if (!empty($item['project_charges'])): ?>
                                         <p class="project-charges-summary">Charges: PKR <?= number_format($item['project_charges'], 2) ?></p>
                                     <?php endif; ?>
