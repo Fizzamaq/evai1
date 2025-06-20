@@ -3,7 +3,7 @@ require_once '../includes/config.php';
 include 'header.php';
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
+    header("Location: " . BASE_URL . "public/login.php");
     exit();
 }
 
@@ -32,8 +32,8 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
             $vendor_services_offered[$service['category_name']][] = $service;
         }
 
-        // NEW: Fetch vendor's portfolio items for display on their profile page (thumbnail only)
-        $portfolio_items = $vendor->getVendorPortfolio($vendor_data['id']);
+        // Removed: Fetch vendor's portfolio items for display on their profile page
+        // $portfolio_items = $vendor->getVendorPortfolio($vendor_data['id']);
     }
 }
 ?>
@@ -44,9 +44,9 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your Profile</title>
     <link rel="stylesheet" href="../assets/css/style.css">
-    <?php /* if ($is_vendor): */ ?>
+    <?php /* if ($is_vendor): ?>
     <link rel="stylesheet" href="../assets/css/vendor_profile.css">
-    <?php /* endif; */ ?>
+    <?php endif; */ ?>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -122,44 +122,44 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
                 </div>
             </div>
 
+            <?php /*
+            // REMOVED: My Portfolio Items section
             <div class="profile-section" style="margin-top: 30px;">
                 <h2>My Portfolio Items</h2>
                 <?php if (!empty($portfolio_items)): ?>
                     <div class="portfolio-grid">
                         <?php foreach ($portfolio_items as $item): ?>
                             <div class="portfolio-item-card">
-                                <a href="<?= BASE_URL ?>public/view_portfolio_item.php?id=<?= $item['id'] ?>" class="portfolio-item-link-area">
-                                    <div class="portfolio-image-wrapper">
-                                        <?php if (!empty($item['main_image_url'])): ?>
-                                            <img src="<?= BASE_URL . htmlspecialchars($item['main_image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
-                                        <?php else: ?>
-                                            <div class="portfolio-placeholder">
-                                                <i class="fas fa-image"></i>
-                                                <span>No Image</span>
-                                            </div>
+                                <div class="portfolio-image-wrapper">
+                                    <?php if ($item['image_url']): ?>
+                                        <img src="<?= BASE_URL . htmlspecialchars($item['image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                                    <?php else: ?>
+                                        <div class="portfolio-placeholder">
+                                            <i class="fas fa-image"></i>
+                                            <span>No Image</span>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div class="portfolio-item-overlay">
+                                        <?php if (!empty($item['video_url'])): ?>
+                                            <a href="<?= htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-light-overlay"><i class="fas fa-video"></i> Watch Video</a>
                                         <?php endif; ?>
-                                        <div class="portfolio-item-overlay">
-                                            <?php if (!empty($item['video_url'])): ?>
-                                                <a href="<?= htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-light-overlay"><i class="fas fa-video"></i> Watch Video</a>
-                                            <?php endif; ?>
-                                            <?php if (!empty($item['client_testimonial'])): ?>
-                                                <p class="testimonial-overlay">"<?= htmlspecialchars(substr($item['client_testimonial'], 0, 100)) ?><?= (strlen($item['client_testimonial']) > 100) ? '...' : '' ?>"</p>
-                                            <?php endif; ?>
-                                        </div>
+                                        <?php if (!empty($item['client_testimonial'])): ?>
+                                            <p class="testimonial-overlay">"<?= htmlspecialchars(substr($item['client_testimonial'], 0, 100)) ?><?= (strlen($item['client_testimonial']) > 100) ? '...' : '' ?>"</p>
+                                        <?php endif; ?>
                                     </div>
-                                    <div class="portfolio-description-content">
-                                        <h3><?= htmlspecialchars($item['title']) ?></h3>
-                                        <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 100)) ?><?= (strlen($item['description'] ?? '') > 100) ? '...' : '' ?></p>
-                                        <div class="portfolio-meta-info">
-                                            <?php if ($item['event_type_name']): ?>
-                                                <span><i class="fas fa-tag"></i> <?= htmlspecialchars($item['event_type_name']); ?></span>
-                                            <?php endif; ?>
-                                            <?php if ($item['project_date']): ?>
-                                                <span><i class="fas fa-calendar-alt"></i> <?= date('M Y', strtotime($item['project_date'])); ?></span>
-                                            <?php endif; ?>
-                                        </div>
+                                </div>
+                                <div class="portfolio-description-content">
+                                    <h3><?= htmlspecialchars($item['title']) ?></h3>
+                                    <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 100)) ?><?= (strlen($item['description'] ?? '') > 100) ? '...' : '' ?></p>
+                                    <div class="portfolio-meta-info">
+                                        <?php if ($item['event_type_name']): ?>
+                                            <span><i class="fas fa-tag"></i> <?= htmlspecialchars($item['event_type_name']); ?></span>
+                                        <?php endif; ?>
+                                        <?php if ($item['project_date']): ?>
+                                            <span><i class="fas fa-calendar-alt"></i> <?= date('M Y', strtotime($item['project_date'])); ?></span>
+                                        <?php endif; ?>
                                     </div>
-                                </a>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -167,6 +167,7 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
                     <p>No portfolio items added yet. Go to <a href="edit_profile.php">Edit Profile</a> to add your first item!</p>
                 <?php endif; ?>
             </div>
+            */ ?>
         <?php endif; ?>
     </div>
 <?php include 'footer.php'; ?>
