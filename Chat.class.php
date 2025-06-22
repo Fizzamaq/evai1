@@ -76,14 +76,26 @@ class Chat {
     }
 
 
-    // Send a message
+    /**
+     * Send a message and update conversation's last message time atomically.
+     * @param int $conversation_id
+     * @param int $sender_id
+     * @param string $message
+     * @param string $type
+     * @param string|null $attachment
+     * @return int|false Last inserted message ID on success, false on failure.
+     */
     public function sendMessage($conversation_id, $sender_id, $message, $type = 'text', $attachment = null) {
         try {
-            $stmt = $this->conn->prepare("INSERT INTO chat_messages
+            // Start a transaction to ensure both insert and update are atomic
+            $this->conn->beginTransaction();
+
+            // 1. Insert the new message
+            $stmt_insert = $this->conn->prepare("INSERT INTO chat_messages
                 (conversation_id, sender_id, message_type, message_content, attachment_url)
                 VALUES (?, ?, ?, ?, ?)");
 
-            $stmt->execute([
+            $insert_success = $stmt_insert->execute([
                 $conversation_id,
                 $sender_id,
                 $type,
@@ -91,37 +103,56 @@ class Chat {
                 $attachment
             ]);
 
-            // Update conversation last message time
-            // IMPORTANT: Check if updateConversationTime also succeeded.
-            // If it fails, sendMessage should also indicate failure.
-            if (!$this->updateConversationTime($conversation_id)) {
-                // If this update fails, log it and return false, as the full "send" operation isn't complete.
-                error_log("Chat.class.php sendMessage: Failed to update last_message_at for conversation_id: " . $conversation_id);
-                return false;
+            if (!$insert_success) {
+                throw new PDOException("Failed to insert message into chat_messages table.");
             }
 
-            return $this->conn->lastInsertId();
+            $message_id = $this->conn->lastInsertId();
+
+            // 2. Update conversation's last message time
+            if (!$this->updateConversationTime($conversation_id)) {
+                // If updateConversationTime returns false, throw an exception to trigger rollback
+                throw new Exception("Failed to update last_message_at for conversation_id: " . $conversation_id);
+            }
+
+            // If both operations succeeded, commit the transaction
+            $this->conn->commit();
+            return $message_id; // Return the new message ID on success
+
         } catch (PDOException $e) {
-            error_log("Chat.class.php sendMessage error: " . $e->getMessage());
+            // Catch PDO exceptions specifically for database errors
+            $this->conn->rollBack(); // Rollback the transaction on database error
+            error_log("Chat.class.php sendMessage PDO error (transaction rolled back): " . $e->getMessage());
+            return false;
+        } catch (Exception $e) {
+            // Catch other general exceptions (like the one from updateConversationTime failure)
+            $this->conn->rollBack(); // Rollback the transaction on other errors
+            error_log("Chat.class.php sendMessage general error (transaction rolled back): " . $e->getMessage());
             return false;
         }
     }
 
-    // Update conversation last message time
+    /**
+     * Update conversation last message time.
+     * This method is now designed to be called within a transaction.
+     * @param int $conversation_id
+     * @return bool True on success, false on failure.
+     */
     private function updateConversationTime($conversation_id) {
-        try {
-            $stmt = $this->conn->prepare("UPDATE chat_conversations
-                SET last_message_at = NOW()
-                WHERE id = ?");
-            $result = $stmt->execute([$conversation_id]);
-            if (!$result) {
-                error_log("Chat.class.php updateConversationTime PDO error: " . implode(" ", $stmt->errorInfo()));
-            }
-            return $result; // Return true on success, false on failure
-        } catch (PDOException $e) {
-            error_log("Chat.class.php updateConversationTime Exception: " . $e->getMessage());
-            return false;
+        // No try-catch here, as it's meant to be part of sendMessage's transaction.
+        // PDOExceptions will be caught by the caller's try-catch (sendMessage).
+        $stmt = $this->conn->prepare("UPDATE chat_conversations
+            SET last_message_at = NOW()
+            WHERE id = ?");
+        $result = $stmt->execute([$conversation_id]);
+
+        // If no rows were affected, it means the conversation_id might be invalid or not found.
+        if ($result && $stmt->rowCount() === 0) {
+            error_log("Chat.class.php updateConversationTime: No rows updated for conversation_id " . $conversation_id . ". ID might be invalid.");
+            return false; // Explicitly indicate failure if no row found/updated
         }
+        
+        return $result; // True if executed and affected rows, false if execution failed
     }
 
     // Get conversation messages
