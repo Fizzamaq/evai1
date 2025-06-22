@@ -1,124 +1,175 @@
 /* assets/css/chat.css */
 
+/* Overall chat container for a framed, modern look */
 .chat-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
+    max-width: 1200px; /* Centered, defined width */
+    margin: var(--spacing-lg) auto; /* Top/bottom margin, auto left/right to center */
+    padding: var(--spacing-md); /* Overall padding */
     display: grid;
-    grid-template-columns: 350px 1fr;
-    gap: 20px;
+    grid-template-columns: 350px 1fr; /* Fixed sidebar width, rest for chat area */
+    gap: var(--spacing-md); /* Gap between sidebar and chat area */
     height: calc(100vh - 120px); /* Adjust height to fill viewport below header/above footer */
     box-sizing: border-box; /* Include padding in height */
+    border-radius: 16px; /* Increased overall container border-radius for softer edges */
+    background: var(--white); /* White background for the whole chat module */
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1); /* More pronounced shadow for a floating effect */
+    overflow: hidden; /* Ensures child elements don't break rounded corners */
 }
 
+/* Sidebar for conversations list */
 .conversations-sidebar {
-    background: var(--white); /* Using global white variable */
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+    background: var(--background-light); /* Lighter background for sidebar */
+    border-radius: 12px; /* Consistent with overall container, but slightly less for nested element */
+    box-shadow: inset -2px 0 8px rgba(0, 0, 0, 0.03); /* Subtle inner shadow on the right edge */
+    overflow: hidden; /* Ensures content stays within rounded corners */
     display: flex;
     flex-direction: column;
+    border: 1px solid var(--border-color); /* Subtle border matching palette */
 }
 
 .conversations-header {
-    padding: 20px;
-    border-bottom: 2px solid var(--border-color); /* Using global border color */
+    padding: var(--spacing-md); /* Increased padding */
+    border-bottom: 2px solid var(--border-color); /* Separator */
+    background: var(--background-light); /* Matching sidebar background */
+    font-size: 1.3em; /* Slightly larger header text */
+    font-weight: 700; /* Bolder */
+    color: var(--primary-color); /* Primary color for header */
+    display: flex; /* For alignment of title and badge */
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0; /* Prevent from shrinking */
 }
 
 .conversations-list {
-    flex: 1;
+    flex: 1; /* Takes remaining space */
     overflow-y: auto; /* Enable scrolling for conversation list */
+    padding: var(--spacing-xs) 0; /* Vertical padding */
+    -webkit-overflow-scrolling: touch; /* Smoother scrolling on iOS */
 }
 
+/* Individual conversation item in the sidebar */
 .conversation-item {
-    padding: 15px 20px;
-    border-bottom: 1px solid var(--border-color);
+    padding: var(--spacing-sm) var(--spacing-md); /* Generous padding */
+    border-bottom: 1px solid var(--border-color); /* Separator */
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 15px; /* Space between avatar and details */
 }
 
-.conversation-item:hover, .conversation-item.active {
-    background-color: var(--background-light); /* Using global light background variable */
+.conversation-item:last-child {
+    border-bottom: none; /* No border on the last item */
+}
+
+.conversation-item:hover {
+    background-color: var(--white); /* Hover background */
+    box-shadow: inset 4px 0 0 var(--accent-color); /* Accent color highlight on hover */
+    transform: translateX(3px); /* Subtle slide effect */
+}
+
+.conversation-item.active {
+    background-color: var(--white); /* Active item background */
+    box-shadow: inset 5px 0 0 var(--primary-color); /* Stronger primary color highlight for active */
+    font-weight: 600; /* Bolder text for active */
+    color: var(--primary-color);
 }
 
 .conversation-avatar {
-    width: 50px;
-    height: 50px;
+    width: 55px; /* Slightly larger avatar */
+    height: 55px; /* Slightly larger avatar */
     border-radius: 50%;
     background-size: cover;
     background-position: center;
     background-color: var(--border-color); /* Fallback/placeholder color */
-    flex-shrink: 0; /* Prevent shrinking */
+    flex-shrink: 0;
+    border: 3px solid var(--accent-color); /* More prominent accent border */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow for avatar */
 }
 
 .conversation-details {
     flex: 1;
-    min-width: 0; /* Allow content to shrink within flex container */
+    min-width: 0; /* Allows text to truncate with ellipsis */
 }
 
 .conversation-title {
-    font-weight: 600;
-    color: var(--text-dark); /* Using global dark text variable */
-    margin-bottom: 5px;
+    font-weight: 700; /* Bolder title */
+    color: var(--text-dark);
+    margin-bottom: 4px; /* Reduced margin */
     display: flex;
     justify-content: space-between;
     align-items: center;
+    font-size: 1.1em;
+}
+.conversation-item.active .conversation-title {
+    color: var(--primary-color); /* Active title color */
 }
 
+
 .conversation-preview {
-    color: var(--text-subtle); /* Using global subtle text variable */
+    color: var(--text-subtle);
     font-size: 0.9em;
     white-space: nowrap; /* Prevent text wrapping */
     overflow: hidden;
     text-overflow: ellipsis; /* Add ellipsis for overflowing text */
+    margin-bottom: 4px; /* Reduced margin */
 }
 
 .conversation-time {
     font-size: 0.8em;
-    color: #b2bec3; /* Specific grey for timestamps */
+    color: #95a5a6; /* Softer grey for timestamps */
 }
 
+/* Unread messages badge */
 .unread-badge {
-    background: #e17055; /* Specific color for unread badge */
+    background: var(--secondary-color); /* Crimson for unread badge */
     color: var(--white);
     border-radius: 50%;
-    min-width: 20px; /* Use min-width instead of fixed width to accommodate two-digit numbers */
-    height: 20px;
+    min-width: 24px; /* Larger badge */
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.7em;
+    font-size: 0.85em; /* Larger font */
     font-weight: bold;
-    padding: 0 5px; /* Add horizontal padding for better look */
+    padding: 0 7px; /* Horizontal padding */
+    margin-left: var(--spacing-sm);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Subtle shadow for badge */
 }
 
+/* Main chat area */
 .chat-area {
     background: var(--white);
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 16px; /* Matches outer container radius */
+    box-shadow: inset 2px 0 8px rgba(0, 0, 0, 0.03); /* Subtle inner shadow on the left edge */
     display: flex;
     flex-direction: column;
+    border: 1px solid var(--border-color); /* Subtle border */
+    position: relative; /* For scroll button positioning */
 }
 
+/* Chat header (current conversation info) */
 .chat-header {
-    padding: 20px;
+    padding: var(--spacing-md);
     border-bottom: 2px solid var(--border-color);
+    background: var(--background-light); /* Lighter header background */
     display: flex;
     align-items: center;
     gap: 15px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); /* Subtle shadow below header */
 }
 
 .chat-header-avatar {
-    width: 60px;
-    height: 60px;
+    width: 65px; /* Larger header avatar */
+    height: 65px; /* Larger header avatar */
     border-radius: 50%;
     background-size: cover;
     background-position: center;
     background-color: var(--border-color);
     flex-shrink: 0;
+    border: 3px solid var(--accent-color);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .chat-header-info {
@@ -126,115 +177,147 @@
 }
 
 .chat-header-title {
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-dark);
-    margin-bottom: 2px; /* Reduce margin */
+    margin-bottom: 3px; /* Adjusted margin */
+    font-size: 1.5em; /* Larger title */
 }
 
 .chat-header-subtitle {
-    font-size: 0.9em;
+    font-size: 0.95em; /* Slightly larger subtitle */
     color: var(--text-subtle);
 }
 
+/* Messages container */
 .chat-messages {
     flex: 1;
-    padding: 20px;
+    padding: var(--spacing-md);
     overflow-y: auto; /* Enable scrolling for messages */
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: var(--spacing-sm); /* Standard gap between messages */
+    -webkit-overflow-scrolling: touch; /* Smoother scrolling on iOS */
+    scroll-behavior: smooth; /* Smooth scroll for new messages */
 }
 
-.message-bubble { /* General style for message bubbles */
-    max-width: 80%;
-    padding: 15px;
-    border-radius: 15px;
+/* Individual message bubbles */
+.message {
+    max-width: 80%; /* Max width for message bubbles */
+    padding: 14px 20px; /* Generous padding */
+    border-radius: 20px; /* Softly rounded corners */
     position: relative;
-    word-wrap: break-word; /* Ensure long words wrap */
+    word-wrap: break-word;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08); /* More noticeable shadow for bubbles */
+    line-height: 1.5;
+    animation: fadeInMessage 0.3s ease-out; /* Fade-in animation for new messages */
 }
 
-.message-outgoing { /* Messages sent by the current user (vendor) */
-    background: var(--primary-color); /* Primary color for outgoing messages */
+.message-content {
+    font-size: 1.05em; /* Slightly larger message font */
+    margin-bottom: 5px; /* Space for time stamp */
+}
+
+.message-outgoing { /* Messages sent by the current user */
+    background: linear-gradient(145deg, var(--primary-color), #6A5ACD); /* Primary purple to slate blue gradient */
     color: var(--white);
     align-self: flex-end; /* Align to the right */
-    border-bottom-right-radius: 5px; /* Tweak border radius for chat bubble effect */
+    border-bottom-right-radius: 8px; /* Tweak corner for chat bubble effect */
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.message-outgoing:hover {
+    transform: translateY(-3px); /* Subtle lift on hover */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15); /* More pronounced shadow on hover */
 }
 
-.message-incoming { /* Messages received from the other party (client) */
+.message-incoming { /* Messages received from the other party */
     background: var(--background-light); /* Light background for incoming messages */
     color: var(--text-dark);
     align-self: flex-start; /* Align to the left */
-    border-bottom-left-radius: 5px; /* Tweak border radius for chat bubble effect */
+    border-bottom-left-radius: 8px; /* Tweak corner for chat bubble effect */
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.message-incoming:hover {
+    transform: translateY(-3px); /* Subtle lift on hover */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* More pronounced shadow on hover */
 }
 
 .message-time {
-    font-size: 0.8em;
-    margin-top: 5px;
+    font-size: 0.78em; /* Adjusted size */
+    margin-top: 4px;
     display: block;
     text-align: right;
-    color: rgba(255,255,255,0.7); /* Lighter color for time in outgoing bubbles */
+    color: rgba(255,255,255,0.8); /* Lighter color for time in outgoing bubbles */
+    opacity: 0.9;
 }
 
 .message-incoming .message-time {
     color: var(--text-subtle); /* Time color for incoming bubbles */
 }
 
+/* Chat input area */
 .chat-input {
-    padding: 20px;
+    padding: var(--spacing-md);
     border-top: 2px solid var(--border-color);
-    background: var(--background-light);
-    flex-shrink: 0; /* Prevent input area from shrinking */
+    background: var(--background-light); /* Lighter background for input area */
+    flex-shrink: 0;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.03); /* Subtle shadow above input */
 }
 
 .message-form {
     display: flex;
-    gap: 10px;
+    gap: 12px; /* Increased gap */
     align-items: flex-end; /* Align send button with textarea */
 }
 
 .message-input {
     flex: 1;
-    padding: 12px 20px;
+    padding: 16px 25px; /* More generous padding for larger input field */
     border: 2px solid var(--border-color);
-    border-radius: 25px; /* Pill-shaped input */
-    font-size: 16px;
-    resize: none; /* Disable manual resize */
-    min-height: 50px; /* Minimum height */
-    max-height: 150px; /* Max height to prevent excessive expansion */
-    box-sizing: border-box; /* Include padding in dimensions */
-    overflow-y: auto; /* Enable scrollbar if text overflows */
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    border-radius: 30px; /* More prominent pill shape */
+    font-size: 17px; /* Larger font size */
+    resize: none;
+    min-height: 60px; /* Larger minimum height */
+    max-height: 180px; /* Allow growing, but limit */
+    box-sizing: border-box;
+    overflow-y: auto;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, height 0.2s ease; /* Smooth height transition */
+    background-color: var(--white);
+    color: var(--text-dark);
+    line-height: 1.4;
 }
 
 .message-input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.2);
+    box-shadow: 0 0 0 5px rgba(138, 43, 226, 0.3); /* Stronger primary color glow */
 }
 
+/* Send button */
 .send-button {
-    background: var(--primary-color);
+    background: linear-gradient(145deg, var(--primary-color), var(--secondary-color)); /* Vibrant gradient for send button */
     color: var(--white);
     border: none;
-    border-radius: 50%; /* Circular button */
-    width: 50px;
-    height: 50px;
+    border-radius: 50%; /* Perfect circle */
+    width: 60px; /* Larger button */
+    height: 60px; /* Larger button */
     cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
+    transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0; /* Prevent shrinking */
+    flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Stronger shadow */
 }
 
 .send-button:hover {
-    background: var(--secondary-color); /* Change color on hover */
-    transform: translateY(-1px);
+    transform: translateY(-3px); /* More noticeable lift effect */
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3); /* Enhanced shadow on hover */
+    background: linear-gradient(145deg, var(--secondary-color), var(--primary-color)); /* Reverse gradient on hover */
 }
 
 .send-button svg {
-    width: 24px;
-    height: 24px;
+    width: 28px; /* Larger icon */
+    height: 28px; /* Larger icon */
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -242,34 +325,52 @@
     stroke-linejoin: round;
 }
 
+/* Empty state for no conversations/messages */
 .no-conversation {
     text-align: center;
-    padding: 40px;
+    padding: var(--spacing-xxl); /* More generous padding */
     color: var(--text-subtle);
-    font-size: 1.1em;
+    font-size: 1.2em; /* Larger font size */
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .no-conversation h3 {
     color: var(--text-dark);
-    margin-bottom: 10px;
+    margin-bottom: var(--spacing-sm);
+    font-size: 1.8em; /* Larger heading */
+}
+
+/* Keyframe for message fade-in animation */
+@keyframes fadeInMessage {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* Responsive adjustments for chat interface */
-@media (max-width: 768px) {
+@media (max-width: 992px) {
     .chat-container {
-        grid-template-columns: 1fr; /* Stack sidebar and chat area vertically */
+        grid-template-columns: 1fr; /* Stack sidebar and chat area vertically on medium screens */
         height: auto; /* Allow height to adjust */
-        min-height: calc(100vh - 120px); /* Ensure minimum height */
+        min-height: calc(100vh - 100px); /* Ensure minimum height */
+        padding: var(--spacing-sm); /* Reduce overall padding */
     }
 
     .conversations-sidebar {
-        height: 300px; /* Give sidebar a fixed height on smaller screens */
+        height: 380px; /* Give sidebar a reasonable fixed height on smaller screens */
         flex-shrink: 0;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); /* Re-apply general shadow for stacked view */
+        border-right: 1px solid var(--border-color); /* Restore horizontal border for clarity */
     }
 
     .chat-area {
         height: auto; /* Allow chat area to expand */
-        min-height: 400px; /* Minimum height for chat messages */
+        min-height: 500px; /* Minimum height for chat messages */
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); /* Re-apply general shadow */
+        border-left: 1px solid var(--border-color); /* Restore horizontal border */
     }
 
     .message-bubble {
@@ -277,26 +378,123 @@
     }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
     .chat-container {
-        padding: 10px; /* Reduce overall padding */
+        padding: var(--spacing-xs); /* Reduce overall padding */
     }
 
     .conversations-sidebar, .chat-area {
-        border-radius: 8px; /* Slightly smaller border radius */
+        border-radius: 12px; /* Consistent border radius */
     }
 
     .conversations-header, .chat-header, .chat-input {
-        padding: 15px; /* Reduce padding in headers/footers */
+        padding: var(--spacing-sm); /* Reduce padding in headers/footers */
+    }
+
+    .conversation-item {
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .chat-header-avatar {
+        width: 55px;
+        height: 55px;
+    }
+    .chat-header-title {
+        font-size: 1.2em;
     }
 
     .message-input {
-        padding: 10px 15px; /* Adjust input padding */
-        min-height: 45px;
+        padding: 12px 18px;
+        min-height: 48px;
+        border-radius: 24px;
+        font-size: 16px;
     }
 
     .send-button {
-        width: 45px;
-        height: 45px;
+        width: 48px;
+        height: 48px;
+    }
+    .send-button svg {
+        width: 22px;
+        height: 22px;
+    }
+    .message-bubble {
+        padding: 12px 16px;
+        font-size: 1em;
+    }
+    .no-conversation h3 {
+        font-size: 1.4em;
+    }
+    .no-conversation p {
+        font-size: 1em;
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-container {
+        padding: 0; /* Remove all padding on very small screens, let child elements manage */
+        border-radius: 0; /* No rounded corners on container edge */
+        box-shadow: none; /* No shadow */
+        height: calc(100vh - 80px); /* Adjust height for very small screens */
+    }
+    .conversations-sidebar, .chat-area {
+        border-radius: 0; /* No rounded corners for main sections */
+        box-shadow: none; /* No shadow */
+        border: none; /* No borders for main sections */
+    }
+    .conversations-sidebar {
+        height: 280px;
+    }
+    .chat-area {
+        min-height: 300px;
+    }
+    .conversations-header, .chat-header, .chat-input {
+        padding: var(--spacing-xs); /* Minimal padding */
+    }
+    .conversations-header h2 {
+        font-size: 1em;
+    }
+    .conversation-item {
+        font-size: 0.85em;
+        padding: 8px 10px;
+        gap: 10px;
+    }
+    .conversation-avatar {
+        width: 38px;
+        height: 38px;
+        border-width: 2px;
+    }
+    .chat-header-avatar {
+        width: 48px;
+        height: 48px;
+        border-width: 2px;
+    }
+    .chat-header-title {
+        font-size: 1.1em;
+    }
+    .chat-messages {
+        padding: var(--spacing-sm);
+        gap: var(--spacing-xs);
+    }
+    .message-input {
+        font-size: 14px;
+        padding: 8px 15px;
+        min-height: 36px;
+        border-radius: 18px;
+    }
+    .send-button {
+        width: 36px;
+        height: 36px;
+    }
+    .send-button svg {
+        width: 18px;
+        height: 18px;
+    }
+    .no-conversation {
+        padding: var(--spacing-md);
+        font-size: 1em;
+    }
+    .no-conversation h3 {
+        font-size: 1.2em;
     }
 }
