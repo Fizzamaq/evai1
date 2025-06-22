@@ -5,8 +5,6 @@ require_once '../includes/config.php';
 require_once '../classes/User.class.php';
 require_once '../classes/Vendor.class.php';
 
-include 'header.php';
-
 // Ensure portfolio item ID is provided in the URL
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     $_SESSION['error_message'] = "Invalid portfolio item ID provided.";
