@@ -5,7 +5,7 @@ require_once '../includes/config.php';
 require_once '../classes/User.class.php';
 require_once '../classes/Vendor.class.php';
 
-// include 'header.php';
+include 'header.php';
 
 // Ensure portfolio item ID is provided in the URL
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
@@ -44,7 +44,7 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <style>
         .portfolio-detail-container {
-            max-width: 1200px;
+            max-width: 1100px; /* Adjusted to make the carousel and details bigger */
             margin: var(--spacing-lg) auto;
             padding: var(--spacing-md);
             background: var(--white);
@@ -77,21 +77,27 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
             .portfolio-content-layout {
                 flex-direction: row; /* Side-by-side on larger screens */
             }
-            .portfolio-details-left,
-            .portfolio-carousel-right {
+            /* Adjust flex ratios for left (details) and right (carousel) columns */
+            .portfolio-details-left {
+                flex: 1; /* Takes 1 part of the available space */
                 max-width: 100%; /* Ensures flex items don't overflow */
             }
+            .portfolio-carousel-right {
+                flex: 2; /* Takes 2 parts of the available space, making it bigger */
+                max-width: 100%; /* Ensures flex items don't overflow */
+            }
+            /* Ensure correct behavior if only one column is present */
+            .portfolio-details-left:only-child {
+                flex: 0 0 100%;
+            }
+            .portfolio-carousel-right:only-child {
+                flex: 0 0 100%;
+            }
         }
-        .portfolio-details-left {
-            flex: 1; /* Take available space */
-        }
-        .portfolio-carousel-right {
-            flex: 1; /* Take available space */
-        }
+        
         /* Styles for Swiper Carousel */
         .portfolio-carousel-wrapper {
             width: 100%;
-            /* Removed fixed height */
             padding-bottom: 75%; /* Set aspect ratio to 4:3 (height is 75% of width) */
             margin-bottom: var(--spacing-lg);
             position: relative; /* For absolute positioning of children */
@@ -113,15 +119,18 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
             height: 100%;
             object-fit: cover;
         }
+        /* Make images clickable, and remove default link styling */
+        .portfolio-carousel-wrapper .swiper-slide a {
+            display: block; /* Ensure the link fills the slide for clicking */
+            width: 100%;
+            height: 100%;
+            text-decoration: none; /* Remove underline from clickable images */
+            cursor: zoom-in; /* Indicate it's clickable for zoom */
+        }
+
         .swiper-button-next,
         .swiper-button-prev {
-            color: var(--white) !important;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            font-size: 1.2em;
+            display: none; /* Hide navigation arrows */
         }
         .swiper-pagination-bullet {
             background: var(--primary-color) !important;
@@ -131,42 +140,187 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
             opacity: 1 !important;
         }
 
-        .portfolio-detail-section {
-            margin-bottom: var(--spacing-lg);
-            padding: var(--spacing-md);
-            background: var(--background-light);
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-        .portfolio-detail-section h2 {
-            font-size: 1.8em;
-            color: var(--text-dark);
+        /* NEW: Styles for the Tabbed Interface */
+        .tab-navigation {
+            display: flex;
+            flex-wrap: wrap; /* Allow tabs to wrap on smaller screens */
+            border-bottom: 2px solid var(--border-color);
             margin-bottom: var(--spacing-md);
-            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 5px; /* Space for border-bottom of active tab */
+            background: var(--white); /* Match container background */
+            border-radius: 8px 8px 0 0; /* Rounded top corners */
+            overflow: hidden; /* Ensure border radius applies */
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* Subtle shadow for tab bar */
+        }
+        .tab-button {
+            background: var(--background-light); /* Light background for inactive tabs */
+            border: none;
+            border-bottom: 3px solid transparent;
+            padding: var(--spacing-sm) var(--spacing-md); /* Increased padding */
+            font-size: 1.05em; /* Slightly larger font */
+            font-weight: 600;
+            color: var(--text-subtle);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap; /* Prevent tab text from wrapping */
+            flex-grow: 1; /* Allow tabs to share space */
+            text-align: center; /* Center tab text */
+            border-right: 1px solid var(--border-color); /* Separator between tabs */
+        }
+        .tab-button:last-child {
+            border-right: none; /* No separator for the last tab */
+        }
+        .tab-button:hover:not(.active) {
+            color: var(--primary-color);
+            background-color: #E6E6FA; /* Lighter hover background */
+        }
+        .tab-button.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            background-color: var(--white); /* White background for active tab */
+            box-shadow: inset 0 -3px 5px rgba(0,0,0,0.05); /* Subtle inner shadow for active tab */
+            transform: translateY(0); /* Ensure no unwanted transform from general hover */
+            position: relative; /* For z-index if needed */
+        }
+        .tab-content {
+            display: none; /* Hidden by default */
+            animation: fadeIn 0.5s ease-out; /* Fade in animation for content */
+            padding: var(--spacing-lg); /* Increased padding for content */
+            background: var(--background-light); /* Background for tab content */
+            border-radius: 0 0 8px 8px; /* Rounded bottom corners */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08); /* Consistent card shadow */
+            margin-bottom: var(--spacing-lg); /* Space after the content */
+        }
+        .tab-content.active {
+            display: block; /* Show active tab content */
+        }
+        .tab-content h2 { /* Adjust heading within tab content */
+            font-size: 1.6em; /* Slightly smaller for tab headings */
+            margin-top: 0;
             padding-bottom: var(--spacing-sm);
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: var(--spacing-md);
+            color: var(--text-dark);
+        }
+        .detail-item {
+            margin-bottom: var(--spacing-sm); /* More space between detail items */
         }
         .detail-item p {
-            margin-bottom: var(--spacing-xs);
-            font-size: 1.05em;
+            margin-bottom: 0; /* Remove default paragraph margin */
+            font-size: 1em; /* Standard font size for details */
+            color: var(--text-dark); /* Darker text for details */
         }
         .detail-item strong {
+            color: var(--primary-color); /* Primary color for strong text */
+            font-weight: 600;
+        }
+        /* Specific list styling for Services Provided */
+        #services-provided ul {
+            list-style: none; /* Remove default bullet points */
+            padding: 0;
+            margin: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Responsive grid for services */
+            gap: var(--spacing-xs); /* Small gap between service items */
+        }
+        #services-provided li {
+            background-color: var(--white);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            font-size: 0.95em;
             color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .detail-item a {
-            word-break: break-all; /* Break long URLs */
+        #services-provided li::before { /* Custom bullet point */
+            content: "•";
+            color: var(--primary-color);
+            font-weight: bold;
+            display: inline-block;
+            width: 1em; /* Space for bullet */
+            margin-left: -1em; /* Pull bullet left */
         }
+
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .client-testimonial-quote {
             font-style: italic;
             border-left: 4px solid var(--primary-color);
             padding-left: var(--spacing-md);
             margin-top: var(--spacing-md);
             color: var(--text-dark);
+            background-color: var(--white); /* Added background for quote */
+            padding: var(--spacing-md);
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         .back-link {
             display: block;
             text-align: center;
             margin-top: var(--spacing-xl);
             font-size: 1.1em;
+        }
+
+        /* Lightbox/Modal Styles */
+        .lightbox-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85); /* Darker overlay */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999; /* Ensure it's on top of everything */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .lightbox-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .lightbox-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+            border-radius: 8px; /* Slight roundness */
+            overflow: hidden; /* Ensure image doesn't overflow its own box-shadow/border-radius */
+        }
+        .lightbox-content img {
+            display: block; /* Remove extra space below image */
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* Contain image within its dimensions */
+            border-radius: 8px; /* Match content border-radius */
+        }
+        .lightbox-close {
+            position: absolute;
+            top: 15px; /* Slightly more padding */
+            right: 15px;
+            font-size: 2.5em; /* Larger close button */
+            color: #fff;
+            cursor: pointer;
+            z-index: 10000;
+            background-color: rgba(0, 0, 0, 0.4); /* Background for visibility */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s ease;
+        }
+        .lightbox-close:hover {
+            background-color: rgba(255, 0, 0, 0.6); /* Red on hover */
         }
     </style>
 </head>
@@ -177,17 +331,30 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
         <div class="portfolio-detail-header">
             <h1><?= htmlspecialchars($item_details['title']) ?></h1>
             <?php if ($vendor_profile): ?>
-                <p>Creation by <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_profile['id']) ?>"><?= htmlspecialchars($vendor_profile['business_name']) ?></a></p>
+                <p>Project by <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_profile['id']) ?>"><?= htmlspecialchars($vendor_profile['business_name']) ?></a></p>
             <?php endif; ?>
         </div>
 
         <div class="portfolio-content-layout">
             <div class="portfolio-details-left">
-                <div class="portfolio-detail-section">
+                <div class="tab-navigation">
+                    <button class="tab-button" data-target="description-content">Description</button>
+                    <button class="tab-button" data-target="details-content">Details</button>
+                    <?php if (!empty($item_details['services_provided'])): ?>
+                        <button class="tab-button" data-target="services-provided">Services Provided</button>
+                    <?php endif; ?>
+                    <?php if (!empty($item_details['client_testimonial'])): ?>
+                        <button class="tab-button" data-target="client-testimonial-tab">Reviews</button>
+                    <?php endif; ?>
+                </div>
+
+                <div id="description-content" class="tab-content">
+                    <h2>Description</h2>
+                    <p><?= nl2br(htmlspecialchars($item_details['description'] ?? 'No description provided.')) ?></p>
+                </div>
+
+                <div id="details-content" class="tab-content">
                     <h2>Details</h2>
-                    <div class="detail-item">
-                        <p><strong>Description:</strong> <?= nl2br(htmlspecialchars($item_details['description'] ?? 'No description provided.')) ?></p>
-                    </div>
                     <?php if (!empty($item_details['project_charges'])): ?>
                         <div class="detail-item">
                             <p><strong>Charges:</strong> PKR <?= number_format($item_details['project_charges'], 2) ?></p>
@@ -198,7 +365,7 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
                     </div>
                     <?php if (!empty($item_details['project_date'])): ?>
                         <div class="detail-item">
-                            <p><strong>Date:</strong> <?= date('F j, Y', strtotime($item_details['project_date'])) ?></p>
+                            <p><strong>Project Date:</strong> <?= date('F j, Y', strtotime($item_details['project_date'])) ?></p>
                         </div>
                     <?php endif; ?>
                     <?php if (!empty($item_details['video_url'])): ?>
@@ -211,39 +378,54 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
                             <p><strong>Status:</strong> Featured Project</p>
                         </div>
                     <?php endif; ?>
+
+                    <?php if (!empty($item_details['venue_name'])): /* Moved Venue Details inside 'Details' tab */ ?>
+                        <div class="detail-item">
+                            <p><strong>Venue Name:</strong> <?= htmlspecialchars($item_details['venue_name']) ?></p>
+                        </div>
+                        <?php if (!empty($item_details['venue_address'])): ?>
+                            <div class="detail-item">
+                                <p><strong>Address:</strong> <?= htmlspecialchars($item_details['venue_address']) ?>, <?= htmlspecialchars($item_details['venue_city']) ?>, <?= htmlspecialchars($item_details['venue_state']) ?>, <?= htmlspecialchars($item_details['venue_postal_code']) ?>, <?= htmlspecialchars($item_details['venue_country']) ?></p>
+                            </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
                 </div>
 
-                <?php if (!empty($item_details['client_testimonial'])): ?>
-                    <div class="portfolio-detail-section">
-                        <h2>Client Testimonial</h2>
-                        <p class="client-testimonial-quote">"<?= nl2br(htmlspecialchars($item_details['client_testimonial'])) ?>"</p>
-                    </div>
+                <?php if (!empty($item_details['services_provided'])): ?>
+                <div id="services-provided" class="tab-content">
+                    <h2>Services Provided</h2>
+                    <ul>
+                        <?php foreach ($item_details['services_provided'] as $service): ?>
+                            <li><?= htmlspecialchars($service['service_name']) ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+                <?php endif; ?>
+
+                <?php if (!empty($item_details['client_testimonial'])): /* Client Testimonial moved to 'Reviews' tab */ ?>
+                <div id="client-testimonial-tab" class="tab-content">
+                    <h2>Reviews</h2>
+                    <p class="client-testimonial-quote">"<?= nl2br(htmlspecialchars($item_details['client_testimonial'])) ?>"</p>
+                </div>
                 <?php endif; ?>
             </div>
 
+            <?php if (!empty($item_details['images'])): /* Only render this div if images exist */ ?>
             <div class="portfolio-carousel-right">
-                <?php if (!empty($item_details['images'])): ?>
-                    <div class="portfolio-carousel-wrapper swiper">
-                        <div class="swiper-wrapper">
-                            <?php foreach ($item_details['images'] as $image): ?>
-                                <div class="swiper-slide">
+                <div class="portfolio-carousel-wrapper swiper">
+                    <div class="swiper-wrapper">
+                        <?php foreach ($item_details['images'] as $image): ?>
+                            <div class="swiper-slide">
+                                <a href="<?= BASE_URL . htmlspecialchars($image['image_url']) ?>" class="lightbox-trigger">
                                     <img src="<?= BASE_URL . htmlspecialchars($image['image_url']) ?>" alt="<?= htmlspecialchars($item_details['title']) ?>">
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <div class="swiper-pagination"></div>
-                        <div class="swiper-button-next"></div>
-                        <div class="swiper-button-prev"></div>
+                                </a>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
-                <?php else: ?>
-                    <div class="portfolio-carousel-wrapper" style="display: flex; justify-content: center; align-items: center; background-color: var(--background-light);">
-                        <div class="portfolio-placeholder" style="position: static; width: auto; height: auto; border: none;">
-                            <i class="fas fa-image" style="font-size: 4em; color: var(--text-subtle);"></i>
-                            <span style="margin-top: 10px; color: var(--text-subtle);">No Images Available</span>
-                        </div>
-                    </div>
-                <?php endif; ?>
+                    <div class="swiper-pagination"></div>
+                </div>
             </div>
+            <?php endif; /* END conditional rendering */ ?>
         </div>
 
         <div class="back-link">
@@ -251,12 +433,20 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
         </div>
     </div>
 
+    <div class="lightbox-overlay" id="lightboxOverlay">
+        <div class="lightbox-content">
+            <img src="" alt="Enlarged Image" id="lightboxImage">
+        </div>
+        <span class="lightbox-close" id="lightboxClose">&times;</span>
+    </div>
+
     <?php include 'footer.php'; ?>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize Swiper only if images exist
-            if (document.querySelector('.portfolio-carousel-wrapper .swiper-slide')) {
+            // Swiper Initialization
+            const swiperWrapper = document.querySelector('.portfolio-carousel-wrapper .swiper-slide');
+            if (swiperWrapper) {
                 new Swiper('.portfolio-carousel-wrapper', {
                     loop: true, // Enable looping
                     autoplay: {
@@ -267,14 +457,75 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
                         el: '.swiper-pagination',
                         clickable: true,
                     },
-                    navigation: {
-                        nextEl: '.swiper-button-next',
-                        prevEl: '.swiper-button-prev',
-                    },
                     grabCursor: true, // Show grab cursor when hovering over slides
                     slidesPerView: 1, // Display one slide at a time
                     spaceBetween: 0, // No space between slides
                 });
+            }
+
+            // Lightbox functionality
+            const lightboxOverlay = document.getElementById('lightboxOverlay');
+            const lightboxImage = document.getElementById('lightboxImage');
+            const lightboxClose = document.getElementById('lightboxClose');
+            const lightboxTriggers = document.querySelectorAll('.lightbox-trigger');
+
+            lightboxTriggers.forEach(trigger => {
+                trigger.addEventListener('click', function(e) {
+                    e.preventDefault(); // Prevent default link behavior
+                    const imageUrl = this.href; // Get the full image URL from the <a> tag
+                    lightboxImage.src = imageUrl;
+                    lightboxOverlay.classList.add('active'); // Show lightbox
+                    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+                });
+            });
+
+            // Close lightbox when clicking close button
+            lightboxClose.addEventListener('click', function() {
+                lightboxOverlay.classList.remove('active');
+                document.body.style.overflow = ''; // Restore scrolling
+            });
+
+            // Close lightbox when clicking outside the image (on the overlay)
+            lightboxOverlay.addEventListener('click', function(e) {
+                if (e.target === lightboxOverlay) { // Only close if clicked directly on overlay, not the image itself
+                    lightboxOverlay.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+
+            // Close lightbox with ESC key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && lightboxOverlay.classList.contains('active')) {
+                    lightboxOverlay.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+
+            // Tabbed interface logic
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    // Remove 'active' class from all buttons and content
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    tabContents.forEach(content => content.classList.remove('active'));
+
+                    // Add 'active' class to the clicked button
+                    button.classList.add('active');
+
+                    // Show the corresponding content tab
+                    const targetId = button.dataset.target;
+                    document.getElementById(targetId).classList.add('active');
+                });
+            });
+
+            // Set default active tab on page load (Description tab)
+            const defaultTabButton = document.querySelector('.tab-button[data-target="description-content"]');
+            const defaultTabContent = document.getElementById('description-content');
+            if (defaultTabButton && defaultTabContent) {
+                defaultTabButton.classList.add('active');
+                defaultTabContent.classList.add('active');
             }
         });
     </script>
