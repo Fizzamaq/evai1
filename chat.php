@@ -378,15 +378,14 @@ else { // This 'else' pairs correctly with the main 'if' above
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token) ?>">
                         <input type="hidden" name="vendor_id_for_chat" value="<?= htmlspecialchars((string)($vendor_id_from_url ?? '')) ?>">
                         <input type="hidden" name="event_id_for_chat" value="<?= htmlspecialchars((string)($event_id_from_url ?? '')) ?>">
-                        <textarea
+                        <input type="hidden" name="send_message" value="1"> <textarea
                             class="message-input"
                             name="message"
                             placeholder="Type your message..."
                             id="message-input"
                             required
                         ></textarea>
-                        <button type="submit" name="send_message" class="send-button">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <button type="submit" name="send_button_submit" class="send-button"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
                             </svg>
                         </button>
