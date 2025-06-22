@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Handle specific POST actions
-    if (isset($_POST['send_message'])) {
+    if (isset($_POST['send_message'])) { // This condition will now always be true due to hidden input
         // Validate CSRF token
         if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
             error_log("CSRF token mismatch on chat message send for user " . ($_SESSION['user_id'] ?? 'N/A'));
@@ -97,7 +97,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } else {
-        // If other POST actions were sent to this file, handle or error out
+        // This 'else' block should ideally not be hit for message sending anymore
+        // since the hidden input will always set $_POST['send_message'].
+        // It remains as a safeguard for other POST actions if they exist.
         header('Content-Type: application/json');
         echo json_encode(['success' => false, 'error' => 'Invalid POST action.']);
         exit();
@@ -105,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 } // Correctly closing the main 'if ($_SERVER['REQUEST_METHOD'] === 'POST')' block
 
 // --- Handle ALL GET Requests (AJAX or Full Page Load) ---
-else {//  This 'else' pairs correctly with the main 'if' above
+else { // This 'else' pairs correctly with the main 'if' above
     // Check user authentication for GET requests
     if (!isset($_SESSION['user_id'])) {
         if ($is_ajax_request) { // For polling, output minimal content
