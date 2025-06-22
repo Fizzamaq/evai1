@@ -190,34 +190,34 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
         try {
             $stmt = $pdo->prepare("
                 SELECT cc.*,
-                       e.title as event_title,
-                       CASE
-                         WHEN cc.vendor_id = ? THEN CONCAT(u.first_name, ' ', u.last_name)
-                         ELSE vp.business_name
-                       END as other_party_name,
-                       CASE
-                         WHEN cc.vendor_id = ? THEN up_user.profile_image
-                         ELSE up_vendor.profile_image
-                       END as other_party_image
-                FROM chat_conversations cc
-                LEFT JOIN events e ON cc.event_id = e.id
-                LEFT JOIN users u ON cc.user_id = u.id
-                LEFT JOIN user_profiles up_user ON u.id = up_user.user_id
-                LEFT JOIN users u2 ON cc.vendor_id = u2.id
-                LEFT JOIN vendor_profiles vp ON u2.id = vp.user_id
-                LEFT JOIN user_profiles up_vendor ON u2.id = up_vendor.user_id
-                WHERE cc.id = ?
-                AND (cc.vendor_id = ? OR cc.user_id = ?)
-            ");
-            $params = [ // 5 parameters for 5 placeholders
-                $_SESSION['user_id'], // for first CASE
-                $_SESSION['user_id'], // for second CASE
-                $conversation_id,
-                $_SESSION['user_id'], // for first OR
-                $_SESSION['user_id']  // for second OR
-            ];
-            $stmt->execute($params);
-            $current_conversation = $stmt->fetch(PDO::FETCH_ASSOC);
+                           e.title as event_title,
+                           CASE
+                             WHEN cc.vendor_id = ? THEN CONCAT(u.first_name, ' ', u.last_name)
+                             ELSE vp.business_name
+                           END as other_party_name,
+                           CASE
+                             WHEN cc.vendor_id = ? THEN up_user.profile_image
+                             ELSE up_vendor.profile_image
+                           END as other_party_image
+                    FROM chat_conversations cc
+                    LEFT JOIN events e ON cc.event_id = e.id
+                    LEFT JOIN users u ON cc.user_id = u.id
+                    LEFT JOIN user_profiles up_user ON u.id = up_user.user_id
+                    LEFT JOIN users u2 ON cc.vendor_id = u2.id
+                    LEFT JOIN vendor_profiles vp ON u2.id = vp.user_id
+                    LEFT JOIN user_profiles up_vendor ON u2.id = up_vendor.user_id
+                    WHERE cc.id = ?
+                    AND (cc.vendor_id = ? OR cc.user_id = ?)
+                ");
+                $params = [ // 5 parameters for 5 placeholders
+                    $_SESSION['user_id'], // for first CASE
+                    $_SESSION['user_id'], // for second CASE
+                    $conversation_id,
+                    $_SESSION['user_id'], // for first OR
+                    $_SESSION['user_id']  // for second OR
+                ];
+                $stmt->execute($params);
+                $current_conversation = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($current_conversation) {
                 $other_party = [
@@ -233,6 +233,15 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
             $_SESSION['error_message'] = "Could not load conversation details. Please try again.";
             $current_conversation = null;
         }
+    }
+    
+    // If other_party is not set by now (i.e., not an existing convo), set a default
+    if (!isset($other_party)) {
+        $other_party = [
+            'id' => null,
+            'name' => 'Select Chat',
+            'image' => ''
+        ];
     }
 
     // Get user's conversations for the sidebar
@@ -280,7 +289,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
         </div>
 
         <div class="chat-area">
-            <?php if ($current_conversation): /* A conversation is loaded and ready for display */ ?>
+            <?php if ($conversation_id): /* Only show chat area if conversation is active */ ?>
                 <div class="chat-header">
                     <div class="chat-header-avatar" style="background-image: url('<?php echo htmlspecialchars((string)($other_party['image'] ? BASE_URL . 'assets/uploads/users/' . $other_party['image'] : BASE_URL . 'assets/images/default-avatar.jpg')); ?>')"></div>
                     <div class="chat-header-info">
@@ -297,8 +306,10 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                     </div>
                 </div>
                 <div class="chat-messages" id="messages-container">
-                    <?php if (empty($messages)): ?>
+                    <?php if (empty($messages) && empty($conversation_id)): /* For new chats before first message */ ?>
                         <div class="empty-state">Start your conversation!</div>
+                    <?php elseif (empty($messages) && $conversation_id): /* For existing chats with no messages */?>
+                        <div class="empty-state">No messages yet. Say hello!</div>
                     <?php else: ?>
                         <?php foreach ($messages as $message):
                             $message_content_display = nl2br(htmlspecialchars((string)($message['message_content'] ?? '')));
@@ -331,7 +342,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                         </button>
                     </form>
                 </div>
-            <?php else: /* No conversation selected or loaded */ ?>
+            <?php else: ?>
                 <div class="no-conversation">
                     <h3>Select a conversation to view messages</h3>
                     <p>Your conversations will appear on the left sidebar. If you have no conversations, start one from a booking or a vendor's profile.</p>
@@ -370,8 +381,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                     method: 'POST',
                     body: new URLSearchParams(new FormData(form)), // Format data as URL-encoded
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'X-Requested-With': 'XMLHttpRequest' // ADDED THIS HEADER
+                        'X-Requested-With': 'XMLHttpRequest' // Only need this if Content-Type is inferred
                     }
                 })
                 .then(response => {
@@ -382,7 +392,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                     } else {
                         // If not JSON, read as text and throw an error to catch below
                         return response.text().then(text => {
-                            console.error('Server response was not JSON:', text);
+                            console.error('Server response was not JSON for chat send (Status:', response.status, '):', text);
                             throw new Error('Server returned unexpected response format.');
                         });
                     }
@@ -395,14 +405,22 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                         if (messagesContainer) {
                             const tempMsg = document.createElement('div');
                             tempMsg.className = 'message message-outgoing';
-                            tempMsg.innerHTML = `
-                                <div class="message-content">${message}</div>
-                                <span class="message-time">Just now</span>
-                            `;
+                            // Use textContent for safety to prevent XSS if message content isn't fully sanitized on client-side
+                            const contentDiv = document.createElement('div');
+                            contentDiv.className = 'message-content';
+                            contentDiv.textContent = message;
+                            
+                            const timeSpan = document.createElement('span');
+                            timeSpan.className = 'message-time';
+                            timeSpan.textContent = 'Just now'; // Temporary client-side timestamp
+
+                            tempMsg.appendChild(contentDiv);
+                            tempMsg.appendChild(timeSpan);
                             messagesContainer.appendChild(tempMsg);
                             scrollToBottom(); // Scroll to the new message
                         }
                     } else {
+                        // Display the error message from the server's JSON response
                         alert('Failed to send message: ' + (data.error || 'Unknown error.'));
                         console.error('Message send failed:', data.error);
                     }
@@ -430,7 +448,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                                 throw new Error('Polling network response was not ok: ' + response.statusText + ' - ' + text);
                             });
                         }
-                        return response.text();
+                        return response.text(); // Expect HTML for polling
                     })
                     .then(html => {
                         const parser = new DOMParser();
@@ -440,6 +458,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                         let addedNew = false;
                         allFetchedMessages.forEach(fetchedMsg => {
                             const fetchedMsgId = parseInt(fetchedMsg.dataset.id);
+                            // Only append new messages
                             if (fetchedMsgId > lastMessageId) {
                                 messagesContainer.appendChild(fetchedMsg.cloneNode(true));
                                 addedNew = true;
@@ -454,8 +473,20 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
             }
         }, 5000); // Poll every 5 seconds
 
-        // Initial scroll to bottom
-        scrollToBottom();
+        // Initial scroll to bottom and event listener setup
+        document.addEventListener('DOMContentLoaded', function() {
+            scrollToBottom();
+
+            // Allow message input to grow with content but not excessively
+            const messageInput = document.getElementById('message-input');
+            if (messageInput) {
+                messageInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = (this.scrollHeight) + 'px';
+                    scrollToBottom(); // Scroll to bottom when input grows
+                });
+            }
+        });
 
         // Enter key handling (Shift+Enter for new line)
         document.getElementById('message-input')?.addEventListener('keydown', function(e) {
