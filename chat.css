@@ -8,12 +8,13 @@
     display: grid;
     grid-template-columns: 350px 1fr; /* Fixed sidebar width, rest for chat area */
     gap: var(--spacing-md); /* Gap between sidebar and chat area */
-    height: calc(100vh - 120px); /* Adjust height to fill viewport below header/above footer */
+    /* EXPLICIT FIXED HEIGHT - FORCED WITH !IMPORTANT FOR DEBUGGING */
+    height: calc(100vh - var(--header-height) - var(--footer-height) - 250px); /* Increased deduction significantly to make it very short for testing, this should definitely constrain it */
     box-sizing: border-box; /* Include padding in height */
     border-radius: 16px; /* Increased overall container border-radius for softer edges */
     background: var(--white); /* White background for the whole chat module */
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1); /* More pronounced shadow for a floating effect */
-    overflow: hidden; /* Ensures child elements don't break rounded corners */
+    overflow: hidden; /* Ensures child elements don't break rounded corners and clips internal overflow */
 }
 
 /* Sidebar for conversations list */
@@ -123,7 +124,7 @@
 /* Unread messages badge */
 .unread-badge {
     background: var(--secondary-color); /* Crimson for unread badge */
-    color: var(--white);
+    color: red;
     border-radius: 50%;
     min-width: 24px; /* Larger badge */
     height: 24px;
@@ -140,12 +141,15 @@
 /* Main chat area */
 .chat-area {
     background: var(--white);
-    border-radius: 16px; /* Matches outer container radius */
+    border-radius: 12px; /* Matches outer container radius */
     box-shadow: inset 2px 0 8px rgba(0, 0, 0, 0.03); /* Subtle inner shadow on the left edge */
+    overflow: hidden;   /*Ensures content stays within rounded corners */
     display: flex;
-    flex-direction: column;
+    flex-direction: column; /* Stack children vertically */
+    flex: 1; /* Make chat-area fill its container */
+    height: 900px; /* Explicitly force height to 100% of its parent (.chat-container) */
     border: 1px solid var(--border-color); /* Subtle border */
-    position: relative; /* For scroll button positioning */
+    position: relative; /* For error container positioning */
 }
 
 /* Chat header (current conversation info) */
@@ -190,9 +194,9 @@
 
 /* Messages container */
 .chat-messages {
-    flex: 1;
+    flex: 1; /* Messages content will grow and enable scrolling */
     padding: var(--spacing-md);
-    overflow-y: auto; /* Enable scrolling for messages */
+    overflow-y: scroll !important; /* FORCE scrollbar visible with !important */
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm); /* Standard gap between messages */
@@ -254,12 +258,56 @@
     color: var(--text-subtle); /* Time color for incoming bubbles */
 }
 
+/* Error message container */
+.chat-error-container {
+    padding: var(--spacing-sm);
+    background-color: #ffcccc; /* Light red background */
+    color: #cc0000; /* Dark red text */
+    border-top: 1px solid #ff9999;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9em;
+    flex-shrink: 0;
+    animation: fadeInError 0.3s ease-out;
+}
+
+.chat-error-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.chat-error-actions .btn {
+    padding: 6px 12px;
+    font-size: 0.8em;
+    border-radius: 6px;
+    box-shadow: none; /* Remove shadows for these small buttons */
+}
+.chat-error-actions .btn-primary {
+    background: #cc0000;
+    color: var(--white);
+}
+.chat-error-actions .btn-primary:hover {
+    background: #ff3333;
+    transform: none;
+}
+.chat-error-actions .btn-secondary {
+    background: var(--white);
+    color: #cc0000;
+    border: 1px solid #cc0000;
+}
+.chat-error-actions .btn-secondary:hover {
+    background: #ffe6e6;
+    transform: none;
+}
+
+
 /* Chat input area */
 .chat-input {
     padding: var(--spacing-md);
     border-top: 2px solid var(--border-color);
     background: var(--background-light); /* Lighter background for input area */
-    flex-shrink: 0;
+    flex-shrink: 0; /* Prevent input from shrinking */
     box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.03); /* Subtle shadow above input */
 }
 
@@ -289,7 +337,7 @@
 .message-input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 5px rgba(138, 43, 226, 0.3); /* Stronger primary color glow */
+    box-shadow: 0 0 0 5px rgba(138, 43, 226, 0.25); /* Stronger primary color glow */
 }
 
 /* Send button */
@@ -350,12 +398,18 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* Keyframe for error message fade-in animation */
+@keyframes fadeInError {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* Responsive adjustments for chat interface */
 @media (max-width: 992px) {
     .chat-container {
         grid-template-columns: 1fr; /* Stack sidebar and chat area vertically on medium screens */
         height: auto; /* Allow height to adjust */
-        min-height: calc(100vh - 100px); /* Ensure minimum height */
+        min-height: calc(100vh - var(--header-height) - var(--footer-height) - var(--spacing-md)); /* Ensure minimum height, more flexible */
         padding: var(--spacing-sm); /* Reduce overall padding */
     }
 
@@ -435,7 +489,7 @@
         padding: 0; /* Remove all padding on very small screens, let child elements manage */
         border-radius: 0; /* No rounded corners on container edge */
         box-shadow: none; /* No shadow */
-        height: calc(100vh - 80px); /* Adjust height for very small screens */
+        height: calc(100vh - var(--header-height) - var(--footer-height)); /* Take full remaining height */
     }
     .conversations-sidebar, .chat-area {
         border-radius: 0; /* No rounded corners for main sections */
