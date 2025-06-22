@@ -92,7 +92,13 @@ class Chat {
             ]);
 
             // Update conversation last message time
-            $this->updateConversationTime($conversation_id);
+            // IMPORTANT: Check if updateConversationTime also succeeded.
+            // If it fails, sendMessage should also indicate failure.
+            if (!$this->updateConversationTime($conversation_id)) {
+                // If this update fails, log it and return false, as the full "send" operation isn't complete.
+                error_log("Chat.class.php sendMessage: Failed to update last_message_at for conversation_id: " . $conversation_id);
+                return false;
+            }
 
             return $this->conn->lastInsertId();
         } catch (PDOException $e) {
@@ -107,9 +113,13 @@ class Chat {
             $stmt = $this->conn->prepare("UPDATE chat_conversations
                 SET last_message_at = NOW()
                 WHERE id = ?");
-            return $stmt->execute([$conversation_id]);
+            $result = $stmt->execute([$conversation_id]);
+            if (!$result) {
+                error_log("Chat.class.php updateConversationTime PDO error: " . implode(" ", $stmt->errorInfo()));
+            }
+            return $result; // Return true on success, false on failure
         } catch (PDOException $e) {
-            error_log("Chat.class.php updateConversationTime error: " . $e->getMessage());
+            error_log("Chat.class.php updateConversationTime Exception: " . $e->getMessage());
             return false;
         }
     }
