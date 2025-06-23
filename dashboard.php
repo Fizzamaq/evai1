@@ -212,7 +212,7 @@ $recent_bookings = array_slice($recent_bookings, 0, 5);
                 <div class="metric-label">Events in Planning</div>
             </div>
             <div class="stat-card">
-                <div class="metric-value">$<?= number_format($event_stats['avg_budget'] ?? 0, 2) ?></div>
+                <div class="metric-value">PKR <?= number_format($event_stats['avg_budget'] ?? 0, 2) ?></div>
                 <div class="metric-label">Avg. Event Budget</div>
             </div>
         </div>
