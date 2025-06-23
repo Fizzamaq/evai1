@@ -177,12 +177,12 @@ class Chat {
                 SELECT cc.*,
                        e.title as event_title, -- event_title might be NULL if event_id is NULL
                        CASE
-                         WHEN cc.user_id = ? THEN vp.business_name
-                         ELSE CONCAT(u.first_name, ' ', u.last_name)
+                         WHEN cc.user_id = ? THEN vp.business_name -- Logged-in user is customer, show vendor business name
+                         ELSE CONCAT(u2.first_name, ' ', u2.last_name) -- Logged-in user is vendor, show customer's full name (FIXED)
                        END as other_party_name,
                        CASE
-                         WHEN cc.user_id = ? THEN up_vendor.profile_image
-                         ELSE up_user.profile_image
+                         WHEN cc.user_id = ? THEN up_vendor.profile_image -- Logged-in user is customer, show vendor profile image
+                         ELSE up_user.profile_image -- Logged-in user is vendor, show customer profile image
                        END as other_party_image,
                        cm.message_content as last_message,
                        cm.created_at as last_message_time,
@@ -190,11 +190,11 @@ class Chat {
                         WHERE conversation_id = cc.id AND sender_id != ? AND is_read = FALSE) as unread_count
                 FROM chat_conversations cc
                 LEFT JOIN events e ON cc.event_id = e.id -- Use LEFT JOIN because event_id can now be NULL
-                LEFT JOIN users u ON cc.vendor_id = u.id
+                LEFT JOIN users u ON cc.vendor_id = u.id -- Alias 'u' for the vendor's user record
                 LEFT JOIN vendor_profiles vp ON u.id = vp.user_id
-                LEFT JOIN user_profiles up_vendor ON u.id = up_vendor.user_id
-                LEFT JOIN users u2 ON cc.user_id = u2.id
-                LEFT JOIN user_profiles up_user ON u2.id = up_user.user_id
+                LEFT JOIN user_profiles up_vendor ON u.id = up_vendor.user_id -- Vendor's user_profile
+                LEFT JOIN users u2 ON cc.user_id = u2.id -- Alias 'u2' for the customer's user record
+                LEFT JOIN user_profiles up_user ON u2.id = up_user.user_id -- Customer's user_profile
                 LEFT JOIN chat_messages cm ON cc.id = cm.conversation_id AND cm.id = (
                     SELECT MAX(id) FROM chat_messages WHERE conversation_id = cc.id
                 )
@@ -203,6 +203,7 @@ class Chat {
                 ORDER BY cc.last_message_at DESC
                 LIMIT ?
             ");
+            // Parameters: first two for CASE statements, third for unread_count subquery, next two for WHERE clause, last for LIMIT
             $stmt->execute([$user_id, $user_id, $user_id, $user_id, $user_id, $limit]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
