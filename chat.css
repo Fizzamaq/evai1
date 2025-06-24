@@ -8,8 +8,17 @@
     display: grid;
     grid-template-columns: 350px 1fr; /* Fixed sidebar width, rest for chat area */
     gap: var(--spacing-md); /* Gap between sidebar and chat area */
-    /* EXPLICIT FIXED HEIGHT - FORCED WITH !IMPORTANT FOR DEBUGGING */
-    height: calc(100vh - var(--header-height) - var(--footer-height) - 250px); /* Increased deduction significantly to make it very short for testing, this should definitely constrain it */
+    
+    /* REFINED HEIGHT CALCULATION: */
+    /* This calculation attempts to fill the remaining vertical space of the viewport (100vh).
+       You might need to adjust the subtracted value (e.g., '200px').
+       - If the chat container is still too short, REDUCE this number (e.g., to 180px, 150px).
+       - If the chat container causes the *page* to scroll (meaning it's too tall), INCREASE this number (e.g., to 220px, 250px).
+       This value accounts for your header, footer, and the container's own top/bottom margins and paddings.
+    */
+    height: calc(100vh - 200px); /* Adjust this value by trial and error for perfect fit */
+    min-height: 550px; /* Ensures a minimum usable height for the chat interface on very short screens */
+
     box-sizing: border-box; /* Include padding in height */
     border-radius: 16px; /* Increased overall container border-radius for softer edges */
     background: var(--white); /* White background for the whole chat module */
@@ -25,11 +34,13 @@
     overflow: hidden; /* Ensures content stays within rounded corners */
     display: flex;
     flex-direction: column;
+    height: 100%; /* Make sidebar fill its parent's height */
     border: 1px solid var(--border-color); /* Subtle border matching palette */
 }
 
 .conversations-header {
-    padding: var(--spacing-md); /* Increased padding */
+    /* MODIFICATION: Smaller padding for a more compact sidebar header */
+    padding: var(--spacing-sm) var(--spacing-md); /* Reduced vertical padding from var(--spacing-md) */
     border-bottom: 2px solid var(--border-color); /* Separator */
     background: var(--background-light); /* Matching sidebar background */
     font-size: 1.3em; /* Slightly larger header text */
@@ -123,15 +134,15 @@
 
 /* Unread messages badge */
 .unread-badge {
-    background: var(--secondary-color); /* Crimson for unread badge */
-    color: red;
-    border-radius: 50%;
+    background: #43AC78; /* Crimson for unread badge */
+    color: var(--white); /* Changed to white for better contrast with crimson */
+    border-radius: 5%;
     min-width: 24px; /* Larger badge */
-    height: 24px;
+    height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.85em; /* Larger font */
+    font-size: 0.45em; /* Larger font */
     font-weight: bold;
     padding: 0 7px; /* Horizontal padding */
     margin-left: var(--spacing-sm);
@@ -147,14 +158,21 @@
     display: flex;
     flex-direction: column; /* Stack children vertically */
     flex: 1; /* Make chat-area fill its container */
-    height: 900px; /* Explicitly force height to 100% of its parent (.chat-container) */
+    
+    /* MODIFICATION START: KEY FIX */
+    /* Removed the problematic fixed height of 900px that caused overflow. */
+    /* This allows .chat-area to dynamically fill the height given by its parent (.chat-container). */
+    height: 100%; /* Make chat area fill the height of its grid parent cell */
+    /* MODIFICATION END */
+
     border: 1px solid var(--border-color); /* Subtle border */
     position: relative; /* For error container positioning */
 }
 
 /* Chat header (current conversation info) */
 .chat-header {
-    padding: var(--spacing-md);
+    /* MODIFICATION: Smaller padding for a more compact header */
+    padding: var(--spacing-sm) var(--spacing-md); /* Vertical 10px, Horizontal 20px */
     border-bottom: 2px solid var(--border-color);
     background: var(--background-light); /* Lighter header background */
     display: flex;
@@ -164,31 +182,30 @@
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); /* Subtle shadow below header */
 }
 
+/* MODIFICATION: Smaller avatar in chat header */
 .chat-header-avatar {
-    width: 65px; /* Larger header avatar */
-    height: 65px; /* Larger header avatar */
+    width: 48px; /* Reduced from 65px */
+    height: 48px; /* Reduced from 65px */
     border-radius: 50%;
     background-size: cover;
     background-position: center;
     background-color: var(--border-color);
     flex-shrink: 0;
-    border: 3px solid var(--accent-color);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    border: 2px solid var(--accent-color); /* Reduced border from 3px */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* Reduced shadow */
 }
 
-.chat-header-info {
-    flex: 1;
-}
-
+/* MODIFICATION: Smaller text in chat header info */
 .chat-header-title {
     font-weight: 700;
     color: var(--text-dark);
-    margin-bottom: 3px; /* Adjusted margin */
-    font-size: 1.5em; /* Larger title */
+    margin-bottom: 2px; /* Reduced margin */
+    font-size: 1.3em; /* Reduced from 1.5em */
 }
 
+/* MODIFICATION: Smaller text in chat header subtitle */
 .chat-header-subtitle {
-    font-size: 0.95em; /* Slightly larger subtitle */
+    font-size: 0.85em; /* Reduced from 0.95em */
     color: var(--text-subtle);
 }
 
@@ -304,7 +321,8 @@
 
 /* Chat input area */
 .chat-input {
-    padding: var(--spacing-md);
+    /* MODIFICATION: Smaller padding for a more compact input area */
+    padding: var(--spacing-sm) var(--spacing-md); /* Vertical 10px, Horizontal 20px */
     border-top: 2px solid var(--border-color);
     background: var(--background-light); /* Lighter background for input area */
     flex-shrink: 0; /* Prevent input from shrinking */
@@ -313,22 +331,23 @@
 
 .message-form {
     display: flex;
-    gap: 12px; /* Increased gap */
+    gap: 10px; /* Reduced gap from 12px */
     align-items: flex-end; /* Align send button with textarea */
 }
 
 .message-input {
     flex: 1;
-    padding: 16px 25px; /* More generous padding for larger input field */
+    /* MODIFICATION: Smaller padding and min-height for a more compact input field */
+    padding: 12px 20px; /* Reduced from 16px 25px */
     border: 2px solid var(--border-color);
-    border-radius: 30px; /* More prominent pill shape */
-    font-size: 17px; /* Larger font size */
+    border-radius: 25px; /* Slightly smaller border-radius for the pill shape */
+    font-size: 16px; /* Slightly reduced font size */
     resize: none;
-    min-height: 60px; /* Larger minimum height */
-    max-height: 180px; /* Allow growing, but limit */
+    min-height: 48px; /* Reduced from 60px */
+    max-height: 150px; /* Reduced max-height */
     box-sizing: border-box;
     overflow-y: auto;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, height 0.2s ease; /* Smooth height transition */
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, height 0.2s ease;
     background-color: var(--white);
     color: var(--text-dark);
     line-height: 1.4;
@@ -337,35 +356,37 @@
 .message-input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 5px rgba(138, 43, 226, 0.25); /* Stronger primary color glow */
+    box-shadow: 0 0 0 4px rgba(138, 43, 226, 0.2); /* Reduced glow intensity */
 }
 
 /* Send button */
 .send-button {
-    background: linear-gradient(145deg, var(--primary-color), var(--secondary-color)); /* Vibrant gradient for send button */
+    background: linear-gradient(145deg, var(--primary-color), var(--secondary-color));
     color: var(--white);
     border: none;
-    border-radius: 50%; /* Perfect circle */
-    width: 60px; /* Larger button */
-    height: 60px; /* Larger button */
+    border-radius: 50%;
+    /* MODIFICATION: Smaller send button */
+    width: 48px; /* Reduced from 60px */
+    height: 48px; /* Reduced from 60px */
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Stronger shadow */
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2); /* Reduced shadow intensity */
 }
 
 .send-button:hover {
-    transform: translateY(-3px); /* More noticeable lift effect */
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3); /* Enhanced shadow on hover */
-    background: linear-gradient(145deg, var(--secondary-color), var(--primary-color)); /* Reverse gradient on hover */
+    transform: translateY(-2px); /* Reduced lift effect */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(145deg, var(--secondary-color), var(--primary-color));
 }
 
 .send-button svg {
-    width: 28px; /* Larger icon */
-    height: 28px; /* Larger icon */
+    /* MODIFICATION: Smaller icon */
+    width: 22px; /* Reduced from 28px */
+    height: 22px; /* Reduced from 28px */
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -376,9 +397,9 @@
 /* Empty state for no conversations/messages */
 .no-conversation {
     text-align: center;
-    padding: var(--spacing-xxl); /* More generous padding */
+    padding: var(--spacing-xxl);
     color: var(--text-subtle);
-    font-size: 1.2em; /* Larger font size */
+    font-size: 1.2em;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -389,7 +410,7 @@
 .no-conversation h3 {
     color: var(--text-dark);
     margin-bottom: var(--spacing-sm);
-    font-size: 1.8em; /* Larger heading */
+    font-size: 1.8em;
 }
 
 /* Keyframe for message fade-in animation */
@@ -407,103 +428,93 @@
 /* Responsive adjustments for chat interface */
 @media (max-width: 992px) {
     .chat-container {
-        grid-template-columns: 1fr; /* Stack sidebar and chat area vertically on medium screens */
-        height: auto; /* Allow height to adjust */
-        min-height: calc(100vh - var(--header-height) - var(--footer-height) - var(--spacing-md)); /* Ensure minimum height, more flexible */
-        padding: var(--spacing-sm); /* Reduce overall padding */
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: calc(100vh - var(--header-height) - var(--footer-height) - var(--spacing-md) * 2);
+        padding: var(--spacing-sm);
     }
 
     .conversations-sidebar {
-        height: 380px; /* Give sidebar a reasonable fixed height on smaller screens */
+        height: 300px; /* Reduced fixed height for sidebar on medium screens */
         flex-shrink: 0;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); /* Re-apply general shadow for stacked view */
-        border-right: 1px solid var(--border-color); /* Restore horizontal border for clarity */
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        border-right: 1px solid var(--border-color);
     }
 
     .chat-area {
-        height: auto; /* Allow chat area to expand */
-        min-height: 500px; /* Minimum height for chat messages */
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); /* Re-apply general shadow */
-        border-left: 1px solid var(--border-color); /* Restore horizontal border */
+        height: auto;
+        min-height: 400px; /* Reduced min-height for chat messages on medium screens */
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        border-left: 1px solid var(--border-color);
     }
 
-    .message-bubble {
-        max-width: 90%; /* Allow messages to take more width on small screens */
+    /* Adjustments for smaller header/input elements on medium screens */
+    .chat-header {
+        padding: var(--spacing-xs) var(--spacing-sm); /* Even smaller padding */
+    }
+    .chat-header-avatar {
+        width: 40px; height: 40px; /* Further reduced avatar size */
+    }
+    .chat-header-title {
+        font-size: 1.2em; /* Adjusted */
+    }
+    .chat-header-subtitle {
+        font-size: 0.8em; /* Adjusted */
+    }
+
+    .message-input {
+        padding: 10px 15px; /* Adjusted padding */
+        min-height: 40px; /* Adjusted min-height */
+        font-size: 15px; /* Adjusted font-size */
+    }
+
+    .send-button {
+        width: 40px; height: 40px; /* Further reduced button size */
+    }
+    .send-button svg {
+        width: 18px; height: 18px; /* Further reduced icon size */
+    }
+
+    .message {
+        padding: 10px 15px; /* Adjusted message padding */
+        font-size: 0.95em; /* Adjusted message font size */
     }
 }
 
 @media (max-width: 768px) {
     .chat-container {
-        padding: var(--spacing-xs); /* Reduce overall padding */
+        padding: var(--spacing-xs);
     }
 
     .conversations-sidebar, .chat-area {
-        border-radius: 12px; /* Consistent border radius */
+        border-radius: 12px;
     }
 
     .conversations-header, .chat-header, .chat-input {
-        padding: var(--spacing-sm); /* Reduce padding in headers/footers */
-    }
-
-    .conversation-item {
-        padding: var(--spacing-xs) var(--spacing-sm);
-    }
-
-    .chat-header-avatar {
-        width: 55px;
-        height: 55px;
-    }
-    .chat-header-title {
-        font-size: 1.2em;
-    }
-
-    .message-input {
-        padding: 12px 18px;
-        min-height: 48px;
-        border-radius: 24px;
-        font-size: 16px;
-    }
-
-    .send-button {
-        width: 48px;
-        height: 48px;
-    }
-    .send-button svg {
-        width: 22px;
-        height: 22px;
-    }
-    .message-bubble {
-        padding: 12px 16px;
-        font-size: 1em;
-    }
-    .no-conversation h3 {
-        font-size: 1.4em;
-    }
-    .no-conversation p {
-        font-size: 1em;
+        padding: var(--spacing-sm);
     }
 }
 
 @media (max-width: 480px) {
     .chat-container {
-        padding: 0; /* Remove all padding on very small screens, let child elements manage */
-        border-radius: 0; /* No rounded corners on container edge */
-        box-shadow: none; /* No shadow */
-        height: calc(100vh - var(--header-height) - var(--footer-height)); /* Take full remaining height */
+        padding: 0;
+        border-radius: 0;
+        box-shadow: none;
+        height: calc(100vh - var(--header-height) - var(--footer-height));
     }
     .conversations-sidebar, .chat-area {
-        border-radius: 0; /* No rounded corners for main sections */
-        box-shadow: none; /* No shadow */
-        border: none; /* No borders for main sections */
+        border-radius: 0;
+        box-shadow: none;
+        border: none;
     }
     .conversations-sidebar {
-        height: 280px;
+        height: 250px; /* Adjusted fixed height for very small screens */
     }
     .chat-area {
-        min-height: 300px;
+        min-height: 280px; /* Adjusted min-height for very small screens */
     }
     .conversations-header, .chat-header, .chat-input {
-        padding: var(--spacing-xs); /* Minimal padding */
+        padding: var(--spacing-xs);
     }
     .conversations-header h2 {
         font-size: 1em;
@@ -514,13 +525,11 @@
         gap: 10px;
     }
     .conversation-avatar {
-        width: 38px;
-        height: 38px;
+        width: 38px; height: 38px;
         border-width: 2px;
     }
     .chat-header-avatar {
-        width: 48px;
-        height: 48px;
+        width: 48px; height: 48px; /* Reverted to 48px for very small screens for better visibility */
         border-width: 2px;
     }
     .chat-header-title {
@@ -537,12 +546,10 @@
         border-radius: 18px;
     }
     .send-button {
-        width: 36px;
-        height: 36px;
+        width: 36px; height: 36px;
     }
     .send-button svg {
-        width: 18px;
-        height: 18px;
+        width: 18px; height: 18px;
     }
     .no-conversation {
         padding: var(--spacing-md);
