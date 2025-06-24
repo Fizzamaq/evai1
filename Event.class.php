@@ -333,6 +333,7 @@ class Event {
 
     /**
      * Get upcoming events for a user
+     * MODIFIED: Only shows events that have a booked vendor.
      */
     public function getUpcomingEvents($user_id, $limit = 5) {
         try {
@@ -342,6 +343,7 @@ class Event {
                     WHERE e.user_id = :user_id
                     AND e.event_date >= CURDATE()
                     AND e.status != 'deleted'
+                    AND EXISTS (SELECT 1 FROM bookings b WHERE b.event_id = e.id) /* ADDED THIS CONDITION */
                     ORDER BY e.event_date ASC
                     LIMIT :limit";
 
