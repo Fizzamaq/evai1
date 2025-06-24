@@ -15,33 +15,63 @@ class Chat {
      * @return int|false Conversation ID on success, false on failure.
      */
     public function startConversation($event_id, $user_id, $vendor_id) {
+        // --- ADDED DEBUG LOGS ---
+        error_log("startConversation: Attempting to create conversation with event_id={$event_id}, user_id={$user_id}, vendor_id={$vendor_id}");
+        // --- END ADDED DEBUG LOGS ---
+
         try {
             // Check if conversation already exists to prevent duplicates
             $existing_conv = $this->getConversationByParticipants($user_id, $vendor_id, $event_id);
             if ($existing_conv) {
+                // --- ADDED DEBUG LOG ---
+                error_log("startConversation: Existing conversation found: ID " . $existing_conv['id'] . ". Returning existing ID.");
+                // --- END ADDED DEBUG LOG ---
                 return $existing_conv['id'];
             }
 
             // Create new conversation
-            $stmt = $this->conn->prepare("INSERT INTO chat_conversations
+            $sql = "INSERT INTO chat_conversations
                 (event_id, user_id, vendor_id)
-                VALUES (?, ?, ?)");
+                VALUES (?, ?, ?)";
+            
+            // --- ADDED DEBUG LOG ---
+            error_log("startConversation: Preparing SQL statement: " . $sql);
+            // --- END ADDED DEBUG LOG ---
+            
+            $stmt = $this->conn->prepare($sql);
 
-            // Bind event_id. PDO automatically handles NULL correctly for INT type.
+            // --- ADDED DEBUG LOG ---
+            error_log("startConversation: Executing statement with parameters: event_id=" . ($event_id ?? 'NULL') . ", user_id={$user_id}, vendor_id={$vendor_id}");
+            // --- END ADDED DEBUG LOG ---
+
             $result = $stmt->execute([$event_id, $user_id, $vendor_id]);
 
             if ($result) {
                 $conversation_id = $this->conn->lastInsertId();
+                // --- ADDED DEBUG LOG ---
+                error_log("startConversation: Successfully created new conversation with ID: " . $conversation_id);
+                // --- END ADDED DEBUG LOG ---
                 return $conversation_id;
             } else {
                 // Log specific PDO error if execution failed
-                error_log("Chat.class.php startConversation PDO error: " . implode(" ", $stmt->errorInfo()));
+                $errorInfo = $stmt->errorInfo();
+                // --- MODIFIED ERROR LOG ---
+                error_log("Chat.class.php startConversation PDO execute failed. ErrorInfo: " . implode(" ", $errorInfo) . " for params: event_id=" . ($event_id ?? 'NULL') . ", user_id={$user_id}, vendor_id={$vendor_id}");
+                // --- END MODIFIED ERROR LOG ---
                 return false;
             }
 
         } catch (PDOException $e) {
             // Log the full PDOException message
-            error_log("Chat.class.php startConversation Exception: " . $e->getMessage());
+            // --- MODIFIED ERROR LOG ---
+            error_log("Chat.class.php startConversation PDOException caught: " . $e->getMessage() . " (Code: " . $e->getCode() . ") SQLSTATE: " . ($e->errorInfo[0] ?? 'N/A') . " - Trace: " . $e->getTraceAsString());
+            // --- END MODIFIED ERROR LOG ---
+            return false;
+        } catch (Exception $e) {
+            // Catch other general exceptions
+            // --- MODIFIED ERROR LOG ---
+            error_log("Chat.class.php startConversation General Exception caught: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
+            // --- END MODIFIED ERROR LOG ---
             return false;
         }
     }
@@ -65,12 +95,28 @@ class Chat {
             } else {
                 $sql .= " AND event_id IS NULL"; // For general conversations
             }
+            
+            // --- ADDED DEBUG LOG ---
+            error_log("getConversationByParticipants: Checking for existing conversation with SQL: " . $sql . " and params: " . json_encode($params));
+            // --- END ADDED DEBUG LOG ---
 
             $stmt = $this->conn->prepare($sql);
             $stmt->execute($params);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // --- ADDED DEBUG LOG ---
+            if ($result) {
+                error_log("getConversationByParticipants: Found existing conversation ID: " . $result['id']);
+            } else {
+                error_log("getConversationByParticipants: No existing conversation found.");
+            }
+            // --- END ADDED DEBUG LOG ---
+            
+            return $result;
         } catch (PDOException $e) {
-            error_log("Chat.class.php getConversationByParticipants error: " . $e->getMessage());
+            // --- MODIFIED ERROR LOG ---
+            error_log("Chat.class.php getConversationByParticipants PDO error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
+            // --- END MODIFIED ERROR LOG ---
             return false;
         }
     }
@@ -104,7 +150,7 @@ class Chat {
             ]);
 
             if (!$insert_success) {
-                throw new PDOException("Failed to insert message into chat_messages table.");
+                throw new PDOException("Failed to insert message into chat_messages table. ErrorInfo: " . implode(" ", $stmt_insert->errorInfo()));
             }
 
             $message_id = $this->conn->lastInsertId();
@@ -122,12 +168,12 @@ class Chat {
         } catch (PDOException $e) {
             // Catch PDO exceptions specifically for database errors
             $this->conn->rollBack(); // Rollback the transaction on database error
-            error_log("Chat.class.php sendMessage PDO error (transaction rolled back): " . $e->getMessage());
+            error_log("Chat.class.php sendMessage PDO error (transaction rolled back): " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         } catch (Exception $e) {
             // Catch other general exceptions (like the one from updateConversationTime failure)
             $this->conn->rollBack(); // Rollback the transaction on other errors
-            error_log("Chat.class.php sendMessage general error (transaction rolled back): " . $e->getMessage());
+            error_log("Chat.class.php sendMessage general error (transaction rolled back): " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         }
     }
@@ -165,7 +211,7 @@ class Chat {
             $stmt->execute([$conversation_id, $limit, $offset]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            error_log("Chat.class.php getMessages error: " . $e->getMessage());
+            error_log("Chat.class.php getMessages error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         }
     }
@@ -207,7 +253,7 @@ class Chat {
             $stmt->execute([$user_id, $user_id, $user_id, $user_id, $user_id, $limit]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            error_log("Chat.class.php getUserConversations error: " . $e->getMessage());
+            error_log("Chat.class.php getUserConversations error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         }
     }
@@ -220,7 +266,7 @@ class Chat {
                 WHERE conversation_id = ? AND sender_id != ? AND is_read = FALSE");
             return $stmt->execute([$conversation_id, $user_id]);
         } catch (PDOException $e) {
-            error_log("Chat.class.php markMessagesAsRead error: " . $e->getMessage());
+            error_log("Chat.class.php markMessagesAsRead error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         }
     }
@@ -240,7 +286,7 @@ class Chat {
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             return $result['unread_count'] ?? 0;
         } catch (PDOException $e) {
-            error_log("Chat.class.php getUnreadCount error: " . $e->getMessage());
+            error_log("Chat.class.php getUnreadCount error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return 0;
         }
     }
