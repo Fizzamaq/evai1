@@ -92,7 +92,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['success' => false, 'error' => 'Failed to send message. Conversation not identified.']);
             exit();
         }
-    } else {
+    } elseif (isset($_POST['delete_chat'])) { // ADDED: Handle chat deletion request
+        $conversation_id_to_delete = $_POST['conversation_id'];
+        // Basic validation: ensure conversation_id is numeric and user is part of it.
+        if (!empty($conversation_id_to_delete) && is_numeric($conversation_id_to_delete)) {
+            if ($chat->markConversationAsArchived((int)$conversation_id_to_delete, $_SESSION['user_id'])) {
+                echo json_encode(['success' => true, 'message' => 'Chat archived successfully.', 'redirect' => BASE_URL . 'public/vendor_chat.php']);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Failed to archive chat.']);
+            }
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Invalid conversation ID for deletion.']);
+        }
+        exit();
+    }
+    else {
         // If other POST actions were sent to this file, handle or error out
         echo json_encode(['success' => false, 'error' => 'Invalid POST action.']);
         exit();
@@ -164,6 +178,12 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                 $current_conversation = $stmt->fetch(PDO::FETCH_ASSOC);
 
                 if ($current_conversation) {
+                    $other_party = [
+                        'id' => (int)(($current_conversation['vendor_id'] == $_SESSION['user_id']) ? $current_conversation['user_id'] : $current_conversation['vendor_id']),
+                        'name' => htmlspecialchars((string)($current_conversation['other_party_name'] ?? 'Unknown User')),
+                        'image' => htmlspecialchars((string)($current_conversation['other_party_image'] ?? ''))
+                    ];
+
                     $messages = $chat->getMessages($conversation_id, 100);
                     $messages = array_reverse($messages); // Show oldest first
 
@@ -223,6 +243,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                     FROM chat_conversations cc
                     LEFT JOIN events e ON cc.event_id = e.id
                     LEFT JOIN users u ON cc.user_id = u.id
+                    LEFT JOIN vendor_profiles vp ON u.id = vp.user_id
                     LEFT JOIN user_profiles up_user ON u.id = up_user.user_id
                     LEFT JOIN users u2 ON cc.vendor_id = u2.id
                     LEFT JOIN vendor_profiles vp ON u2.id = vp.user_id
@@ -295,6 +316,9 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                                     <?php if ($conv['unread_count'] > 0): ?>
                                         <span class="unread-badge"><?php echo htmlspecialchars((string)$conv['unread_count']); ?></span>
                                     <?php endif; ?>
+                                    <span class="delete-chat-icon" data-conversation-id="<?= htmlspecialchars((string)$conv['id']) ?>" title="Delete Chat" style="margin-left: auto;">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </span>
                                 </div>
                                 <div class="conversation-preview">
                                     <?php echo $last_message_preview; ?>
@@ -335,7 +359,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                         <?php foreach ($messages as $message):
                             $message_content_display = nl2br(htmlspecialchars((string)($message['message_content'] ?? '')));
                             $message_time_display = !empty($message['created_at']) ? date('g:i a', strtotime((string)$message['created_at'])) : 'N/A';
-                        ?>
+                            ?>
                             <div class="message <?php echo ($message['sender_id'] == $_SESSION['user_id']) ? 'message-outgoing' : 'message-incoming'; ?>" data-id="<?= htmlspecialchars((string)($message['id'])) ?>">
                                 <div class="message-content"><?php echo $message_content_display; ?></div>
                                 <span class="message-time">
@@ -397,6 +421,8 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
         const chatDismissButton = document.getElementById('chat-dismiss-error');
         const messageInput = document.getElementById('message-input');
         const messageForm = document.querySelector('.message-form');
+        // MODIFIED: Select all delete buttons in the sidebar
+        const deleteChatButtons = document.querySelectorAll('.delete-chat-sidebar-btn'); 
 
         let lastFailedMessage = ''; // Store the last message that failed to send
 
@@ -430,6 +456,40 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
             lastFailedMessage = ''; // Clear stored message
         });
 
+        // MODIFIED: Attach event listener to all delete buttons in the sidebar
+        deleteChatButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent the conversation item's click event from firing
+                const conversationIdToDelete = this.dataset.conversationId;
+                if (confirm('Are you sure you want to delete (archive) this chat? This action cannot be undone.')) {
+                    fetch('<?= BASE_URL ?>public/chat.php', {
+                        method: 'POST',
+                        body: new URLSearchParams({
+                            delete_chat: '1',
+                            conversation_id: conversationIdToDelete,
+                            csrf_token: '<?= htmlspecialchars((string)$csrf_token) ?>' // Include CSRF token
+                        }),
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            window.location.href = data.redirect || '<?= BASE_URL ?>public/chat.php'; // Redirect to clear page or chat list
+                        } else {
+                            alert(data.error || 'Failed to delete chat.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error deleting chat:', error);
+                        alert('An error occurred while trying to delete the chat.');
+                    });
+                }
+            });
+        });
+
 
         // Send message with AJAX
         messageForm?.addEventListener('submit', function(e) {
@@ -442,27 +502,23 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
             if (message) {
                 lastFailedMessage = message; // Store message in case of failure
 
-                let postUrl = '<?= BASE_URL ?>public/vendor_chat.php'; // Corrected for vendor_chat.php
+                let postUrl = '<?= BASE_URL ?>public/chat.php';
                 const currentConversationId = '<?php echo htmlspecialchars((string)($conversation_id ?? '')); ?>';
                 if (currentConversationId) {
-                    postUrl += `?conversation_id=${currentConversationId}`; // Append conversation ID for existing chats
+                    postUrl += `?conversation_id=${currentConversationId}`;
                 }
 
-                // Send message via Fetch API
                 fetch(postUrl, {
                     method: 'POST',
-                    body: new URLSearchParams(new FormData(form)), // Format data as URL-encoded
+                    body: new URLSearchParams(new FormData(form)),
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest' // Only need this if Content-Type is inferred
+                        'X-Requested-With': 'XMLHttpRequest'
                     }
-                })
-                .then(response => {
-                    // Check if the response is actually JSON before parsing
+                }).then(response => {
                     const contentType = response.headers.get('content-type');
                     if (contentType && contentType.includes('application/json')) {
                         return response.json();
                     } else {
-                        // If not JSON, read as text and throw an error to catch below
                         return response.text().then(text => {
                             console.error('Server response was not JSON for chat send (Status:', response.status, '):', text);
                             throw new Error('Server returned unexpected response format.');
@@ -471,18 +527,21 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                 })
                 .then(data => {
                     if (data.success) {
-                        messageInput.value = ''; // Clear input field
+                        messageInput.value = '';
                         lastFailedMessage = ''; // Clear stored message on success
 
-                        // Add the sent message to the display immediately for responsiveness
+                        if (data.redirect_to_conversation) {
+                            window.location.href = data.redirect_to_conversation;
+                            return;
+                        }
+                        // Add message to display
                         const messagesContainer = document.getElementById('messages-container');
                         if (messagesContainer) {
                             const tempMsg = document.createElement('div');
                             tempMsg.className = 'message message-outgoing';
-                            // Use textContent for safety to prevent XSS if message content isn't fully sanitized on client-side
                             const contentDiv = document.createElement('div');
                             contentDiv.className = 'message-content';
-                            contentDiv.textContent = message;
+                            contentDiv.textContent = message; // Use textContent for safety
                             
                             const timeSpan = document.createElement('span');
                             timeSpan.className = 'message-time';
@@ -491,15 +550,14 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                             tempMsg.appendChild(contentDiv);
                             tempMsg.appendChild(timeSpan);
                             messagesContainer.appendChild(tempMsg);
-                            scrollToBottom(); // Scroll to the new message
+                            scrollToBottom();
                         }
                     } else {
                         // Display the error message from the server's JSON response
                         showErrorMessage(data.error || 'Unknown error occurred.');
                         console.error('Message send failed:', data.error);
                     }
-                })
-                .catch(error => {
+                }).catch(error => {
                     showErrorMessage('Network error: ' + error.message + '. Please check your connection.');
                     console.error('Error sending message:', error);
                 });
@@ -514,7 +572,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                 const currentLastMessage = messagesContainer ? messagesContainer.lastElementChild : null;
                 const lastMessageId = currentLastMessage ? parseInt(currentLastMessage.dataset.id) : 0;
 
-                fetch(`<?= BASE_URL ?>public/vendor_chat.php?conversation_id=${conversationId}&ajax=1`) // Corrected for vendor_chat.php
+                fetch(`<?= BASE_URL ?>public/chat.php?conversation_id=${conversationId}&ajax=1`)
                     .then(response => {
                         if (!response.ok) {
                             return response.text().then(text => {
