@@ -56,6 +56,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Get conversation_id. For vendors, it should usually be present from URL.
         $conversation_id = $_GET['conversation_id'] ?? null; 
 
+        // --- NEW: Check for vendor-to-vendor chat attempt ---
+        $sender_user_type = $_SESSION['user_type'] ?? null;
+        $recipient_user_type = null;
+
+        if ($conversation_id) { // If an existing conversation, participant types should already be valid
+            // No direct check needed here if $conversation_id is already valid and existing.
+            // This check only applies to initiating *new* conversations between vendors.
+        } elseif ($vendor_id_for_creation = $_POST['vendor_id_for_chat'] ?? null) {
+            $recipient_user_data = $user->getUserById($vendor_id_for_creation);
+            if ($recipient_user_data) {
+                $recipient_user_type = $recipient_user_data['user_type_id'];
+            }
+        }
+        
+        // If both sender and recipient are vendors (user_type_id = 2) for a *new* conversation attempt
+        if ($sender_user_type == 2 && $recipient_user_type == 2 && !$conversation_id) {
+            echo json_encode(['success' => false, 'error' => 'Vendor-to-vendor chat is not supported by the current system design.']);
+            exit();
+        }
+        // --- END NEW CHECK ---
+
         // Vendors should always be responding within an existing conversation.
         if ($conversation_id) {
             $message_sent = $chat->sendMessage($conversation_id, $_SESSION['user_id'], $message); // Sender is the vendor's user_id
@@ -324,6 +345,13 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
+                <div class="chat-error-container" id="chat-error-container" style="display: none;">
+                    <div class="chat-error-message" id="chat-error-message"></div>
+                    <div class="chat-error-actions">
+                        <button type="button" id="chat-retry-send" class="btn btn-sm btn-primary">Retry</button>
+                        <button type="button" id="chat-dismiss-error" class="btn btn-sm btn-secondary">Dismiss</button>
+                    </div>
+                </div>
                 <div class="chat-input">
                     <form class="message-form" method="POST">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token) ?>">
@@ -362,14 +390,58 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
             if (container) container.scrollTop = container.scrollHeight;
         }
 
+        // Elements for error display
+        const chatErrorContainer = document.getElementById('chat-error-container');
+        const chatErrorMessage = document.getElementById('chat-error-message');
+        const chatRetryButton = document.getElementById('chat-retry-send');
+        const chatDismissButton = document.getElementById('chat-dismiss-error');
+        const messageInput = document.getElementById('message-input');
+        const messageForm = document.querySelector('.message-form');
+
+        let lastFailedMessage = ''; // Store the last message that failed to send
+
+        function showErrorMessage(message) {
+            if (chatErrorContainer && chatErrorMessage) {
+                chatErrorMessage.textContent = message;
+                chatErrorContainer.style.display = 'flex'; // Use flex to center content
+                scrollToBottom(); // Keep the error in view
+            }
+        }
+
+        function hideErrorMessage() {
+            if (chatErrorContainer) {
+                chatErrorContainer.style.display = 'none';
+                chatErrorMessage.textContent = '';
+            }
+        }
+
+        // Event listener for retry button
+        chatRetryButton?.addEventListener('click', function() {
+            if (messageInput && lastFailedMessage) {
+                messageInput.value = lastFailedMessage; // Restore message to input
+                hideErrorMessage(); // Hide the error message
+                messageForm?.dispatchEvent(new Event('submit')); // Re-submit the form
+            }
+        });
+
+        // Event listener for dismiss button
+        chatDismissButton?.addEventListener('click', function() {
+            hideErrorMessage();
+            lastFailedMessage = ''; // Clear stored message
+        });
+
+
         // Send message with AJAX
-        document.querySelector('.message-form')?.addEventListener('submit', function(e) {
-            e.preventDefault(); // Prevent default form submission
+        messageForm?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            hideErrorMessage(); // Hide any previous error when attempting to send
+            
             const form = this;
-            const messageInput = document.getElementById('message-input');
             const message = messageInput.value.trim();
 
             if (message) {
+                lastFailedMessage = message; // Store message in case of failure
+
                 let postUrl = '<?= BASE_URL ?>public/vendor_chat.php'; // Corrected for vendor_chat.php
                 const currentConversationId = '<?php echo htmlspecialchars((string)($conversation_id ?? '')); ?>';
                 if (currentConversationId) {
@@ -400,6 +472,8 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                 .then(data => {
                     if (data.success) {
                         messageInput.value = ''; // Clear input field
+                        lastFailedMessage = ''; // Clear stored message on success
+
                         // Add the sent message to the display immediately for responsiveness
                         const messagesContainer = document.getElementById('messages-container');
                         if (messagesContainer) {
@@ -421,13 +495,13 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                         }
                     } else {
                         // Display the error message from the server's JSON response
-                        alert('Failed to send message: ' + (data.error || 'Unknown error.'));
+                        showErrorMessage(data.error || 'Unknown error occurred.');
                         console.error('Message send failed:', data.error);
                     }
                 })
                 .catch(error => {
+                    showErrorMessage('Network error: ' + error.message + '. Please check your connection.');
                     console.error('Error sending message:', error);
-                    alert('An error occurred while sending your message. Please check the console for details.');
                 });
             }
         });
