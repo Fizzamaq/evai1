@@ -49,34 +49,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Initialize variables for conversation creation
         $conversation_id = $_GET['conversation_id'] ?? null; // Get from URL for existing conversations
-        $event_id_for_creation = filter_var(($_POST['event_id_for_chat'] ?? null), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $vendor_id_for_creation = $_POST['vendor_id_for_chat'] ?? null;
 
-        // --- REMOVED: Vendor-to-vendor chat blocking check ---
-        /*
-        $sender_user_type = $_SESSION['user_type'] ?? null;
-        $recipient_user_type = null;
-
-        if ($vendor_id_for_creation) {
-            $recipient_user_data = $user->getUserById($vendor_id_for_creation);
-            if ($recipient_user_data) {
-                $recipient_user_type = $recipient_user_data['user_type_id'];
+        // Ensure event_id_for_creation is genuinely NULL if not provided or invalid
+        $event_id_for_creation = null; // Default to NULL
+        if (isset($_POST['event_id_for_chat']) && $_POST['event_id_for_chat'] !== '') {
+            $filtered_event_id = filter_var($_POST['event_id_for_chat'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($filtered_event_id !== false) {
+                $event_id_for_creation = $filtered_event_id;
             }
         }
-        
-        if ($sender_user_type == 2 && $recipient_user_type == 2) {
-            echo json_encode(['success' => false, 'error' => 'Vendor-to-vendor chat is not supported by the current system design.']);
-            exit();
-        }
-        */
-        // --- END REMOVED CHECK ---
 
+        $vendor_id_for_creation = $_POST['vendor_id_for_chat'] ?? null;
 
         // Logic to find/create conversation if vendor_id is passed without conversation_id
         if (!$conversation_id && $vendor_id_for_creation) {
             $conversation_id = $chat->startConversation($event_id_for_creation, $_SESSION['user_id'], $vendor_id_for_creation);
             if (!$conversation_id) {
-                error_log("Failed to start new conversation for user " . $_SESSION['user_id'] . " and vendor " . $vendor_id_for_creation);
+                error_log("Failed to start new conversation for user " . ($_SESSION['user_id'] ?? 'N/A') . " and vendor " . ($vendor_id_for_creation ?? 'N/A'));
                 echo json_encode(['success' => false, 'error' => 'Failed to create new conversation.']);
                 exit();
             }
@@ -106,7 +95,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['success' => false, 'error' => 'Conversation not identified after processing.']);
             exit();
         }
-    } else {
+    } elseif (isset($_POST['delete_chat'])) { // ADDED: Handle chat deletion request
+        $conversation_id_to_delete = $_POST['conversation_id'];
+        // Basic validation: ensure conversation_id is numeric and user is part of it.
+        if (!empty($conversation_id_to_delete) && is_numeric($conversation_id_to_delete)) {
+            if ($chat->markConversationAsArchived((int)$conversation_id_to_delete, $_SESSION['user_id'])) {
+                echo json_encode(['success' => true, 'message' => 'Chat archived successfully.', 'redirect' => BASE_URL . 'public/chat.php']);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Failed to archive chat.']);
+            }
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Invalid conversation ID for deletion.']);
+        }
+        exit();
+    }
+    else {
         // If other POST actions were sent to this file, handle or error out
         echo json_encode(['success' => false, 'error' => 'Invalid POST action.']);
         exit();
@@ -291,12 +294,12 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                     WHERE cc.id = ?
                     AND (cc.user_id = ? OR cc.vendor_id = ?)
                 ");
-                $params = [
-                    $_SESSION['user_id'],
-                    $_SESSION['user_id'],
+                $params = [ // 5 parameters for 5 placeholders
+                    $_SESSION['user_id'], // for first CASE
+                    $_SESSION['user_id'], // for second CASE
                     $conversation_id,
-                    $_SESSION['user_id'],
-                    $_SESSION['user_id']
+                    $_SESSION['user_id'], // for first OR
+                    $_SESSION['user_id']  // for second OR
                 ];
                 $stmt->execute($params);
                 $current_conversation_details = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -352,6 +355,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                                     <?php if ($conv['unread_count'] > 0): ?>
                                         <span class="unread-badge"><?php echo htmlspecialchars((string)$conv['unread_count']); ?></span>
                                     <?php endif; ?>
+                                    <span class="delete-chat-icon" data-conversation-id="<?= htmlspecialchars((string)$conv['id']) ?>" title="Delete Chat"><i class="fas fa-trash-alt"></i></span>
                                 </div>
                                 <div class="conversation-preview">
                                     <?php echo $last_message_preview; ?>
@@ -394,7 +398,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                         <?php foreach ($messages as $message):
                             $message_content_display = nl2br(htmlspecialchars((string)($message['message_content'] ?? '')));
                             $message_time_display = !empty($message['created_at']) ? date('g:i a', strtotime((string)$message['created_at'])) : 'N/A';
-                        ?>
+                            ?>
                             <div class="message <?php echo ($message['sender_id'] == $_SESSION['user_id']) ? 'message-outgoing' : 'message-incoming'; ?>" data-id="<?= htmlspecialchars((string)($message['id'])) ?>">
                                 <div class="message-content"><?php echo $message_content_display; ?></div>
                                 <span class="message-time">
@@ -458,6 +462,8 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
         const chatDismissButton = document.getElementById('chat-dismiss-error');
         const messageInput = document.getElementById('message-input');
         const messageForm = document.querySelector('.message-form');
+        // MODIFIED: Select all delete buttons in the sidebar
+        const deleteChatButtons = document.querySelectorAll('.delete-chat-sidebar-btn'); 
 
         let lastFailedMessage = ''; // Store the last message that failed to send
 
@@ -489,6 +495,40 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
         chatDismissButton?.addEventListener('click', function() {
             hideErrorMessage();
             lastFailedMessage = ''; // Clear stored message
+        });
+
+        // MODIFIED: Attach event listener to all delete buttons in the sidebar
+        deleteChatButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent the conversation item's click event from firing
+                const conversationIdToDelete = this.dataset.conversationId;
+                if (confirm('Are you sure you want to delete (archive) this chat? This action cannot be undone.')) {
+                    fetch('<?= BASE_URL ?>public/chat.php', {
+                        method: 'POST',
+                        body: new URLSearchParams({
+                            delete_chat: '1',
+                            conversation_id: conversationIdToDelete,
+                            csrf_token: '<?= htmlspecialchars((string)$csrf_token) ?>' // Include CSRF token
+                        }),
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            window.location.href = data.redirect || '<?= BASE_URL ?>public/chat.php'; // Redirect to clear page or chat list
+                        } else {
+                            alert(data.error || 'Failed to delete chat.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error deleting chat:', error);
+                        alert('An error occurred while trying to delete the chat.');
+                    });
+                }
+            });
         });
 
 
