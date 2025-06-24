@@ -52,6 +52,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $event_id_for_creation = filter_var(($_POST['event_id_for_chat'] ?? null), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $vendor_id_for_creation = $_POST['vendor_id_for_chat'] ?? null;
 
+        // --- REMOVED: Vendor-to-vendor chat blocking check ---
+        /*
+        $sender_user_type = $_SESSION['user_type'] ?? null;
+        $recipient_user_type = null;
+
+        if ($vendor_id_for_creation) {
+            $recipient_user_data = $user->getUserById($vendor_id_for_creation);
+            if ($recipient_user_data) {
+                $recipient_user_type = $recipient_user_data['user_type_id'];
+            }
+        }
+        
+        if ($sender_user_type == 2 && $recipient_user_type == 2) {
+            echo json_encode(['success' => false, 'error' => 'Vendor-to-vendor chat is not supported by the current system design.']);
+            exit();
+        }
+        */
+        // --- END REMOVED CHECK ---
+
+
         // Logic to find/create conversation if vendor_id is passed without conversation_id
         if (!$conversation_id && $vendor_id_for_creation) {
             $conversation_id = $chat->startConversation($event_id_for_creation, $_SESSION['user_id'], $vendor_id_for_creation);
@@ -384,6 +404,13 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
+                <div class="chat-error-container" id="chat-error-container" style="display: none;">
+                    <div class="chat-error-message" id="chat-error-message"></div>
+                    <div class="chat-error-actions">
+                        <button type="button" id="chat-retry-send" class="btn btn-sm btn-primary">Retry</button>
+                        <button type="button" id="chat-dismiss-error" class="btn btn-sm btn-secondary">Dismiss</button>
+                    </div>
+                </div>
                 <div class="chat-input">
                     <form class="message-form" method="POST">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token) ?>">
@@ -424,14 +451,58 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
             if (container) container.scrollTop = container.scrollHeight;
         }
 
+        // Elements for error display
+        const chatErrorContainer = document.getElementById('chat-error-container');
+        const chatErrorMessage = document.getElementById('chat-error-message');
+        const chatRetryButton = document.getElementById('chat-retry-send');
+        const chatDismissButton = document.getElementById('chat-dismiss-error');
+        const messageInput = document.getElementById('message-input');
+        const messageForm = document.querySelector('.message-form');
+
+        let lastFailedMessage = ''; // Store the last message that failed to send
+
+        function showErrorMessage(message) {
+            if (chatErrorContainer && chatErrorMessage) {
+                chatErrorMessage.textContent = message;
+                chatErrorContainer.style.display = 'flex'; // Use flex to center content
+                scrollToBottom(); // Keep the error in view
+            }
+        }
+
+        function hideErrorMessage() {
+            if (chatErrorContainer) {
+                chatErrorContainer.style.display = 'none';
+                chatErrorMessage.textContent = '';
+            }
+        }
+
+        // Event listener for retry button
+        chatRetryButton?.addEventListener('click', function() {
+            if (messageInput && lastFailedMessage) {
+                messageInput.value = lastFailedMessage; // Restore message to input
+                hideErrorMessage(); // Hide the error message
+                messageForm?.dispatchEvent(new Event('submit')); // Re-submit the form
+            }
+        });
+
+        // Event listener for dismiss button
+        chatDismissButton?.addEventListener('click', function() {
+            hideErrorMessage();
+            lastFailedMessage = ''; // Clear stored message
+        });
+
+
         // Send message with AJAX
-        document.querySelector('.message-form')?.addEventListener('submit', function(e) {
+        messageForm?.addEventListener('submit', function(e) {
             e.preventDefault();
+            hideErrorMessage(); // Hide any previous error when attempting to send
+            
             const form = this;
-            const messageInput = document.getElementById('message-input');
             const message = messageInput.value.trim();
 
             if (message) {
+                lastFailedMessage = message; // Store message in case of failure
+
                 let postUrl = '<?= BASE_URL ?>public/chat.php';
                 const currentConversationId = '<?php echo htmlspecialchars((string)($conversation_id ?? '')); ?>';
                 if (currentConversationId) {
@@ -442,7 +513,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                     method: 'POST',
                     body: new URLSearchParams(new FormData(form)),
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest' // Only need this if Content-Type is inferred
+                        'X-Requested-With': 'XMLHttpRequest'
                     }
                 }).then(response => {
                     const contentType = response.headers.get('content-type');
@@ -458,6 +529,8 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                 .then(data => {
                     if (data.success) {
                         messageInput.value = '';
+                        lastFailedMessage = ''; // Clear stored message on success
+
                         if (data.redirect_to_conversation) {
                             window.location.href = data.redirect_to_conversation;
                             return;
@@ -467,10 +540,9 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                         if (messagesContainer) {
                             const tempMsg = document.createElement('div');
                             tempMsg.className = 'message message-outgoing';
-                            // Use textContent for safety to prevent XSS if message content isn't fully sanitized on client-side
                             const contentDiv = document.createElement('div');
                             contentDiv.className = 'message-content';
-                            contentDiv.textContent = message;
+                            contentDiv.textContent = message; // Use textContent for safety
                             
                             const timeSpan = document.createElement('span');
                             timeSpan.className = 'message-time';
@@ -483,12 +555,12 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                         }
                     } else {
                         // Display the error message from the server's JSON response
-                        alert('Failed to send message: ' + (data.error || 'Unknown error.'));
+                        showErrorMessage(data.error || 'Unknown error occurred.');
                         console.error('Message send failed:', data.error);
                     }
                 }).catch(error => {
+                    showErrorMessage('Network error: ' + error.message + '. Please check your connection.');
                     console.error('Error sending message:', error);
-                    alert('An error occurred while sending your message. Please check the console for details.');
                 });
             }
         });
