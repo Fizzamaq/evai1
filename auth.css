@@ -2,7 +2,7 @@
 
 /* ADDED: Background image for login/register pages */
 body {
-    background-image: url('../images/hero2.jpg'); /* REPLACE with your desired image path */
+    background-image: url('../images/hero3.jpg'); /* REPLACE with your desired image path */
     background-size: cover; /* Ensures the image covers the entire background */
     background-position: center center; /* Centers the background image */
     background-repeat: no-repeat; /* Prevents the image from repeating */
