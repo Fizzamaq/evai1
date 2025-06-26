@@ -1,0 +1,91 @@
+/* assets/css/auth.css */
+
+/* ADDED: Background image for login/register pages */
+body {
+    background-image: url('../images/hero2.jpg'); /* REPLACE with your desired image path */
+    background-size: cover; /* Ensures the image covers the entire background */
+    background-position: center center; /* Centers the background image */
+    background-repeat: no-repeat; /* Prevents the image from repeating */
+    background-attachment: fixed; /* Makes the background image fixed while content scrolls */
+    background-color: var(--tertiary-color); /* Fallback background color if image fails to load */
+    position: relative; /* Crucial: Needed for the ::before pseudo-element to be positioned absolutely relative to body */
+    z-index: 0; /* Ensures body establishes a stacking context below header/main content */
+}
+
+/* ADDED: Overlay for the background image on auth pages */
+body::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4); /* Semi-transparent black overlay (adjust opacity 0.0-1.0 as needed) */
+    z-index: 1; /* Positions the overlay above the background image but below main content */
+}
+
+/* Apply flexbox to the main content area specifically for auth pages
+   to center its direct children (like .auth-container) */
+.main-content-area {
+    display: flex;
+    flex-direction: column; /* Ensures children stack vertically */
+    align-items: center;   /* Centers children horizontally within the flex container */
+    justify-content: center; /* Centers children vertically within the flex container */
+    flex-grow: 1;          /* Already present in style.css, but ensuring it grows */
+    min-height: 100%;      /* Ensures this main area takes up full height of its flex parent body */
+    padding: var(--spacing-md); /* Keep consistent padding */
+    position: relative; /* Crucial: Needed to ensure content appears above the body::before overlay */
+    z-index: 2; /* Positions main content above the overlay */
+}
+
+.auth-container {
+    max-width: 500px;
+    /* Remove explicit top/bottom margins as flexbox parent will handle vertical centering */
+    margin-top: 100px; /* Changed from 2rem auto */
+    padding: 2rem;
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-sizing: border-box; /* Include padding in width */
+    width: 100%; /* Ensures it respects max-width within flex context */
+    border: 1px solid var(--light-grey-border); /* Consistent border */
+    position: relative; /* Crucial: Ensures this container establishes its own stacking context */
+    z-index: 3; /* Positions auth-container above main-content-area if needed */
+}
+
+/* General styling for elements within auth-container */
+.auth-container h2 {
+    text-align: center;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-lg);
+}
+
+.auth-container p {
+    text-align: center;
+    color: var(--text-subtle);
+}
+
+.auth-container .alert {
+    margin-left: auto;
+    margin-right: auto;
+    width: 90%; /* Adjust width to not stretch full and maintain internal alignment */
+}
+
+.auth-container .form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.auth-container .btn.primary {
+    width: 100%;
+    margin-top: var(--spacing-md);
+}
+
+.auth-links {
+    text-align: center;
+    margin-top: var(--spacing-md);
+    font-size: 0.9em;
+}
+
+.auth-links a {
+    color: var(--primary-color);
+}
