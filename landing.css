@@ -2,60 +2,107 @@
 
 /* Hero Section */
 .hero {
-    background-image: url('../images/hero1.jpg');
+    /* Use a high-quality background image. You can change 'hero1.jpg' to your desired image. */
+    background-image: url('../images/hero1.jpg'); /* Default image for the hero background */
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    background-color: var(--primary-color);
+    background-color: var(--tertiary-color); /* Fallback dark background */
     
     color: var(--white);
-    padding: 100px 0;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-    min-height: 60vh;
+    height: 100vh; /* Make hero section fill the full viewport height */
     display: flex;
+    flex-direction: column; /* Changed to column to stack content correctly */
     align-items: center;
     justify-content: center;
+    position: relative;
+    overflow: hidden;
+
+    /* MODIFICATION: Make hero span full viewport width */
+    width: 100vw; /* Take 100% of the viewport width */
+    position: relative; /* Needed for 'left' and 'transform' to work relative to its normal flow position */
+    left: 50%;
+    transform: translateX(-50%); /* Centers the element visually while spanning 100vw */
 }
 
-.hero-content {
+/* Overlay for the hero background image */
+.hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5); /* Semi-transparent black overlay for text readability */
     z-index: 1;
+}
+
+/* Ensure hero-carousel covers the entire hero section */
+.hero-carousel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0; /* Behind the content and overlay */
+}
+
+/* Individual slides within the hero carousel (if multiple backgrounds are used) */
+.hero-carousel .swiper-slide {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    /* You would set individual background-image for each slide here if dynamic */
+    /* Example: background-image: url('../images/hero-slide2.jpg'); */
+}
+
+/* Content within the hero section (text, search bar, buttons) */
+.hero-content {
+    position: relative; /* Position relative to allow z-index to work against overlay */
+    z-index: 2; /* Above the overlay */
     max-width: 1000px;
     margin: 0 auto;
     padding: var(--spacing-md);
+    text-align: center;
+    display: flex; /* Added flex for internal layout of text/search/buttons */
+    flex-direction: column; /* Stack text, search, and buttons vertically */
+    align-items: center; /* Center items horizontally */
+    animation: fadeInScale 1s ease-out; /* Add animation for content */
 }
 
 .hero-content h1 {
-    font-size: 3.5em;
+    font-size: 5em; /* Much larger headline */
     margin-bottom: var(--spacing-md);
-    font-weight: 700;
-    line-height: 1.2;
+    font-weight: 800; /* Extra bold */
+    line-height: 1.1;
     color: var(--white);
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.6); /* Text shadow for readability */
 }
 
 .subtitle {
-    font-size: 1.5em;
-    max-width: 700px;
-    margin: 0 auto var(--spacing-xl);
-    opacity: 0.9;
+    font-size: 1.8em; /* Larger subtitle */
+    max-width: 800px; /* Wider subtitle */
+    margin: 0 auto var(--spacing-xl); /* More space below subtitle for search/buttons */
+    opacity: 0.95; /* Slightly less transparent */
     color: var(--white);
+    text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.5); /* Subtle text shadow */
 }
 
-/* Search Bar Styles */
+/* Search Bar Styles (Re-enabled and integrated) */
 .search-bar-container {
-    margin-bottom: var(--spacing-lg);
-    display: flex;
-    justify-content: center;
+    display: flex !important; /* Re-enable display */
+    margin-bottom: var(--spacing-lg); /* Space below search bar */
+    width: 100%; /* Take full width of hero-content */
+    justify-content: center; /* Center content within its width */
 }
 
 .search-form {
     display: flex;
     width: 100%;
-    max-width: 600px;
-    background-color: var(--white);
+    max-width: 600px; /* Max width for the search form */
+    background-color: rgba(255, 255, 255, 0.9); /* Slightly transparent white background */
     border-radius: 50px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2); /* More prominent shadow */
     overflow: hidden;
 }
 
@@ -93,11 +140,91 @@
     transform: translateX(2px);
 }
 
+/* CTA Buttons (Re-enabled and integrated) */
 .cta-buttons {
-    display: flex;
+    display: flex !important; /* Re-enable display */
     gap: var(--spacing-md);
     justify-content: center;
     flex-wrap: wrap;
+    margin-top: var(--spacing-md); /* Space above buttons */
+}
+
+
+/* Header Transparency and Stickiness */
+.main-header {
+    /* MODIFICATION: Position header absolutely to float over hero background */
+    position: absolute !important; /* Forces header out of normal flow */
+    top: 0;
+    left: 0;
+    width: 100%; /* Ensures header spans full width */
+    background: transparent !important; /* Transparent by default for landing page */
+    box-shadow: none !important; /* No shadow by default */
+    transition: background-color 0.4s ease, box-shadow 0.4s ease, padding 0.4s ease;
+    padding: 1.5rem 0 !important; /* More vertical padding for transparent state */
+    z-index: 1000; /* Ensure header is above all hero content */
+}
+
+.main-header.fixed-header {
+    position: fixed !important; /* Change to fixed when scrolled to stick to viewport */
+    background: var(--tertiary-color) !important; /* Solid black when fixed */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important; /* Add shadow when fixed */
+    padding: 0.6rem 0 !important; /* Smaller padding when fixed */
+}
+
+.main-header .main-nav a {
+    font-weight: 600; /* Slightly bolder nav links */
+}
+
+/* Features Section (General section styling from style.css should apply) */
+.section {
+    padding: var(--spacing-xl) 0;
+    background: var(--background-light);
+}
+
+.section.bg-light {
+    background: var(--background-light);
+}
+
+.section h2 {
+    text-align: center;
+    margin-bottom: var(--spacing-xl);
+    font-size: 2.5em;
+    color: var(--text-dark);
+}
+
+.section-title {
+    text-align: center;
+    margin-bottom: var(--spacing-xl);
+    font-size: 2.5em;
+    color: var(--text-dark);
+    padding-left: var(--spacing-md);
+    padding-right: var(--spacing-md);
+}
+
+/* Features Section (General section styling from style.css should apply) */
+.section {
+    padding: var(--spacing-xl) 0;
+    background: var(--background-light);
+}
+
+.section.bg-light {
+    background: var(--background-light);
+}
+
+.section h2 {
+    text-align: center;
+    margin-bottom: var(--spacing-xl);
+    font-size: 2.5em;
+    color: var(--text-dark);
+}
+
+.section-title {
+    text-align: center;
+    margin-bottom: var(--spacing-xl);
+    font-size: 2.5em;
+    color: var(--text-dark);
+    padding-left: var(--spacing-md);
+    padding-right: var(--spacing-md);
 }
 
 /* Features Section */
@@ -199,6 +326,7 @@
 
 /* Categories Section & Carousel */
 .categories-section {
+    width: 100vw; position: relative; left: 50%; transform: translateX(-50%);
     padding-top: 100px;
     padding-bottom: 100px;
     background: var(--background-light);
@@ -259,6 +387,10 @@
 
 /* Vendor Categories Sections (each category will have its own vendor carousel) */
 .vendor-category-section {
+    width: 100vw; /* Take 100% of the viewport width */
+    position: relative; /* Needed for 'left' and 'transform' to work relative to its normal flow position */
+    left: 50%;
+    transform: translateX(-50%); /* Centers the element visually while spanning 100vw */
     padding: var(--spacing-xl) 0;
     background: var(--background-light);
     border-top: 1px solid var(--border-color);
@@ -278,6 +410,11 @@
 
 /* Swiper container for Vendors */
 .swiper[class*="vendors-swiper-"] {
+
+    width: 100vw; /* Take 100% of the viewport width */
+    position: relative; /* Needed for 'left' and 'transform' to work relative to its normal flow position */
+    left: 50%;
+    transform: translateX(-50%); /* Centers the element visually while spanning 100vw */
     width: 100%;
     overflow: hidden;
     position: relative;
