@@ -404,8 +404,10 @@ input[type="radio"] {
     background: var(--tertiary-color); /* Black footer */
     color: var(--white);
     padding: 5px; /* Decreased vertical padding further */
-    height: 110px;
-    margin-top: var(--spacing-xl);
+    padding-bottom: 2px;
+    height: 140px;
+    margin-top: 150px;
+
     text-align: center;
 }
 
