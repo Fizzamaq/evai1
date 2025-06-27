@@ -150,30 +150,40 @@
 }
 
 
-/* Header Transparency and Stickiness */
+/* Header Transparency (Specific to Landing Page) */
 .main-header {
-    /* MODIFICATION: Position header absolutely to float over hero background */
+    /* MODIFIED START: Position header absolutely to float over hero background */
     position: absolute !important; /* Forces header out of normal flow */
     top: 0;
     left: 0;
     width: 100%; /* Ensures header spans full width */
-    background: transparent !important; /* Transparent by default for landing page */
+    background: transparent !important; /* Fully transparent by default for landing page */
     box-shadow: none !important; /* No shadow by default */
-    transition: background-color 0.4s ease, box-shadow 0.4s ease, padding 0.4s ease;
+    transition: background-color 0.4s ease, box-shadow 0.4s ease, padding 0.4s ease, border-radius 0.3s ease; /* Ensure border-radius transition */
     padding: 1.5rem 0 !important; /* More vertical padding for transparent state */
     z-index: 1000; /* Ensure header is above all hero content */
 }
 
+/* MODIFIED START: Header content color for transparent landing page header */
+.main-header .logo,
+.main-header .mobile-menu-icon,
+.main-header .main-nav a {
+    color: var(--white) !important; /* Force white color for content over hero */
+}
+.main-header .main-nav a.active::after {
+    background: var(--accent-color) !important; /* Ensure active underline is visible */
+}
+/* MODIFIED END */
+
+/* The .fixed-header styles will now primarily come from style.css for consistent dynamic island look */
 .main-header.fixed-header {
-    position: fixed !important; /* Change to fixed when scrolled to stick to viewport */
-    background: var(--tertiary-color) !important; /* Solid black when fixed */
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important; /* Add shadow when fixed */
-    padding: 0.6rem 0 !important; /* Smaller padding when fixed */
+    position: fixed !important; 
+    /* Allow global fixed-header style from style.css to take over background, blur, shadow, and shape */
+    /* Remove any specific conflicting styles here if necessary */
+    background: rgba(0, 0, 0, 0.30) !important; /* Ensure no residual background color */
+    box-shadow: rgba(0, 0, 0, 0.15) !important; /* Ensure no residual shadow */
 }
 
-.main-header .main-nav a {
-    font-weight: 600; /* Slightly bolder nav links */
-}
 
 /* Features Section (General section styling from style.css should apply) */
 .section {
@@ -228,31 +238,6 @@
 }
 
 /* Features Section */
-.section {
-    padding: var(--spacing-xl) 0;
-    background: var(--background-light);
-}
-
-.section.bg-light {
-    background: var(--background-light);
-}
-
-.section h2 {
-    text-align: center;
-    margin-bottom: var(--spacing-xl);
-    font-size: 2.5em;
-    color: var(--text-dark);
-}
-
-.section-title {
-    text-align: center;
-    margin-bottom: var(--spacing-xl);
-    font-size: 2.5em;
-    color: var(--text-dark);
-    padding-left: var(--spacing-md);
-    padding-right: var(--spacing-md);
-}
-
 .features-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -326,20 +311,26 @@
 
 /* Categories Section & Carousel */
 .categories-section {
-    width: 100vw; position: relative; left: 50%; transform: translateX(-50%);
     padding-top: 100px;
     padding-bottom: 100px;
     background: var(--background-light);
     width: 100%;
     overflow: hidden;
+
+    /* MODIFICATION START: Make categories-section span full viewport width */
+    width: 100vw; /* Take 100% of the viewport width */
+    position: relative; /* Needed for 'left' and 'transform' to work */
+    left: 50%;
+    transform: translateX(-50%); /* Centers the element visually */
+    /* MODIFICATION END */
 }
 
 .categories-swiper {
     display: flex;
     width: 100%;
     max-width: 100vw;
-    padding-bottom: 100px;
-    padding-top: 100px;
+    padding-bottom: 80px; /* Space for pagination dots */
+    padding-top: 30px; /* More space above cards */
     overflow: hidden;
     position: relative;
     box-sizing: border-box;
@@ -350,29 +341,28 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    padding-top: 50px;
-    padding-bottom: 50px;
+    padding: var(--spacing-md); /* Adjusted padding */
     background: var(--white);
-    border-radius: 12px;
-    margin-top: 30px;
-    margin-bottom: 80px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-    transition: transform 0.8s ease, box-shadow 0.3s ease;
+    border-radius: 12px; /* Consistent rounded corners */
+    margin-top: 0; /* No extra margin */
+    margin-bottom: 0; /* No extra margin */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08); /* Consistent shadow */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
     text-decoration: none;
-    height: 150px;
-    width: 200px;
+    height: 150px; /* Adjusted height */
+    width: 200px; /* Adjusted width */
 }
 
 .category-card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-8px); /* More prominent lift effect */
     box-shadow: 0 8px 20px rgba(0,0,0,0.15);
 }
 
 .category-icon {
     font-size: 3.5em;
-    margin-bottom: 20px;
+    margin-bottom: var(--spacing-md); /* More space below icon */
     color: var(--secondary-color);
-    transition: transform 0.8s ease;
+    transition: transform 0.3s ease;
 }
 
 .category-card:hover .category-icon {
@@ -396,21 +386,46 @@
     border-top: 1px solid var(--border-color);
 }
 
-.vendor-category-section:first-of-type {
-    border-top: none;
+/* NEW: Specific style for a dark background section */
+.vendor-category-section.dark-section {
+    background: var(--tertiary-color); /* Black/darker background */
+    color: var(--white); /* White text for contrast */
 }
 
-.vendor-category-section h2 {
-    text-align: left;
-    margin-bottom: var(--spacing-lg);
-    font-size: 2em;
-    color: var(--text-dark);
-    padding-left: var(--spacing-md);
+.vendor-category-section.dark-section h2,
+.vendor-category-section.dark-section .vendor-card-content h3,
+.vendor-category-section.dark-section .vendor-card-services {
+    color: var(--white); /* Ensure headings and service text are white in dark sections */
+}
+
+.vendor-category-section.dark-section .vendor-card-content p,
+.vendor-category-section.dark-section .vendor-card-rating span {
+    color: rgba(255, 255, 255, 0.7); /* Lighter subtle text for contrast */
+}
+
+/* Ensure vendor cards within a dark section still look good */
+.vendor-category-section.dark-section .vendor-card-item {
+    background: rgba(255, 255, 255, 0.1); /* Slightly transparent white card background */
+    border-color: rgba(255, 255, 255, 0.2); /* Lighter border for contrast */
+    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.05);
+}
+.vendor-category-section.dark-section .vendor-card-item:hover {
+    box-shadow: 0 8px 25px rgba(255, 255, 255, 0.1);
+}
+.vendor-category-section.dark-section .vendor-card-content h3 {
+    color: var(--accent-color); /* Accent color for titles in dark cards */
+}
+.vendor-category-section.dark-section .vendor-card-content p,
+.vendor-category-section.dark-section .vendor-card-services,
+.vendor-category-section.dark-section .vendor-card-rating span {
+    color: rgba(255, 255, 255, 0.8);
+}
+.vendor-category-section.dark-section .vendor-card-image {
+    border-bottom-color: rgba(255, 255, 255, 0.2);
 }
 
 /* Swiper container for Vendors */
 .swiper[class*="vendors-swiper-"] {
-
     width: 100vw; /* Take 100% of the viewport width */
     position: relative; /* Needed for 'left' and 'transform' to work relative to its normal flow position */
     left: 50%;
@@ -615,16 +630,18 @@
 /* Responsive adjustments for landing page */
 @media (max-width: 992px) {
     .hero-content h1 {
-        font-size: 3em;
+        font-size: 4em;
     }
     .subtitle {
-        font-size: 1.3em;
+        font-size: 1.5em;
     }
     .category-card {
-        width: 160px;
+        width: 180px;
+        height: 160px;
     }
     .vendor-card-item {
-        width: 280px;
+        width: 300px;
+        height: 400px;
     }
 }
 
@@ -633,47 +650,23 @@
         padding: 80px var(--spacing-sm);
     }
     .hero-content h1 {
-        font-size: 2.5em;
+        font-size: 3em;
     }
     .subtitle {
-        font-size: 1.1em;
+        font-size: 1.3em;
         margin-bottom: var(--spacing-lg);
     }
-    /* Search bar adjustments for smaller screens */
-    .search-form {
-        flex-direction: column;
-        border-radius: 12px;
-    }
-    .search-input {
-        border-radius: 8px;
-        padding: 12px 20px;
-        font-size: 1em;
-    }
-    .search-button {
-        border-radius: 8px;
-        margin-top: var(--spacing-sm);
-        padding: 12px 20px;
-        font-size: 1em;
-    }
-    .cta-buttons {
-        flex-direction: column;
-        gap: var(--spacing-sm);
-    }
-    .cta-buttons .btn {
-        width: 100%;
-    }
-    .section {
-        padding: var(--spacing-lg) 0;
-    }
+    /* Header handled by style.css media query for mobile nav toggle */
+
     .section h2 {
         font-size: 2em;
         margin-bottom: var(--spacing-lg);
     }
-    .features-grid, .steps {
+    .steps {
         grid-template-columns: 1fr;
         gap: var(--spacing-md);
     }
-    .feature-card, .step {
+    .step {
         max-width: 100%;
     }
     .categories-swiper,
@@ -686,13 +679,6 @@
     }
     .vendor-card-item {
         width: 250px;
-    }
-    .swiper-container-fade-overlay::before,
-    .swiper-container-fade-overlay::after {
-        width: 30px;
-    }
-    .swiper-pagination-bullets {
-        bottom: 0px !important;
     }
 
     .cta-bottom-section {
@@ -708,10 +694,10 @@
 
 @media (max-width: 480px) {
     .hero-content h1 {
-        font-size: 2em;
+        font-size: 2.5em;
     }
     .subtitle {
-        font-size: 1em;
+        font-size: 1.1em;
     }
     .section h2 {
         font-size: 1.8em;
@@ -725,9 +711,11 @@
         font-size: 1.8em;
     }
     .category-card {
-        width: 120px;
+        width: 100%;
+        height: 150px;
     }
     .vendor-card-item {
-        width: 220px;
+        width: 100%;
+        height: 380px;
     }
 }
