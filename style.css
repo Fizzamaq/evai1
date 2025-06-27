@@ -13,6 +13,8 @@
     --background-light: #F8F8FF; /* Ghost White - very light background */
     --white: #FFFFFF;
     --border-color: #DDA0DD; /* Plum - a subtle purple border */
+    --light-grey-border: #e0e0e0; /* Added for lighter borders */
+    --light-bg-hover: #f0f0f0; /* Added for subtle hover backgrounds */
 
     --success-color: #2ECC71; /* Emerald Green */
     --error-color: #E74C3C; /* Alizarin Red (stronger red for errors) */
@@ -30,8 +32,10 @@
     --spacing-xxl: 60px; /* Added for larger sections */
 }
 
-html { /* ADDED THIS RULE */
+html {
+    height: 100%; /* Make HTML element take full viewport height */
     overflow-x: hidden; /* Prevents horizontal scrolling from overflowing elements */
+    scroll-behavior: smooth; /* Smooth scrolling for anchor links */
 }
 
 body {
@@ -43,12 +47,16 @@ body {
     color: var(--text-dark);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 /* General container for content - wide and flexible */
 .container {
     width: 100%; /* Take full width initially */
-    max-width: 1400px; /* Increased max-width for wider content */
+    max-width: 1300px; /* Wider max-width for content, to feel more expansive */
     margin: 0 auto; /* Center the container */
     padding: var(--spacing-md); /* Add horizontal and vertical padding */
     box-sizing: border-box; /* Include padding in width calculation */
@@ -56,6 +64,7 @@ body {
 
 /* Main content area padding */
 .main-content-area {
+    flex-grow: 1; /* This makes the main content area grow and push the footer down */
     padding-top: var(--spacing-lg);
     padding-bottom: var(--spacing-lg);
 }
@@ -66,11 +75,13 @@ h1, h2, h3, h4, h5, h6 {
     margin-top: 0;
     margin-bottom: var(--spacing-md);
     font-weight: 700; /* Make headings bolder */
+    line-height: 1.2; /* Tighter line height for headings */
 }
 
 h1 { font-size: 2.8em; } /* Slightly larger */
 h2 { font-size: 2.2em; } /* Slightly larger */
 h3 { font-size: 1.7em; } /* Slightly larger */
+h4 { font-size: 1.3em; } /* Added for better hierarchy */
 
 p {
     margin-bottom: var(--spacing-sm);
@@ -126,7 +137,7 @@ a:hover {
 }
 
 .btn-secondary:hover {
-    background: #E6E6FA; /* Lavender - slightly darker light background */
+    background: var(--light-grey-border); /* Lighter grey hover */
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
@@ -165,6 +176,25 @@ a:hover {
     padding: 18px 36px;
     font-size: 1.2em;
     border-radius: 12px;
+}
+
+/* Link button variant (no background, looks like a link but clickable like a button) */
+.btn-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--primary-color);
+    text-decoration: underline;
+    box-shadow: none;
+}
+
+.btn-link:hover {
+    color: var(--secondary-color);
+    text-decoration: none;
+    transform: none;
+    box-shadow: none;
 }
 
 
@@ -247,11 +277,6 @@ a:hover {
     line-height: 1.8; /* Make optgroup labels taller */
 }
 
-.form-group select[multiple] optgroup:first-of-type {
-    margin-top: 0; /* No top margin for first group */
-}
-
-
 .form-group select[multiple] optgroup option {
     padding-left: 25px; /* Indent options within an optgroup */
     font-weight: normal; /* Reset font-weight for options */
@@ -288,7 +313,15 @@ input[type="checkbox"],
 input[type="radio"] {
     margin-right: 8px;
     transform: scale(1.2); /* Slightly larger checkboxes */
+    accent-color: var(--primary-color); /* Use accent color */
 }
+
+/* For specific featured checkbox styling */
+.featured-checkbox label {
+    font-weight: normal;
+    color: var(--text-dark);
+}
+
 
 /* --- Alerts --- */
 .alert {
@@ -299,6 +332,7 @@ input[type="radio"] {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
 .alert.success {
@@ -362,6 +396,13 @@ input[type="radio"] {
     padding: 5px 0; /* Add padding for better alignment */
 }
 
+.mobile-menu-icon {
+    display: none; /* Hidden by default for desktop */
+    font-size: 1.8rem;
+    color: var(--white);
+    cursor: pointer;
+}
+
 .main-nav {
     display: flex;
     flex-wrap: wrap;
@@ -404,10 +445,8 @@ input[type="radio"] {
     background: var(--tertiary-color); /* Black footer */
     color: var(--white);
     padding: 5px; /* Decreased vertical padding further */
-    padding-bottom: 2px;
-    height: 140px;
-    margin-top: 150px;
-
+    height: 110px;
+    margin-top: var(--spacing-xl);
     text-align: center;
 }
 
@@ -456,26 +495,39 @@ a:hover {
     }
 
     .main-header .container {
-        flex-direction: column;
-        align-items: flex-start;
+        flex-direction: row; /* Keep row for toggle */
+        justify-content: space-between;
+        align-items: center;
     }
 
-    .logo {
-        margin-bottom: var(--spacing-sm);
-        margin-right: 0;
+    .mobile-menu-icon {
+        display: block; /* Show toggle button */
     }
 
     .main-nav {
-        width: 100%;
-        margin-left: 0;
+        display: none; /* Hide nav by default on mobile */
         flex-direction: column;
-        gap: var(--spacing-xs);
-        text-align: center;
+        background: var(--tertiary-color);
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        padding: var(--spacing-sm) 0;
+        box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+        z-index: 999;
+    }
+
+    .main-nav.active {
+        display: flex; /* Show when active */
     }
 
     .main-nav a {
-        width: 100%;
-        padding: 10px 0;
+        padding: 10px var(--spacing-md); /* Pad links for mobile touch */
+        width: auto; /* Auto width */
+    }
+
+    .logo {
+        margin-bottom: 0; /* No bottom margin when toggle is visible */
     }
 
     .form-row {
