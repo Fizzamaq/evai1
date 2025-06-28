@@ -28,6 +28,14 @@ if (!$item_details) {
 // Fetch vendor profile data (to link back to the vendor's main profile)
 $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
 
+// ADDED: Fetch other portfolio items from the same vendor, EXCLUDING the current one
+$other_portfolio_items = [];
+if ($vendor_profile) {
+    // Pass the current portfolio_item_id to exclude it from the list
+    $other_portfolio_items = $vendor_obj->getVendorPortfolio($vendor_profile['id'], $portfolio_item_id);
+}
+
+// include 'header.php'; // Include header AFTER all PHP logic that might set session messages
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -429,6 +437,46 @@ $vendor_profile = $vendor_obj->getVendorProfileById($item_details['vendor_id']);
         <div class="back-link">
             <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_profile['id'] ?? '') ?>" class="btn btn-secondary">Back to <?= htmlspecialchars($vendor_profile['business_name'] ?? 'Vendor') ?>'s Profile</a>
         </div>
+
+        <?php // ADDED: Section for "More from this Vendor" ?>
+        <?php if (!empty($other_portfolio_items)): ?>
+            <div class="profile-section" style="margin-top: var(--spacing-xxl);">
+                <h2>More from <?= htmlspecialchars($vendor_profile['business_name']) ?></h2>
+                <div class="portfolio-grid">
+                    <?php foreach ($other_portfolio_items as $item): ?>
+                        <div class="portfolio-item-card">
+                            <a href="<?= BASE_URL ?>public/view_portfolio_item.php?id=<?= $item['id'] ?>" class="portfolio-item-link-area">
+                                <div class="portfolio-image-wrapper">
+                                    <?php if (!empty($item['main_image_url'])): ?>
+                                        <img src="<?= BASE_URL . htmlspecialchars($item['main_image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                                    <?php else: ?>
+                                        <div class="portfolio-placeholder">
+                                            <i class="fas fa-image"></i>
+                                            <span>No Image</span>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="portfolio-description-content">
+                                    <h3><?= htmlspecialchars($item['title']) ?></h3>
+                                    <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 150)) ?><?= (strlen($item['description'] ?? '') > 150 ? '...' : '') ?></p>
+                                    <?php if (!empty($item['project_charges'])): ?>
+                                        <p class="project-charges-summary">Charges: PKR <?= number_format($item['project_charges'], 0) ?></p>
+                                    <?php endif; ?>
+                                    <div class="portfolio-meta-info">
+                                        <?php if (!empty($item['event_type_name'])): ?>
+                                            <span><i class="fas fa-tag"></i> <?= htmlspecialchars($item['event_type_name']); ?></span>
+                                        <?php endif; ?>
+                                        <?php if (!empty($item['project_date'])): ?>
+                                            <span><i class="fas fa-calendar-alt"></i> <?= date('M Y', strtotime($item['project_date'])); ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
 
     <div class="lightbox-overlay" id="lightboxOverlay">
