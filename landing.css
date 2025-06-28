@@ -180,8 +180,8 @@
     position: fixed !important; 
     /* Allow global fixed-header style from style.css to take over background, blur, shadow, and shape */
     /* Remove any specific conflicting styles here if necessary */
-    background: rgba(0, 0, 0, 0.30) !important; /* Ensure no residual background color */
-    box-shadow: rgba(0, 0, 0, 0.15) !important; /* Ensure no residual shadow */
+    /*background: rgba(0, 0, 0, 0.30) !important;  Ensure no residual background color */
+    /*box-shadow: rgba(0, 0, 0, 0.15) !important;  Ensure no residual shadow */
 }
 
 
