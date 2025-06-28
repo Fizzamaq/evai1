@@ -3,7 +3,7 @@
 /* --- Customer Dashboard Container --- */
 .customer-dashboard-container {
     width: 100%;
-    max-width: 1200px;
+    max-width: 1200px; /* Wider for dashboards */
     margin: 0 auto;
     padding: var(--spacing-md);
     box-sizing: border-box;
@@ -17,13 +17,13 @@
     margin-bottom: var(--spacing-lg);
     padding-bottom: var(--spacing-md);
     border-bottom: 2px solid var(--border-color);
-    flex-wrap: wrap; /* Allow items to wrap */
+    flex-wrap: wrap;
 }
 
 .dashboard-header h1 {
     font-size: 2em;
     margin-bottom: var(--spacing-xs);
-    color: var(--primary-color); /* Changed from fixed color to primary variable */
+    color: var(--primary-color);
 
 }
 
@@ -33,18 +33,18 @@
 }
 
 .dashboard-header > div {
-    margin-bottom: var(--spacing-sm); /* Space when items wrap */
+    margin-bottom: var(--spacing-sm);
 }
 
 .dashboard-header .btn {
-    margin-left: var(--spacing-sm); /* Space between buttons */
+    margin-left: var(--spacing-sm);
 }
 
 /* --- Stats Grid (Customer & Vendor) --- */
 .customer-stats-grid,
 .vendor-stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); /* Slightly larger min-width for stats cards */
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-lg);
 }
@@ -53,33 +53,33 @@
     background: var(--white);
     padding: var(--spacing-md);
     border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); /* Enhanced shadow */
     text-align: center;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    border: 1px solid var(--border-color); /* Added subtle border */
+    border: 1px solid var(--light-grey-border); /* Consistent border */
 }
 
 .stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.12);
+    transform: translateY(-5px); /* More pronounced lift */
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); /* Enhanced shadow */
 }
 
 .metric-value {
-    font-size: 2.2em;
+    font-size: 2.5em; /* Larger metric values */
     font-weight: 700;
-    color: var(--primary-color); /* Use primary color for key metrics */
+    color: var(--primary-color);
     margin-bottom: var(--spacing-xs);
 }
 
 .metric-label {
     color: var(--text-subtle);
-    font-size: 0.95em;
+    font-size: 1em; /* Slightly larger label */
 }
 
 /* --- Dashboard Sections (Common to both customer and vendor) --- */
 .dashboard-sections {
     display: grid;
-    grid-template-columns: 1fr 1fr; /* Default two columns */
+    grid-template-columns: 1fr 1fr;
     gap: var(--spacing-lg);
 }
 
@@ -87,8 +87,8 @@
     background: var(--white);
     padding: var(--spacing-md);
     border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-    border: 1px solid var(--border-color); /* Added subtle border */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); /* Enhanced shadow */
+    border: 1px solid var(--light-grey-border); /* Consistent border */
 }
 
 .section-card h2 {
@@ -97,22 +97,22 @@
     border-bottom: 1px solid var(--border-color);
     padding-bottom: var(--spacing-sm);
     margin-bottom: var(--spacing-md);
-    display: flex; /* Make h2 a flex container */
-    justify-content: space-between; /* Space out title and button */
-    align-items: center; /* Vertically align items */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.section-card h2 .btn { /* Style for button inside h2 */
-    font-size: 0.7em; /* Smaller button font */
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);;
-    padding: 6px 12px;
-    border-radius: 6px;
+.section-card h2 .btn {
+    font-size: 0.75em; /* Adjusted smaller font */
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    padding: 8px 15px; /* Adjusted padding */
+    border-radius: 8px; /* More rounded */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Added shadow */
 }
-
 
 .list-item {
     padding: var(--spacing-sm) 0;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--light-grey-border); /* Consistent border */
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -126,7 +126,7 @@
 .list-item-title {
     font-weight: 600;
     color: var(--text-dark);
-    flex-basis: 100%; /* Take full width on wrap */
+    flex-basis: 100%;
 }
 
 .list-item-meta {
@@ -141,13 +141,13 @@
     font-size: 0.9em;
     padding: 5px 10px;
     border-radius: 5px;
-    background-color: rgba(102, 126, 234, 0.1); /* Light background for link button */
+    background-color: rgba(138, 43, 226, 0.1); /* Use primary color with opacity */
     color: var(--primary-color);
     font-weight: 500;
 }
 
 .list-item .btn-link:hover {
-    background-color: rgba(102, 126, 234, 0.2);
+    background-color: rgba(138, 43, 226, 0.2);
     text-decoration: none;
 }
 
@@ -161,7 +161,7 @@
 
 .vendor-header .rating {
     font-size: 1.1em;
-    color: var(--warning-color); /* Star color */
+    color: var(--warning-color);
     font-weight: 600;
 }
 
@@ -178,16 +178,17 @@
     background: var(--white);
     padding: var(--spacing-md);
     border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); /* Consistent shadow */
+    border: 1px solid var(--light-grey-border); /* Consistent border */
 }
 
 /* FullCalendar Custom Styles (from vendor.css, integrated here for dashboard context) */
-#availability-calendar { /* Specific ID for dashboard widget */
-    max-width: 100%; /* Ensure calendar fits its container */
+#availability-calendar {
+    max-width: 100%;
     margin: 0 auto;
-    padding: 0; /* Remove internal padding if container already has it */
-    box-shadow: none; /* Remove redundant shadow if parent has one */
-    background: transparent; /* Transparent background */
+    padding: 0;
+    box-shadow: none;
+    background: transparent;
 }
 
 .fc-event {
@@ -196,24 +197,24 @@
     border-radius: 4px;
     font-size: 0.9em;
     text-align: center;
-    border: 1px solid transparent; /* Default border */
-    color: var(--text-dark); /* Default text color */
+    border: 1px solid transparent;
+    color: var(--text-dark);
 }
 
 .fc-event-available {
-    background: #e6ffe6; /* Lighter green */
+    background: #e6ffe6;
     border-color: #a5d6a7;
     color: #1b5e20;
 }
 
 .fc-event-booked {
-    background: #ffe6e6; /* Lighter red */
+    background: #ffe6e6;
     border-color: #ef9a9a;
     color: #b71c1c;
 }
 
 .fc-event-blocked {
-    background: #f0f0f0; /* Light grey */
+    background: #f0f0f0;
     border-color: #bdbdbd;
     color: #424242;
 }
@@ -225,7 +226,8 @@
     padding: var(--spacing-md);
     background: var(--white);
     border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08); /* Consistent shadow */
+    border: 1px solid var(--light-grey-border); /* Consistent border */
 }
 
 .setting-item {
@@ -234,6 +236,7 @@
     background: var(--background-light);
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    border: 1px solid var(--light-grey-border); /* Consistent border */
 }
 
 .setting-key {
@@ -260,14 +263,14 @@
 
 .settings-container .btn-primary {
     margin-top: var(--spacing-md);
-    width: auto; /* Override full width button from global styles */
+    width: auto;
     padding: 12px 30px;
 }
 
 /* --- Responsive Adjustments (Dashboard Specific) --- */
 @media (max-width: 992px) {
     .dashboard-sections {
-        grid-template-columns: 1fr; /* Stack sections vertically on medium screens */
+        grid-template-columns: 1fr;
     }
 }
 
@@ -288,6 +291,6 @@
     }
     .customer-stats-grid,
     .vendor-stats {
-        grid-template-columns: 1fr; /* Stack stats cards on small screens */
+        grid-template-columns: 1fr;
     }
 }
