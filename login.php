@@ -1,6 +1,8 @@
 <?php
 require_once '../includes/config.php';
-include 'header.php';
+// REMOVED: The incorrect line that was trying to include CSS as PHP:
+// require_once '../assets/css/auth.css'; 
+include 'header.php'; // This file likely contains the correct <link> to auth.css
 
 if (isset($_SESSION['user_id'])) {
     header("Location: dashboard.php");
@@ -35,4 +37,5 @@ unset($_SESSION['login_error'], $_SESSION['registration_success']);
     </form>
     <p>Don't have an account? <a href="register.php">Register here</a></p>
 </div>
+
 <?php include 'footer.php'; ?>
