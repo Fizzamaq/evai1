@@ -27,71 +27,80 @@ document.addEventListener('DOMContentLoaded', function() {
     const mainHeader = document.querySelector('.main-header');
     const heroSection = document.getElementById('hero-section'); // Only exists on index.php
 
-    // MODIFIED START: Function to check if the page is long enough to warrant the fixed header
+    // Function to check if the page is long enough to warrant the fixed header
     function isPageLongEnough() {
-        // Compare the total scrollable height to the viewport height.
-        // If content height is less than (e.g., 120%) of viewport height, it's a "short" page.
         const contentHeight = document.body.scrollHeight;
         const viewportHeight = window.innerHeight;
-        return contentHeight > (viewportHeight * 1.2); // Page is "long enough" if content is > 120% of viewport
+        const result = contentHeight > (viewportHeight * 1.2); 
+        console.log('isPageLongEnough: contentHeight=', contentHeight, 'viewportHeight=', viewportHeight, 'Result:', result);
+        return result;
     }
-    // MODIFIED END
 
     if (mainHeader) {
-        // Determine scroll threshold dynamically based on hero section height if on landing page
-        // If the page is short, fixedHeader should never be applied.
-        const scrollThreshold = heroSection ? (heroSection.offsetHeight * 0.8) : 50; // 80% of hero height, or 50px for other pages
+        // Determine scroll threshold dynamically:
+        // - For index.php: 80% of hero section height.
+        // - For other pages: A fixed small threshold like 50px.
+        const scrollThreshold = heroSection ? (heroSection.offsetHeight * 0.8) : 50; 
+        console.log('Initial scrollThreshold:', scrollThreshold, 'Hero Height:', heroSection ? heroSection.offsetHeight : 'N/A');
 
-        // Initial state check on load and on resize
-        checkAndToggleHeader(); 
-        window.addEventListener('resize', checkAndToggleHeader); // Re-check on window resize
+        // Initial state check and attach/detach scroll listener
+        // This function runs on DOMContentLoaded and window resize
+        // It decides if the page is long enough for the fixed header effect
+        function setupHeaderScroll() {
+            if (!isPageLongEnough()) {
+                // If the page is short, ensure header is in its default (non-fixed) state
+                mainHeader.classList.remove('fixed-header');
+                // On landing page (index.php), ensure it is transparent if it's a short page
+                if (heroSection) { 
+                    mainHeader.classList.add('main-header-transparent'); // Keep transparent for short landing
+                    console.log('setupHeaderScroll: Page is short, removing fixed-header, adding main-header-transparent (if index.php).');
+                } else {
+                    // For short non-index pages, ensure it's default blurry black
+                    // This is handled by style.css default .main-header rule
+                    console.log('setupHeaderScroll: Non-index page, short, ensuring default header.');
+                }
 
-        window.addEventListener('scroll', function() {
-            toggleHeaderFixedState(scrollThreshold);
-        });
-    }
-
-    // MODIFIED START: New wrapper function to manage header state for short pages
-    function checkAndToggleHeader() {
-        if (!isPageLongEnough()) {
-            // If the page is short, ensure header is in its default (non-fixed) state
-            mainHeader.classList.remove('fixed-header');
-            // Ensure no transparency on static header for short pages
-            if (mainHeader.classList.contains('main-header-transparent')) {
-                 mainHeader.classList.remove('main-header-transparent'); // This will be used in landing.css
+                // Remove the scroll listener as it's not needed for short pages
+                window.removeEventListener('scroll', currentScrollHandler); // REMOVED previous listener
+            } else {
+                // If page is long, apply scroll logic
+                toggleHeaderFixedState(scrollThreshold); // Run initial check for long pages
+                // MODIFIED: Attach listener correctly to pass the numeric threshold
+                window.addEventListener('scroll', currentScrollHandler); // Use the named handler
+                console.log('setupHeaderScroll: Page is long, scroll listener added.');
             }
-            // Ensure content colors are default (white text on blurry black) for short pages
-            mainHeader.style.setProperty('color', 'var(--white)', 'important');
-            mainHeader.querySelector('.logo').style.setProperty('color', 'var(--white)', 'important');
-            mainHeader.querySelector('.mobile-menu-icon').style.setProperty('color', 'var(--white)', 'important');
-            mainHeader.querySelectorAll('.main-nav a').forEach(link => link.style.setProperty('color', 'var(--white)', 'important'));
-
-            // Remove the scroll listener as it's not needed for short pages
-            window.removeEventListener('scroll', toggleHeaderFixedState);
-        } else {
-            // If page is long, apply scroll logic
-            toggleHeaderFixedState(scrollThreshold); // Run initial check for long pages
-            window.addEventListener('scroll', toggleHeaderFixedState); // Add scroll listener
-        }
-    }
-    // MODIFIED END
-
-    function toggleHeaderFixedState(scrollThreshold) {
-        const currentScroll = window.scrollY || document.documentElement.scrollTop;
-
-        // Only apply fixed header if page is long enough
-        if (!isPageLongEnough()) { // Double-check inside scroll function
-             mainHeader.classList.remove('fixed-header');
-             return; // Exit if page is short
         }
 
-        if (currentScroll > scrollThreshold) {
-            mainHeader.classList.add('fixed-header'); // This class applies the "dynamic island" style
-        } else {
-            mainHeader.classList.remove('fixed-header'); // Returns to default style (e.g., transparent on landing, blurry black on others)
+        // MODIFIED: Create a named function for the scroll handler to ensure correct threshold is always passed
+        const currentScrollHandler = () => toggleHeaderFixedState(scrollThreshold);
+
+        setupHeaderScroll(); // Run initially
+        window.addEventListener('resize', setupHeaderScroll); // Re-run on window resize
+
+        // Function that manages the header's fixed state based on scroll
+        function toggleHeaderFixedState(currentScrollThreshold) {
+            const currentScroll = window.scrollY || document.documentElement.scrollTop;
+            console.log('toggleHeaderFixedState: currentScroll=', currentScroll, 'threshold=', currentScrollThreshold);
+
+            if (currentScroll > currentScrollThreshold) {
+                mainHeader.classList.add('fixed-header'); // Applies the "dynamic island" style
+                console.log('toggleHeaderFixedState: Scrolled past threshold, adding fixed-header.');
+            } else {
+                mainHeader.classList.remove('fixed-header'); // Returns to default style
+                console.log('toggleHeaderFixedState: Scrolled before threshold, removing fixed-header.');
+            }
+            
+            // On index.php, manage the transparent class based on scrollThreshold
+            if (heroSection) { // Only applies to the landing page
+                if (currentScroll <= currentScrollThreshold) {
+                    mainHeader.classList.add('main-header-transparent'); // Keep transparent while over hero
+                    console.log('toggleHeaderFixedState (index.php): Adding main-header-transparent.');
+                } else {
+                    mainHeader.classList.remove('main-header-transparent'); // Remove transparency when scrolled past hero
+                    console.log('toggleHeaderFixedState (index.php): Removing main-header-transparent.');
+                }
+            }
         }
-        
-        // Removed: 'scrolled-down' class logic as header should always be visible once fixed
     }
 
     // --- Mobile Menu Toggle ---
