@@ -17,16 +17,17 @@ class User {
         $this->pdo->beginTransaction();
         try {
             // Insert user
+            // Set is_active = 0 and email_verified = 0 initially for verification
             $stmt = $this->pdo->prepare("INSERT INTO users 
-                                        (user_type_id, email, password_hash, first_name, last_name, is_active) 
-                                        VALUES (?, ?, ?, ?, ?, 0)"); // is_active = 0 initially
+                                        (user_type_id, email, password_hash, first_name, last_name, is_active, email_verified) 
+                                        VALUES (?, ?, ?, ?, ?, 0, 0)"); 
             $stmt->execute([$userTypeId, $email, $hashedPassword, $firstName, $lastName]);
             $userId = $this->pdo->lastInsertId();
 
             // Create profile
             $this->initUserProfile($userId);
 
-            // --- NEW: Send verification email ---
+            // Send verification email
             $token = bin2hex(random_bytes(32));
             $expires = date('Y-m-d H:i:s', strtotime('+24 hours')); // Verification link valid for 24 hours
             $stmt_token = $this->pdo->prepare("INSERT INTO email_verifications (user_id, token, expires_at) VALUES (?, ?, ?)");
@@ -54,14 +55,17 @@ class User {
 
     public function login($email, $password) {
         try {
-            $stmt = $this->pdo->prepare("SELECT id, password_hash, user_type_id, first_name, email, email_verified FROM users WHERE email = ? AND is_active = 1");
+            $stmt = $this->pdo->prepare("SELECT id, password_hash, user_type_id, first_name, email, email_verified, is_active FROM users WHERE email = ?"); // Added is_active to select
             $stmt->execute([$email]);
             $user = $stmt->fetch();
 
             if ($user && password_verify($password, $user['password_hash'])) {
                 if (!$user['email_verified']) {
                     // Check if email is verified
-                    throw new Exception("Your email address is not verified. Please check your inbox.");
+                    throw new Exception("Your email address is not verified. Please check your inbox for the verification link.");
+                }
+                if (!$user['is_active']) { // Check if user is active (could be inactive by admin or other reasons)
+                    throw new Exception("Your account is not active. Please contact support.");
                 }
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_type'] = $user['user_type_id'];
@@ -73,9 +77,61 @@ class User {
             return false;
         } catch (PDOException $e) {
             error_log("Login error: " . $e->getMessage());
+            // Re-throw exception if it's a critical database error, otherwise return false
             return false;
+        } catch (Exception $e) {
+            // Catch custom exceptions like "email not verified" and re-throw them
+            // so login.php can display them.
+            throw $e;
         }
     }
+
+    /**
+     * Verifies a user's email address using a token.
+     * Activates the user and deletes the token upon successful verification.
+     * @param string $token The verification token.
+     * @return bool True on successful verification, false otherwise.
+     */
+    public function verifyEmail($token) {
+        $this->pdo->beginTransaction();
+        try {
+            // Find the token and associated user
+            $stmt = $this->pdo->prepare("SELECT user_id, expires_at FROM email_verifications WHERE token = ?");
+            $stmt->execute([$token]);
+            $verification_record = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$verification_record) {
+                throw new Exception("Invalid verification token.");
+            }
+
+            // Check if the token has expired
+            if (strtotime($verification_record['expires_at']) < time()) {
+                // Delete expired token
+                $this->pdo->prepare("DELETE FROM email_verifications WHERE token = ?")->execute([$token]);
+                throw new Exception("Verification token has expired. Please request a new one.");
+            }
+
+            // Mark user's email as verified and account as active
+            $stmt_user_update = $this->pdo->prepare("UPDATE users SET email_verified = 1, is_active = 1 WHERE id = ?");
+            $stmt_user_update->execute([$verification_record['user_id']]);
+
+            // Delete the used token
+            $stmt_token_delete = $this->pdo->prepare("DELETE FROM email_verifications WHERE token = ?");
+            $stmt_token_delete->execute([$token]);
+
+            $this->pdo->commit();
+            return true;
+        } catch (PDOException $e) {
+            $this->pdo->rollBack();
+            error_log("Email verification PDO error: " . $e->getMessage());
+            return false;
+        } catch (Exception $e) {
+            $this->pdo->rollBack();
+            error_log("Email verification error: " . $e->getMessage());
+            throw $e; // Re-throw to handle specific messages in verify_email.php
+        }
+    }
+
 
     private function initUserProfile($userId) {
         try {
