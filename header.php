@@ -9,10 +9,23 @@
     <title>EventCraftAI</title>
     <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/style.css">
     <?php
-    // Dynamically load page-specific CSS if it exists
-    $page_css_file = basename($_SERVER['PHP_SELF'], '.php') . '.css';
-    if (file_exists("../assets/css/" . $page_css_file)): ?>
-        <link rel="stylesheet" href="../assets/css/<?= htmlspecialchars($page_css_file) ?>">
+    // MODIFIED: Dynamically load page-specific CSS, specifically handling auth pages
+    $current_page = basename($_SERVER['PHP_SELF'], '.php');
+    $page_css_to_load = null;
+
+    // Check if the current page is one of the authentication pages
+    if (in_array($current_page, ['login', 'register', 'forgot_password', 'reset_password'])) {
+        $page_css_to_load = 'auth.css'; // Always load auth.css for these pages
+    } else {
+        // For other pages, use the existing dynamic loading logic
+        $dynamic_css_file_name = $current_page . '.css';
+        if (file_exists("../assets/css/" . $dynamic_css_file_name)) {
+            $page_css_to_load = $dynamic_css_file_name;
+        }
+    }
+
+    if ($page_css_to_load): ?>
+        <link rel="stylesheet" href="../assets/css/<?= htmlspecialchars($page_css_to_load) ?>">
     <?php endif; ?>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -21,7 +34,7 @@
     <header class="main-header">
         <div class="container">
             <a href="<?= BASE_URL ?>public/index.php" class="logo">EventCraftAI</a>
-            
+
             <div id="mobile-menu-toggle" class="mobile-menu-icon">
                 <i class="fas fa-bars"></i>
             </div>
@@ -46,6 +59,7 @@
                         <a href="<?= BASE_URL ?>public/ai_chat.php">AI Assistant</a>
                         <a href="<?= BASE_URL ?>public/chat.php">Messages</a>
                     <?php elseif ($user_type == 2): // Vendor specific links ?>
+                        <a href="<?= BASE_URL ?>public/vendor_portfolio.php">Portfolio</a>
                         <a href="<?= BASE_URL ?>public/vendor_chat.php">Messages</a>
                     <?php endif; ?>
                     <a href="<?= BASE_URL ?>public/profile.php">Profile</a>
