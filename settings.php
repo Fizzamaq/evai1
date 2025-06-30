@@ -1,13 +1,14 @@
-<?php
+h<?php
+// public/admin/settings.php
 session_start();
-require_once '../../includes/config.php';
-require_once '../../classes/User.class.php';
-require_once '../../classes/SystemSettings.class.php'; // Include SystemSettings class
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../classes/User.class.php';
+require_once __DIR__ . '/../../classes/SystemSettings.class.php';
 
-$user = new User($pdo); // Pass PDO
-$settings = new SystemSettings($pdo); // Pass PDO
+$user = new User($pdo);
+$settings = new SystemSettings($pdo);
 
-if (!$user->isAdmin($_SESSION['user_id'] ?? null)) { // Check if user is admin
+if (!$user->isAdmin($_SESSION['user_id'] ?? null)) {
     header('Location: ' . BASE_URL . 'public/login.php');
     exit();
 }
@@ -15,17 +16,18 @@ if (!$user->isAdmin($_SESSION['user_id'] ?? null)) { // Check if user is admin
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach ($_POST['settings'] as $key => $value) {
-        // Sanitize and validate input before updating settings
-        $sanitizedValue = htmlspecialchars($value); // Basic sanitization
+        $sanitizedValue = htmlspecialchars($value);
         $settings->updateSetting($key, $sanitizedValue);
     }
-    $_SESSION['success'] = "Settings updated successfully!";
-    header('Location: ' . BASE_URL . 'admin/settings.php');
+    $_SESSION['success_message'] = "Settings updated successfully!"; // Use 'success_message' for consistency
+    header('Location: ' . BASE_URL . 'public/admin/settings.php'); // Redirect back to this page
     exit();
 }
 
 // Get all system settings
 $system_settings = $settings->getAllSettings();
+
+include '../../includes/admin_header.php'; // Corrected path
 ?>
 
 <!DOCTYPE html>
@@ -33,60 +35,21 @@ $system_settings = $settings->getAllSettings();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Settings - EventCraftAI</title>
-    <link rel="stylesheet" href="../../assets/css/style.css">
-    <style>
-        .settings-container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .setting-item {
-            margin-bottom: 25px;
-            padding: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .setting-key {
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #2d3436;
-        }
-
-        .setting-description {
-            color: #636e72;
-            font-size: 0.9em;
-            margin-bottom: 15px;
-        }
-
-        .setting-input {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #e1e5e9;
-            border-radius: 6px;
-        }
-
-        .alert {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-    </style>
+    <title>Admin System Settings - EventCraftAI</title>
+    <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/style.css">
+    <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/admin.css"> <!-- Admin specific CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-    <?php include '../includes/admin_header.php'; ?>
 
-    <div class="settings-container">
+    <div class="admin-container">
         <h1>System Settings</h1>
 
-        <?php if (isset($_SESSION['success'])): ?>
-            <div class="alert"><?= htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?></div>
+        <?php if (isset($_SESSION['success_message'])): ?>
+            <div class="alert success"><?= htmlspecialchars($_SESSION['success_message']); unset($_SESSION['success_message']); ?></div>
+        <?php endif; ?>
+        <?php if (isset($_SESSION['error_message'])): // Add error message display if needed ?>
+            <div class="alert error"><?= htmlspecialchars($_SESSION['error_message']); unset($_SESSION['error_message']); ?></div>
         <?php endif; ?>
 
         <form method="POST">
@@ -98,7 +61,7 @@ $system_settings = $settings->getAllSettings();
                     <?php if ($setting['data_type'] === 'boolean'): ?>
                         <label>
                             <input type="checkbox" name="settings[<?php echo htmlspecialchars($setting['setting_key']); ?>]"
-                                value="1" <?php echo $setting['setting_value'] ? 'checked' : ''; ?>>
+                                value="1" <?php echo ($setting['setting_value'] == '1') ? 'checked' : ''; ?>> <!-- Ensure comparison for boolean -->
                             Enable
                         </label>
                     <?php elseif ($setting['data_type'] === 'json'): ?>
@@ -115,5 +78,7 @@ $system_settings = $settings->getAllSettings();
             <button type="submit" class="btn btn-primary">Save All Changes</button>
         </form>
     </div>
+
+    <?php include 'admin_footer.php'; ?>
 </body>
 </html>
