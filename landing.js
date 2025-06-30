@@ -1,34 +1,43 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Smooth scrolling for anchor links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.querySelector(this.getAttribute('href')).scrollIntoView({
-                behavior: 'smooth'
-            });
-        });
-    });
+    // Removed: Smooth scrolling for anchor links - now handled by main.js
+    // Removed: Header fixed on scroll logic - now handled by main.js
 
-    // Add fixed header on scroll (existing logic)
-    const header = document.querySelector('.main-nav');
-    const hero = document.querySelector('.hero');
-    
-    if (header && hero) {
-        const heroHeight = hero.offsetHeight;
-        
-        window.addEventListener('scroll', function() {
-            if (window.scrollY > heroHeight * 0.8) {
-                header.classList.add('fixed-header');
-            } else {
-                header.classList.remove('fixed-header');
+
+    // Initialize Swiper for the Hero Carousel Background
+    new Swiper('.hero-carousel', {
+        loop: true, // Infinite loop
+        autoplay: {
+            delay: 5000, // 5 seconds between slides
+            disableOnInteraction: false, // Continue autoplay after user interaction
+        },
+        speed: 1000, // Transition speed
+        effect: 'fade', // Smooth fade effect
+        fadeEffect: {
+            crossFade: true,
+        },
+        // Navigation (Arrows) and Pagination (Dots) are optional and can be uncommented here if visible in HTML
+        // navigation: {
+        //     nextEl: '.swiper-button-next',
+        //     prevEl: '.swiper-button-prev',
+        // },
+        // pagination: {
+        //     el: '.swiper-pagination',
+        //     clickable: true,
+        // },
+        on: {
+            init: function () {
+                // Initial background image setup if needed (hero background is mostly CSS now)
+            },
+            slideChangeTransitionEnd: function () {
+                // Logic for dynamic background images per slide if you choose to implement
             }
-        });
-    }
+        }
+    });
 
     // Initialize Swiper for Categories
     const categoriesSwiper = new Swiper('.categories-swiper', {
         slidesPerView: 'auto', // Adjust based on card width
-        spaceBetween: 20, // Space between slides
+        spaceBetween: 15, // Reduced space between category cards
         loop: true, // Infinite loop
         centeredSlides: false, // Keep slides left-aligned
         grabCursor: true, // Makes it visually clear the carousel is draggable
@@ -40,28 +49,23 @@ document.addEventListener('DOMContentLoaded', function() {
             el: '.categories-pagination',
             clickable: true,
         },
-        // Navigation (Arrows) are hidden via CSS
-        // Responsive breakpoints
+        // Responsive breakpoints for categories
         breakpoints: {
-            // when window width is >= 320px
             320: {
                 slidesPerView: 2,
-                spaceBetween: 10
+                spaceBetween: 8
             },
-            // when window width is >= 480px
             480: {
                 slidesPerView: 3,
-                spaceBetween: 20
+                spaceBetween: 10
             },
-            // when window width is >= 768px
             768: {
                 slidesPerView: 4,
-                spaceBetween: 20
+                spaceBetween: 15
             },
-            // when window width is >= 1024px
             1024: {
                 slidesPerView: 5,
-                spaceBetween: 30
+                spaceBetween: 20
             }
         }
     });
@@ -82,24 +86,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (categoryId) {
             new Swiper(swiperContainer, {
-                slidesPerView: 'auto', // Adjust based on card width
-                spaceBetween: 20, // Space between slides
-                loop: true, // Infinite loop
-                centeredSlides: false, // Keep slides left-aligned
-                grabCursor: true, // Makes it visually clear the carousel is draggable
+                slidesPerView: 'auto',
+                spaceBetween: 20, // Space between vendor cards
+                loop: true,
+                centeredSlides: false,
+                grabCursor: true,
                 autoplay: {
-                    delay: 4000, // Autoplay delay in ms (slightly different from categories)
+                    delay: 4000,
                     disableOnInteraction: false,
                 },
                 pagination: {
                     el: `.vendors-pagination-${categoryId}`,
                     clickable: true,
                 },
-                // Navigation (Arrows) are hidden via CSS
-                // Responsive breakpoints
+                // Responsive breakpoints for vendor carousels
                 breakpoints: {
                     320: {
-                        slidesPerView: 1.2, // Show more than 1 for swiping feel
+                        slidesPerView: 1.2,
                         spaceBetween: 10
                     },
                     480: {
@@ -118,4 +121,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    // Removed: Smooth scrolling for anchor links - now handled by main.js
 });
