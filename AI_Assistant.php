@@ -40,7 +40,7 @@ class AI_Assistant {
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HTTPHEADER => [
-                    'Content-Type': 'application/json',
+                    'Content-Type: application/json',
                     'Authorization: Bearer ' . $this->apiKey
                 ],
                 CURLOPT_POST => true,
@@ -214,7 +214,8 @@ class AI_Assistant {
                     vp.id, vp.business_name, vp.website, vp.rating, vp.total_reviews, 
                     vp.business_address, vp.business_city, vp.business_state, vp.business_country,
                     vp.service_radius,
-                    ST_X(vp.business_location) AS business_lat, ST_Y(vp.business_location) AS business_lng,
+                    ST_X(vp.business_location) AS business_lng, 
+                    ST_Y(vp.business_location) AS business_lat,
                     GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR '; ') AS offered_services_names,
                     AVG(vso.price_range_min) AS avg_min_price,
                     AVG(vso.price_range_max) AS avg_max_price,
@@ -258,7 +259,7 @@ class AI_Assistant {
     /**
      * Get vendor recommendations based on form data (new implementation).
      * This method directly uses the provided event details from the form input.
-     * @param array $eventData An associative array with event details.
+     * @param array $eventData An associative array with event details including event_type_id, budget_min, budget_max, event_date, location_string, service_ids.
      * @return array
      */
     public function getVendorRecommendationsFromForm(array $eventData) {
@@ -390,7 +391,7 @@ class AI_Assistant {
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HTTPHEADER => [
-                    'Content-Type': 'application/json',
+                    'Content-Type: application/json',
                     'Authorization: Bearer ' . $this->apiKey
                 ],
                 CURLOPT_POST => true,
@@ -464,7 +465,7 @@ class AI_Assistant {
         $avgPrice = (($vendor['avg_min_price'] ?? 0) + ($vendor['avg_max_price'] ?? 0)) / 2;
         $eventBudget = (($event['budget_min'] ?? 0) + ($event['budget_max'] ?? 0)) / 2;
 
-        if ($eventBudget == 0 || ($budgetMin == 0 && $budgetMax == 0)) return 0.5; // Neutral if event budget is TBD
+        if ($eventBudget == 0 || ($event['budget_min'] == 0 && $event['budget_max'] == 0)) return 0.5; // Neutral if event budget is TBD
 
         // If vendor price is within or below event budget
         if ($avgPrice >= ($event['budget_min'] ?? 0) && $avgPrice <= ($event['budget_max'] ?? PHP_FLOAT_MAX)) return 1; // Within budget
