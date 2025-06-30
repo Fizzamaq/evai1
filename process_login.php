@@ -53,12 +53,13 @@ try {
         header("Location: " . $redirect_url);
         exit();
     } else {
-        $_SESSION['login_error'] = "Invalid email or password";
+        $_SESSION['login_error'] = "Invalid email or password"; // Generic error for security
         header("Location: login.php");
         exit();
     }
 } catch (Exception $e) {
-    $_SESSION['login_error'] = "Login failed. Please try again.";
+    // Catch the specific exceptions thrown by the login method
+    $_SESSION['login_error'] = $e->getMessage();
     header("Location: login.php");
     exit();
 }
