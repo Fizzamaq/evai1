@@ -1,12 +1,13 @@
 <?php
+session_start();
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';     // Include User class
 require_once '../classes/Vendor.class.php';   // Include Vendor class for vendor profile
-require_once '../classes/UploadHandler.class.php'; // Include UploadHandler for portfolio image uploads
+require_once '../classes/UploadHandler.class.php'; // Include UploadHandler for displaying images, not for handling upload directly in this file
 include 'header.php';
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: " . BASE_URL . "public/login.php");
+    header('Location: ' . BASE_URL . 'public/login.php');
     exit();
 }
 
@@ -18,6 +19,7 @@ $vendor_data = null;
 $vendor_categories = [];
 $vendor_services_by_category = [];
 $selected_vendor_services = []; // Array to hold service IDs the vendor already offers
+$selected_vendor_services_with_prices = []; // New: To store selected service IDs with their min/max prices
 
 if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 2 is vendor type
     $is_vendor = true;
@@ -40,10 +42,16 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
         $vendor_services_by_category[$service['category_name']][] = $service;
     }
 
-    // Fetch services already offered by this vendor
+    // Fetch services already offered by this vendor with their prices
     if ($vendor_data) {
         $current_offerings = $vendor->getVendorServices($vendor_data['id']);
-        $selected_vendor_services = array_column($current_offerings, 'service_id');
+        foreach ($current_offerings as $offering) {
+            $selected_vendor_services[] = $offering['service_id'];
+            $selected_vendor_services_with_prices[$offering['service_id']] = [
+                'min_price' => $offering['price_range_min'],
+                'max_price' => $offering['price_range_max']
+            ];
+        }
     }
 }
 
@@ -203,21 +211,46 @@ unset($_SESSION['profile_error'], $_SESSION['profile_success']);
 
         <div class="step-content" id="step-services-offered">
             <h2>Services Offered</h2>
-            <p>Select the types of services you provide:</p>
+            <p>Select the types of services you provide and optionally set your price range for each.</p>
             <div class="service-categories-container">
                 <?php foreach ($vendor_categories as $category): ?>
                     <div class="service-category-group">
                         <h4><?= htmlspecialchars($category['category_name']) ?></h4>
                         <div class="services-checkbox-grid">
                             <?php if (isset($vendor_services_by_category[$category['category_name']])): ?>
-                                <?php foreach ($vendor_services_by_category[$category['category_name']] as $service): ?>
+                                <?php foreach ($vendor_services_by_category[$category['category_name']] as $service):
+                                    $is_selected = in_array($service['id'], $selected_vendor_services);
+                                    $min_price = $selected_vendor_services_with_prices[$service['id']]['min_price'] ?? '';
+                                    $max_price = $selected_vendor_services_with_prices[$service['id']]['max_price'] ?? '';
+                                ?>
                                     <div class="form-group-checkbox">
                                         <input type="checkbox"
                                                id="service_<?= $service['id'] ?>"
-                                               name="services_offered[]"
+                                               name="services_offered[<?= $service['id'] ?>][id]"
                                                value="<?= $service['id'] ?>"
-                                               <?= in_array($service['id'], $selected_vendor_services) ? 'checked' : '' ?>>
+                                               data-service-id="<?= $service['id'] ?>"
+                                               <?= $is_selected ? 'checked' : '' ?>>
                                         <label for="service_<?= $service['id'] ?>"><?= htmlspecialchars($service['service_name']) ?></label>
+                                    </div>
+                                    <div class="service-price-inputs" id="price_inputs_<?= $service['id'] ?>" style="display: <?= $is_selected ? 'block' : 'none' ?>;">
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="service_<?= $service['id'] ?>_min">Min Price</label>
+                                                <input type="number" step="0.01" min="0"
+                                                       id="service_<?= $service['id'] ?>_min"
+                                                       name="services_offered[<?= $service['id'] ?>][min_price]"
+                                                       value="<?= htmlspecialchars($min_price) ?>"
+                                                       placeholder="PKR">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="service_<?= $service['id'] ?>_max">Max Price</label>
+                                                <input type="number" step="0.01" min="0"
+                                                       id="service_<?= $service['id'] ?>_max"
+                                                       name="services_offered[<?= $service['id'] ?>][max_price]"
+                                                       value="<?= htmlspecialchars($max_price) ?>"
+                                                       placeholder="PKR">
+                                            </div>
+                                        </div>
                                     </div>
                                 <?php endforeach; ?>
                             <?php else: ?>
