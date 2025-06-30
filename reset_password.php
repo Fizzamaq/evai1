@@ -1,7 +1,7 @@
 <?php
-require_once __DIR__ . '/includes/config.php';
-require_once __DIR__ . '/classes/User.class.php';
-require_once __DIR__ . '/includes/auth.php'; // For generateCSRFToken
+require_once __DIR__ . '/../includes/config.php'; // Correct path to config.php
+require_once __DIR__ . '/../classes/User.class.php'; // Correct path to User.class.php
+require_once __DIR__ . '/../includes/auth.php'; // Corrected path to auth.php
 
 // session_start(); // Should be handled by config.php
 $user = new User($pdo); // Pass PDO
