@@ -25,23 +25,27 @@ class Event {
                 :end_date, :end_time, :venue_name, :venue_address, :venue_city, :venue_state,
                 :venue_country, :venue_postal_code, :guest_count, :budget_min, :budget_max,
                 :status, :special_requirements, :ai_preferences, :location_string, ST_GeomFromText(:venue_location_point_str),
-                :created_at, :updated_at
+                NOW(), NOW() -- Use NOW() for created_at and updated_at
             )";
 
             $stmt = $this->conn->prepare($sql);
 
             $venue_location_point_str_val = null;
-            if (!empty($data['location_string'])) {
-                // Placeholder for geocoding logic
-            }
+            // Placeholder for geocoding logic if you implement it
+            // if (!empty($data['location_string'])) {
+            //     $coords = $this->geocodeLocation($data['location_string']);
+            //     if ($coords) {
+            //         $venue_location_point_str_val = "POINT(" . $coords['lat'] . " " . $coords['lng'] . ")";
+            //     }
+            // }
 
             $execute_params = [
                 ':user_id' => $data['user_id'],
-                ':event_type_id' => $data['event_type_id'],
+                ':event_type_id' => $data['event_type_id'], // Corrected key from 'event_type' to 'event_type_id'
                 ':title' => $data['title'],
                 ':description' => $data['description'],
                 ':event_date' => $data['event_date'],
-                ':event_time' => $data['event_time'],
+                ':event_time' => $data['event_time'] ?? null,
                 ':end_date' => $data['end_date'] ?? null,
                 ':end_time' => $data['end_time'] ?? null,
                 ':venue_name' => $data['venue_name'] ?? null,
@@ -49,7 +53,7 @@ class Event {
                 ':venue_city' => $data['venue_city'] ?? null,
                 ':venue_state' => $data['venue_state'] ?? null,
                 ':venue_country' => $data['venue_country'] ?? null,
-                ':venue_postal_code' => $data['postal_code'] ?? null, // Changed from business_postal_code for consistency
+                ':venue_postal_code' => $data['venue_postal_code'] ?? null,
                 ':guest_count' => $data['guest_count'],
                 ':budget_min' => $data['budget_min'],
                 ':budget_max' => $data['budget_max'],
@@ -57,9 +61,7 @@ class Event {
                 ':special_requirements' => $data['special_requirements'],
                 ':ai_preferences' => $data['ai_preferences'] ?? null,
                 ':location_string' => $data['location_string'] ?? null,
-                ':venue_location_point_str' => $venue_location_point_str_val,
-                ':created_at' => $data['created_at'],
-                ':updated_at' => $data['updated_at']
+                ':venue_location_point_str' => $venue_location_point_str_val
             ];
 
             $event_insert_success = $stmt->execute($execute_params);
@@ -77,7 +79,7 @@ class Event {
                                     VALUES (?, ?, ?, ?, ?, ?)";
                 $service_stmt = $this->conn->prepare($service_req_sql);
 
-                foreach ($data['services_needed_array'] as $index => $service) {
+                foreach ($data['services_needed_array'] as $service) {
                     $service_execute_params = [
                         $event_id,
                         $service['service_id'],
@@ -188,20 +190,24 @@ class Event {
                 status = :status,
                 special_requirements = :special_requirements,
                 location_string = :location_string,
-                venue_location = ST_GeomFromText(?) -- Update point as well
+                venue_location = ST_GeomFromText(:venue_location_point_str) -- Update point as well
                 WHERE id = :event_id AND user_id = :user_id";
 
             $stmt = $this->conn->prepare($sql);
 
             $venue_location_point_str = null;
-            if (!empty($data['location_string_from_form'])) {
-                // Placeholder for geocoding logic
-            }
+            // Placeholder for geocoding logic if you implement it
+            // if (!empty($data['location_string_from_form'])) {
+            //     $coords = $this->geocodeLocation($data['location_string_from_form']);
+            //     if ($coords) {
+            //         $venue_location_point_str = "POINT(" . $coords['lat'] . " " . $coords['lng'] . ")";
+            //     }
+            // }
 
             $stmt->execute([
                 ':title' => $data['title'],
                 ':description' => $data['description'],
-                ':event_type_id' => $data['event_type'],
+                ':event_type_id' => $data['event_type'], // Corrected key to 'event_type'
                 ':event_date' => $data['event_date'],
                 ':event_time' => $data['event_time'] ?? null,
                 ':end_date' => $data['end_date'] ?? null,
@@ -218,7 +224,7 @@ class Event {
                 ':status' => $data['status'] ?? 'planning',
                 ':special_requirements' => $data['special_requirements'] ?? null,
                 ':location_string' => $data['location_string_from_form'] ?? null,
-                1 => $venue_location_point_str,
+                ':venue_location_point_str' => $venue_location_point_str, // Pass as named parameter
                 ':event_id' => $event_id,
                 ':user_id' => $user_id
             ]);
@@ -287,7 +293,6 @@ class Event {
                 $params[':event_type_id'] = $criteria['event_type_id'];
             }
 
-            // FIX: Robustly handle 'status' criteria (array or single string)
             if (!empty($criteria['status'])) {
                 if (is_array($criteria['status'])) {
                     $named_placeholders = [];
@@ -343,7 +348,7 @@ class Event {
                     WHERE e.user_id = :user_id
                     AND e.event_date >= CURDATE()
                     AND e.status != 'deleted'
-                    AND EXISTS (SELECT 1 FROM bookings b WHERE b.event_id = e.id) /* ADDED THIS CONDITION */
+                    AND EXISTS (SELECT 1 FROM bookings b WHERE b.event_id = e.id)
                     ORDER BY e.event_date ASC
                     LIMIT :limit";
 
@@ -449,22 +454,22 @@ class Event {
             unset($new_event_data['id']);
             $new_event_data['title'] .= ' (Copy)';
             $new_event_data['status'] = 'planning';
-            $new_event_data['created_at'] = date('Y-m-d H:i:s');
-            $new_event_data['updated_at'] = date('Y-m-d H:i:s');
+            // created_at and updated_at will be handled by NOW() in createEvent
 
             if ($new_date) {
                 $new_event_data['event_date'] = $new_date;
             }
 
             // Services needed for duplication (fetch from event_service_requirements)
-            $services_to_duplicate = $this->conn->prepare("SELECT service_id, priority, budget_allocated, specific_requirements, status FROM event_service_requirements WHERE event_id = ?");
-            $services_to_duplicate->execute([$event_id]);
-            $new_event_data['services_needed_array'] = $services_to_duplicate->fetchAll(PDO::FETCH_ASSOC);
+            $services_to_duplicate_stmt = $this->conn->prepare("SELECT service_id, priority, budget_allocated, specific_requirements, status FROM event_service_requirements WHERE event_id = ?");
+            $services_to_duplicate_stmt->execute([$event_id]);
+            $new_event_data['services_needed_array'] = $services_to_duplicate_stmt->fetchAll(PDO::FETCH_ASSOC);
 
             // Need to map old 'event_type_name' back to 'event_type_id' for insertion
+            // This is crucial for createEvent if it expects event_type_id
             $event_type_stmt = $this->conn->prepare("SELECT id FROM event_types WHERE type_name = ?");
             $event_type_stmt->execute([$original_event['type_name']]);
-            $new_event_data['event_type'] = $event_type_stmt->fetchColumn();
+            $new_event_data['event_type_id'] = $event_type_stmt->fetchColumn(); // Corrected key to event_type_id
 
 
             return $this->createEvent($new_event_data);
@@ -472,6 +477,56 @@ class Event {
         } catch (Exception $e) {
             error_log("Event duplication error: " . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * NEW: Method to get all events for the admin panel.
+     * @return array
+     */
+    public function getAllEvents() {
+        try {
+            $sql = "SELECT e.*, et.type_name
+                    FROM events e
+                    JOIN event_types et ON e.event_type_id = et.id
+                    ORDER BY e.event_date ASC, e.created_at DESC";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting all events for admin: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * NEW: Method to update event status for admin panel.
+     * @param int $eventId
+     * @param string $newStatus
+     * @return bool
+     */
+    public function updateEventStatus($eventId, $newStatus) {
+        try {
+            $stmt = $this->conn->prepare("UPDATE events SET status = ?, updated_at = NOW() WHERE id = ?");
+            return $stmt->execute([$newStatus, $eventId]);
+        } catch (PDOException $e) {
+            error_log("Error updating event status by admin: " . $e->getMessage());
+            throw new Exception("Failed to update event status.");
+        }
+    }
+
+    /**
+     * NEW: Method to soft delete an event for admin panel (changes status to 'deleted').
+     * @param int $eventId
+     * @return bool
+     */
+    public function deleteEventSoft($eventId) {
+        try {
+            $stmt = $this->conn->prepare("UPDATE events SET status = 'deleted', updated_at = NOW() WHERE id = ?");
+            return $stmt->execute([$eventId]);
+        } catch (PDOException $e) {
+            error_log("Error soft deleting event by admin: " . $e->getMessage());
+            throw new Exception("Failed to soft delete event.");
         }
     }
 }
