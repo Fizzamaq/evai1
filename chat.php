@@ -463,7 +463,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
         const messageInput = document.getElementById('message-input');
         const messageForm = document.querySelector('.message-form');
         // MODIFIED: Select all delete buttons in the sidebar
-        const deleteChatButtons = document.querySelectorAll('.delete-chat-sidebar-btn'); 
+        const deleteChatButtons = document.querySelectorAll('.delete-chat-icon'); // Corrected selector 
 
         let lastFailedMessage = ''; // Store the last message that failed to send
 
