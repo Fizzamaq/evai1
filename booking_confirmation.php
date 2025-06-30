@@ -22,7 +22,8 @@ $clientSecret = $_GET['client_secret'] ?? null; // For Stripe client-side confir
         <button id="submit-payment-btn" class="btn btn-primary">Pay Now</button>
         <script src="https://js.stripe.com/v3/"></script>
         <script>
-            const stripe = Stripe('YOUR_STRIPE_PUBLISHABLE_KEY'); // Replace with your actual key
+            // Use the Stripe Publishable Key defined in config.php
+            const stripe = Stripe('<?= STRIPE_PUBLISHABLE_KEY ?>'); 
             const clientSecret = '<?= htmlspecialchars($clientSecret) ?>';
 
             const appearance = { /* appearance styling */ };
