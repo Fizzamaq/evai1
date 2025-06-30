@@ -125,4 +125,15 @@ class CalendarManager {
         $stmt->execute([$userId]);
         return (bool)$stmt->fetchColumn();
     }
+
+    // NEW METHOD: Delete a user's calendar token
+    public function deleteToken($userId) {
+        try {
+            $stmt = $this->pdo->prepare("DELETE FROM user_calendar_tokens WHERE user_id = ?");
+            return $stmt->execute([$userId]);
+        } catch (PDOException $e) {
+            error_log("Failed to delete calendar token for user $userId: " . $e->getMessage());
+            return false;
+        }
+    }
 }
