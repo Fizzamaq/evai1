@@ -91,10 +91,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (checkbox.checked) {
                         anyServiceSelected = true;
                         // Optional: Validate price inputs if they are required when checked
-                        // const serviceId = checkbox.dataset.serviceId;
-                        // const minPriceInput = document.getElementById(`service_${serviceId}_min`);
-                        // const maxPriceInput = document.getElementById(`service_${serviceId}_max`);
-                        // Add validation for minPriceInput.value and maxPriceInput.value if needed
+                        const serviceId = checkbox.dataset.serviceId;
+                        const minPriceInput = document.getElementById(`service_${serviceId}_min`);
+                        const maxPriceInput = document.getElementById(`service_${serviceId}_max`);
+                        
+                        // Example: Ensure min price is not empty if max price is entered
+                        if (minPriceInput && maxPriceInput && maxPriceInput.value.trim() !== '' && minPriceInput.value.trim() === '') {
+                            isValid = false;
+                            minPriceInput.style.borderColor = 'var(--error-color)';
+                        } else if (minPriceInput) {
+                            minPriceInput.style.borderColor = 'var(--border-color)';
+                        }
+
+                        // Example: Ensure max price is not empty if min price is entered
+                        if (minPriceInput && maxPriceInput && minPriceInput.value.trim() !== '' && maxPriceInput.value.trim() === '') {
+                            isValid = false;
+                            maxPriceInput.style.borderColor = 'var(--error-color)';
+                        } else if (maxPriceInput) {
+                            maxPriceInput.style.borderColor = 'var(--border-color)';
+                        }
+
+                        // Example: Ensure min price is not greater than max price
+                        if (minPriceInput && maxPriceInput && parseFloat(minPriceInput.value) > parseFloat(maxPriceInput.value)) {
+                            isValid = false;
+                            minPriceInput.style.borderColor = 'var(--error-color)';
+                            maxPriceInput.style.borderColor = 'var(--error-color)';
+                        }
                     }
                 });
                 // The user did not specify that at least one service must be selected.
