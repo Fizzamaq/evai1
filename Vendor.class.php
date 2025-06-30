@@ -916,4 +916,37 @@ class Vendor {
             return [];
         }
     }
+
+    /**
+     * Get all vendor profiles for admin panel.
+     * Includes user email, name, and profile image if available.
+     * @return array
+     */
+    public function getAllVendorProfiles() {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT 
+                    vp.id,
+                    vp.business_name,
+                    vp.business_city,
+                    vp.rating,
+                    vp.total_reviews,
+                    vp.verified,
+                    u.email,
+                    u.first_name,
+                    u.last_name,
+                    up.profile_image
+                FROM vendor_profiles vp
+                JOIN users u ON vp.user_id = u.id
+                LEFT JOIN user_profiles up ON u.id = up.user_id
+                GROUP BY vp.id /* Ensure one row per vendor profile */
+                ORDER BY vp.created_at DESC
+            ");
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error in Vendor::getAllVendorProfiles(): " . $e->getMessage());
+            return [];
+        }
+    }
 }
