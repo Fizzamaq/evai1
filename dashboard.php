@@ -28,7 +28,7 @@ if (isset($_SESSION['user_type'])) {
             header('Location: ' . BASE_URL . 'public/vendor_dashboard.php');
             exit();
         case 3: // Admin
-            header('Location: ' . BASE_URL . 'admin/dashboard.php');
+            header('Location: ' . BASE_URL . 'public/admin/admin_dashboard.php');
             exit();
         // User type 1 (Customer) will fall through and continue
     }
@@ -212,7 +212,7 @@ $recent_bookings = array_slice($recent_bookings, 0, 5);
                 <div class="metric-label">Events in Planning</div>
             </div>
             <div class="stat-card">
-                <div class="metric-value">PKR <?= number_format($event_stats['avg_budget'] ?? 0, 2) ?></div>
+                <div class="metric-value">PKR<?= number_format($event_stats['avg_budget'] ?? 0, 2) ?></div>
                 <div class="metric-label">Avg. Event Budget</div>
             </div>
         </div>
