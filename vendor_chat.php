@@ -422,7 +422,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
         const messageInput = document.getElementById('message-input');
         const messageForm = document.querySelector('.message-form');
         // MODIFIED: Select all delete buttons in the sidebar
-        const deleteChatButtons = document.querySelectorAll('.delete-chat-sidebar-btn'); 
+        const deleteChatButtons = document.querySelectorAll('.delete-chat-icon'); // Corrected selector 
 
         let lastFailedMessage = ''; // Store the last message that failed to send
 
@@ -462,7 +462,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                 e.stopPropagation(); // Prevent the conversation item's click event from firing
                 const conversationIdToDelete = this.dataset.conversationId;
                 if (confirm('Are you sure you want to delete (archive) this chat? This action cannot be undone.')) {
-                    fetch('<?= BASE_URL ?>public/chat.php', {
+                    fetch('<?= BASE_URL ?>public/vendor_chat.php', {
                         method: 'POST',
                         body: new URLSearchParams({
                             delete_chat: '1',
@@ -477,7 +477,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                     .then(data => {
                         if (data.success) {
                             alert(data.message);
-                            window.location.href = data.redirect || '<?= BASE_URL ?>public/chat.php'; // Redirect to clear page or chat list
+                            window.location.href = data.redirect || '<?= BASE_URL ?>public/vendor_chat.php'; // Redirect to clear page or chat list
                         } else {
                             alert(data.error || 'Failed to delete chat.');
                         }
@@ -502,7 +502,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
             if (message) {
                 lastFailedMessage = message; // Store message in case of failure
 
-                let postUrl = '<?= BASE_URL ?>public/chat.php';
+                let postUrl = '<?= BASE_URL ?>public/vendor_chat.php';
                 const currentConversationId = '<?php echo htmlspecialchars((string)($conversation_id ?? '')); ?>';
                 if (currentConversationId) {
                     postUrl += `?conversation_id=${currentConversationId}`;
@@ -572,7 +572,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                 const currentLastMessage = messagesContainer ? messagesContainer.lastElementChild : null;
                 const lastMessageId = currentLastMessage ? parseInt(currentLastMessage.dataset.id) : 0;
 
-                fetch(`<?= BASE_URL ?>public/chat.php?conversation_id=${conversationId}&ajax=1`)
+                fetch(`<?= BASE_URL ?>public/vendor_chat.php?conversation_id=${conversationId}&ajax=1`)
                     .then(response => {
                         if (!response.ok) {
                             return response.text().then(text => {
