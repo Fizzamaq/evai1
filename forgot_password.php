@@ -1,16 +1,23 @@
 <?php
-require_once __DIR__ . '/includes/config.php';
-require_once __DIR__ . '/classes/User.class.php';
+// Corrected path to config.php
+require_once __DIR__ . '/../includes/config.php'; 
+// Corrected path to User.class.php
+require_once __DIR__ . '/../classes/User.class.php';
 
-$user = new User();
+// session_start(); // Should be handled by config.php
+
+// Instantiate User class with $pdo
+$user = new User($pdo); 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
     
+    // Pass $pdo to the User constructor
     if ($user->initiatePasswordReset($email)) {
-        $_SESSION['success'] = "Reset link sent to your email";
+        $_SESSION['success'] = "Password reset link sent to your email address.";
     } else {
-        $_SESSION['error'] = "Error processing request";
+        // Provide a generic message for security, regardless of whether email exists or not
+        $_SESSION['error'] = "If an account with that email exists, a password reset link has been sent.";
     }
     header('Location: forgot_password.php');
     exit();
@@ -22,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <title>Password Recovery - EventCraftAI</title>
-    <link rel="stylesheet" href="/assets/css/auth.css">
+    <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/auth.css">
 </head>
 <body>
     <div class="auth-container">
@@ -30,12 +37,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <h1>Forgot Password?</h1>
             
             <?php if (isset($_SESSION['success'])): ?>
-                <div class="alert success"><?= $_SESSION['success'] ?></div>
+                <div class="alert success"><?= htmlspecialchars($_SESSION['success']) ?></div>
                 <?php unset($_SESSION['success']); ?>
             <?php endif; ?>
             
             <?php if (isset($_SESSION['error'])): ?>
-                <div class="alert error"><?= $_SESSION['error'] ?></div>
+                <div class="alert error"><?= htmlspecialchars($_SESSION['error']) ?></div>
                 <?php unset($_SESSION['error']); ?>
             <?php endif; ?>
 
