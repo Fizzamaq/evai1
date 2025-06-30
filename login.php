@@ -11,7 +11,12 @@ if (isset($_SESSION['user_id'])) {
 
 $error = $_SESSION['login_error'] ?? null;
 $success = $_SESSION['registration_success'] ?? null;
-unset($_SESSION['login_error'], $_SESSION['registration_success']);
+
+// New: For email verification messages
+$verification_message_type = $_SESSION['login_message_type'] ?? null;
+$verification_message = $_SESSION['login_message'] ?? null;
+
+unset($_SESSION['login_error'], $_SESSION['registration_success'], $_SESSION['login_message_type'], $_SESSION['login_message']);
 ?>
 <div class="auth-container">
     <h2>Login to Your Account</h2>
@@ -22,6 +27,12 @@ unset($_SESSION['login_error'], $_SESSION['registration_success']);
     
     <?php if ($error): ?>
         <div class="alert error"><?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
+
+    <?php if ($verification_message): ?>
+        <div class="alert <?= htmlspecialchars($verification_message_type) ?>">
+            <?= htmlspecialchars($verification_message) ?>
+        </div>
     <?php endif; ?>
     
     <form action="process_login.php" method="post">
@@ -36,6 +47,7 @@ unset($_SESSION['login_error'], $_SESSION['registration_success']);
         <button type="submit" class="btn primary">Login</button>
     </form>
     <p>Don't have an account? <a href="register.php">Register here</a></p>
+    <p><a href="forgot_password.php">Forgot Password?</a></p>
 </div>
 
 <?php include 'footer.php'; ?>
