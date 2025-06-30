@@ -27,7 +27,7 @@ class User {
             // Create profile
             $this->initUserProfile($userId);
 
-            // Send verification email
+            // --- NEW: Send verification email ---
             $token = bin2hex(random_bytes(32));
             $expires = date('Y-m-d H:i:s', strtotime('+24 hours')); // Verification link valid for 24 hours
             $stmt_token = $this->pdo->prepare("INSERT INTO email_verifications (user_id, token, expires_at) VALUES (?, ?, ?)");
@@ -55,18 +55,18 @@ class User {
 
     public function login($email, $password) {
         try {
-            $stmt = $this->pdo->prepare("SELECT id, password_hash, user_type_id, first_name, email, email_verified, is_active FROM users WHERE email = ?"); // Added is_active to select
+            $stmt = $this->pdo->prepare("SELECT id, password_hash, user_type_id, first_name, email, email_verified, is_active FROM users WHERE email = ? AND is_active = 1");
             $stmt->execute([$email]);
             $user = $stmt->fetch();
 
             if ($user && password_verify($password, $user['password_hash'])) {
                 if (!$user['email_verified']) {
                     // Check if email is verified
-                    throw new Exception("Your email address is not verified. Please check your inbox for the verification link.");
+                    throw new Exception("Your email address is not verified. Please check your inbox.");
                 }
-                if (!$user['is_active']) { // Check if user is active (could be inactive by admin or other reasons)
-                    throw new Exception("Your account is not active. Please contact support.");
-                }
+                // if (!$user['is_active']) { // is_active check is already part of the SQL query.
+                //     throw new Exception("Your account is not active. Please contact support.");
+                // }
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_type'] = $user['user_type_id'];
                 $_SESSION['user_name'] = $user['first_name'];
@@ -77,7 +77,6 @@ class User {
             return false;
         } catch (PDOException $e) {
             error_log("Login error: " . $e->getMessage());
-            // Re-throw exception if it's a critical database error, otherwise return false
             return false;
         } catch (Exception $e) {
             // Catch custom exceptions like "email not verified" and re-throw them
@@ -284,5 +283,37 @@ class User {
         // Modified to update profile_image in user_profiles table
         $stmt = $this->pdo->prepare("UPDATE user_profiles SET profile_image = ? WHERE user_id = ?");
         return $stmt->execute([$filename, $userId]);
+    }
+
+    /**
+     * Get all users for admin panel.
+     * Includes user type name and profile image if available.
+     * @return array
+     */
+    public function getAllUsers() {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT 
+                    u.id, 
+                    u.first_name, 
+                    u.last_name, 
+                    u.email, 
+                    ut.type_name AS user_type, 
+                    u.is_active,
+                    u.email_verified,
+                    up.profile_image,
+                    u.created_at
+                FROM users u
+                JOIN user_types ut ON u.user_type_id = ut.id
+                LEFT JOIN user_profiles up ON u.id = up.user_id
+                GROUP BY u.id  /* FIX: Group by user ID to prevent redundant rows */
+                ORDER BY u.created_at DESC
+            ");
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error in User::getAllUsers(): " . $e->getMessage());
+            return [];
+        }
     }
 }
