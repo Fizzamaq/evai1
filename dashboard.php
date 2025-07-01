@@ -5,6 +5,8 @@ require_once '../includes/config.php';
 require_once '../classes/User.class.php';
 require_once '../classes/Event.class.php';
 require_once '../classes/Booking.class.php';
+require_once '../classes/Notification.class.php'; // Include Notification class
+require_once '../classes/ReportGenerator.class.php'; // Include ReportGenerator for recent activities
 
 // Redirect to login page if user is not logged in
 if (!isset($_SESSION['user_id'])) {
@@ -16,6 +18,8 @@ if (!isset($_SESSION['user_id'])) {
 $user = new User($pdo);
 $event = new Event($pdo);
 $booking = new Booking($pdo);
+$notification_obj = new Notification($pdo); // Instantiate Notification class
+$report_generator = new ReportGenerator($pdo); // Instantiate ReportGenerator
 
 // Fetch current user's data
 $user_data = $user->getUserById($_SESSION['user_id']);
@@ -43,6 +47,9 @@ $upcoming_events = $event->getUpcomingEvents($_SESSION['user_id'], 5);
 $recent_bookings = $booking->getUserBookings($_SESSION['user_id']);
 // Manually limit if the method doesn't support it directly
 $recent_bookings = array_slice($recent_bookings, 0, 5);
+
+// Fetch recent activities for the user
+$recent_activities = $report_generator->getUserRecentActivity($_SESSION['user_id'], 5);
 
 ?>
 
@@ -156,6 +163,44 @@ $recent_bookings = array_slice($recent_bookings, 0, 5);
     color: #764ba2; /* Darker shade on hover */
 }
 
+/* Specific styles for Activity list (reusing admin_dashboard.php styles) */
+.activity-log {
+    /* Styles for the overall activity log container */
+}
+.activity-item {
+    display: flex;
+    align-items: flex-start; /* Align icon to the top of message */
+    gap: 15px;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+.activity-item:last-child {
+    border-bottom: none;
+}
+.activity-icon {
+    flex-shrink: 0; /* Prevent icon from shrinking */
+    font-size: 1.4em; /* Slightly larger icon */
+    color: var(--primary-color);
+    width: 30px; /* Fixed width for consistent alignment */
+    text-align: center;
+}
+.activity-content {
+    flex-grow: 1; /* Allow content to take remaining space */
+}
+.activity-message {
+    font-size: 0.95em;
+    color: var(--text-dark);
+    line-height: 1.4;
+}
+.activity-time {
+    font-size: 0.8em;
+    color: var(--text-subtle);
+    margin-top: 5px;
+    display: flex; /* For aligning time and view link */
+    justify-content: space-between;
+    align-items: center;
+}
+
 /* Responsive adjustments for smaller screens */
 @media (max-width: 768px) {
     .dashboard-sections {
@@ -218,6 +263,33 @@ $recent_bookings = array_slice($recent_bookings, 0, 5);
         </div>
 
         <div class="dashboard-sections">
+            <div class="section-card">
+                <h2>Recent Activities</h2>
+                <?php if (!empty($recent_activities)): ?>
+                    <div class="activity-log">
+                        <?php foreach ($recent_activities as $activity): ?>
+                        <div class="activity-item">
+                            <div class="activity-icon"><i class="<?= htmlspecialchars($activity['icon_class']) ?>"></i></div>
+                            <div class="activity-content">
+                                <div class="activity-message"><?= htmlspecialchars($activity['type_prefix']) . htmlspecialchars($activity['message_detail']) ?></div>
+                                <div class="activity-time">
+                                    <?= date('M j, Y g:i a', strtotime($activity['created_at'])) ?>
+                                    <?php if (!empty($activity['related_url'])): ?>
+                                        <a href="<?= BASE_URL . htmlspecialchars($activity['related_url']) ?>" class="btn-link btn-sm" style="margin-left: 10px;">View</a>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div style="text-align: right; margin-top: 15px;">
+                        <a href="<?= BASE_URL ?>public/notifications.php" class="btn-link">View All Notifications</a>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">No recent activities.</div>
+                <?php endif; ?>
+            </div>
+
             <div class="section-card">
                 <h2>Upcoming Events</h2>
                 <?php if (!empty($upcoming_events)): ?>
