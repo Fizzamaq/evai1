@@ -5,11 +5,10 @@
 // Removed session_start(): handled by config.php
 require_once __DIR__ . '/../includes/config.php'; // Use __DIR__ for robust pathing
 require_once __DIR__ . '/../classes/Vendor.class.php';
-
-// require_once __DIR__ . '/../classes/User.class.php'; // Removed: User class not directly used here after Vendor verification
+require_once __DIR__ . '/../classes/ReportGenerator.class.php'; // Include ReportGenerator for recent activities
 
 $vendor = new Vendor($pdo); // Pass PDO
-// $user = new User($pdo);     // Removed: User object not directly used here
+$report_generator = new ReportGenerator($pdo); // Instantiate ReportGenerator
 
 // Verify vendor access: This method ensures the user is logged in, is a vendor,
 // and sets $_SESSION['vendor_id'] if successful. It redirects otherwise.
@@ -31,6 +30,10 @@ $stats = [
     'average_rating' => $vendor_data['rating'] ?? 0, // Display vendor's average rating
     'response_rate' => $vendor->getResponseRate($vendor_data['id']) // Display vendor's response rate
 ];
+
+// Fetch recent activities for the vendor
+$recent_activities = $report_generator->getVendorRecentActivity($vendor_data['id'], 5); // Limit to 5 recent activities
+
 ?>
 
 <!DOCTYPE html>
@@ -40,8 +43,7 @@ $stats = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vendor Dashboard - EventCraftAI</title>
     <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/style.css">
-    <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/dashboard.css">
-    <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/vendor.css">
+    <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/dashboard.css"> <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/vendor.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -97,12 +99,45 @@ $stats = [
                 <?php endif; ?>
             </div>
 
+            <div class="section-card">
+                <h2>Recent Activities</h2>
+                <?php if (!empty($recent_activities)): ?>
+                    <div class="activity-log">
+                        <?php foreach ($recent_activities as $activity): ?>
+                        <div class="activity-item">
+                            <div class="activity-icon"><i class="<?= htmlspecialchars($activity['icon_class']) ?>"></i></div>
+                            <div class="activity-content">
+                                <div class="activity-message"><?= htmlspecialchars($activity['type_prefix']) . htmlspecialchars($activity['message_detail']) ?></div>
+                                <div class="activity-time">
+                                    <?= date('M j, Y g:i a', strtotime($activity['created_at'])) ?>
+                                    <?php if (!empty($activity['related_url'])): ?>
+                                        <a href="<?= BASE_URL . htmlspecialchars($activity['related_url']) ?>" class="btn-link btn-sm" style="margin-left: 10px;">View</a>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div style="text-align: right; margin-top: 15px;">
+                        <?php /* You could create a dedicated 'vendor_notifications.php' or 'vendor_activity_log.php' page for full history */ ?>
+                        <a href="<?= BASE_URL ?>public/notifications.php" class="btn-link">View All Notifications</a>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">No recent activities.</div>
+                <?php endif; ?>
+            </div>
+
+
             <div class="section-card calendar-widget">
                 <h2>Availability Calendar
                     <a href="<?= BASE_URL ?>public/vendor_availability.php" class="btn btn-sm btn-info" style="float:right; margin-left: 10px;">Manage Availability</a>
                 </h2>
                 <div id="availability-calendar"></div>
             </div>
+        </div>
+
+        <div class="dashboard-actions" style="margin-top: var(--spacing-lg); text-align: center;">
+            <a href="<?= BASE_URL ?>public/vendor_manage_services.php" class="btn btn-primary btn-large">Manage My Services & Packages</a>
         </div>
     </div>
 
@@ -120,7 +155,7 @@ $stats = [
                         fetch(`<?= BASE_URL ?>public/availability.php?vendor_id=<?= $_SESSION['vendor_id'] ?>&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
                             .then(response => {
                                 if (!response.ok) {
-                                    throw new Error('Network response was not ok');
+                                    throw new Error(`HTTP error! status: ${response.status}`);
                                 }
                                 return response.json();
                             })
@@ -129,8 +164,8 @@ $stats = [
                                 const formattedEvents = data.map(event => ({
                                     id: event.id,
                                     title: event.status.charAt(0).toUpperCase() + event.status.slice(1), // Capitalize first letter
-                                    start: event.date + 'T' + event.start_time, // Combine date and time for ISO format
-                                    end: event.date + 'T' + event.end_time,     // Combine date and time
+                                    start: event.date + 'T' + event.start_time, // Full datetime string
+                                    end: event.date + 'T' + event.end_time,     // Full datetime string
                                     allDay: false, // Assuming specific times are always provided
                                     extendedProps: { // Custom property to store original status
                                         status: event.status
