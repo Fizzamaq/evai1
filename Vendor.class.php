@@ -172,35 +172,120 @@ class Vendor {
         }
     }
 
-    // Add vendor service offering
+    // Add vendor service offering (original, modified to include description)
+    // This is for adding a *type* of service to the vendor's offerings (from edit_profile.php)
     public function addServiceOffering($vendor_id, $service_id, $data) {
         try {
             $stmt = $this->conn->prepare("INSERT INTO vendor_service_offerings
                 (vendor_id, service_id, price_range_min, price_range_max, description)
                 VALUES (?, ?, ?, ?, ?)");
 
-            return $stmt->execute([
+            $result = $stmt->execute([
                 $vendor_id,
                 $service_id,
                 $data['price_min'] ?? null,
                 $data['price_max'] ?? null,
                 $data['description'] ?? null
             ]);
+            return $result ? $this->conn->lastInsertId() : false;
         } catch (PDOException $e) {
+            // Check if it's a duplicate entry error
+            if ($e->getCode() == '23000' && strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                 throw new Exception("This service is already offered. Please edit the existing entry or select a different service.");
+            }
             error_log("Add service offering error: " . $e->getMessage());
             return false;
         }
     }
 
-    // Get vendor services
+    // NEW METHOD: Update a specific service offering
+    // This now updates the *overall* price range and description on the vendor_service_offerings table
+    public function updateServiceOffering($service_offering_id, $vendor_id, $data) {
+        try {
+            $query = "UPDATE vendor_service_offerings SET
+                price_range_min = ?,
+                price_range_max = ?,
+                description = ?,
+                updated_at = NOW()
+                WHERE id = ? AND vendor_id = ?"; // Ensure vendor ownership
+
+            $params = [
+                $data['price_min'] ?? null,
+                $data['price_max'] ?? null,
+                $data['description'] ?? null,
+                $service_offering_id,
+                $vendor_id
+            ];
+
+            $stmt = $this->conn->prepare($query);
+            return $stmt->execute($params);
+        } catch (PDOException $e) {
+            error_log("Update service offering error: " . $e->getMessage());
+            throw new Exception("Failed to update service offering: " . $e->getMessage());
+        }
+    }
+
+    // NEW METHOD: Delete a specific service offering (and all its packages/images)
+    public function deleteServiceOffering($service_offering_id, $vendor_id) {
+        try {
+            $this->conn->beginTransaction();
+
+            // All associated packages and their images will be cascade-deleted by database foreign key constraints
+            // We need to fetch package images manually to delete physical files
+            $packages_with_images = $this->getPackagesByServiceOfferingId($service_offering_id);
+            $all_package_images_to_delete = [];
+            foreach ($packages_with_images as $package) {
+                if (!empty($package['images'])) {
+                    $all_package_images_to_delete = array_merge($all_package_images_to_delete, $package['images']);
+                }
+            }
+            
+            // Delete the main service offering record
+            $stmt = $this->conn->prepare("DELETE FROM vendor_service_offerings WHERE id = ? AND vendor_id = ?");
+            $success = $stmt->execute([$service_offering_id, $vendor_id]);
+
+            if ($success) {
+                require_once __DIR__ . '/UploadHandler.class.php';
+                $uploader = new UploadHandler();
+
+                foreach ($all_package_images_to_delete as $image) {
+                    $relative_path_from_web_root = str_replace(BASE_URL, '', $image['image_url']);
+                    $physical_path = realpath(__DIR__ . '/../../') . '/' . $relative_path_from_web_root;
+
+                    if (file_exists($physical_path)) {
+                        $uploader->deleteFile(basename($physical_path), dirname($relative_path_from_web_root) . '/');
+                    } else {
+                        error_log("File not found for deletion during service offering delete: " . $physical_path);
+                    }
+                }
+                $this->conn->commit();
+                return true;
+            }
+            $this->conn->rollBack();
+            return false;
+        } catch (PDOException $e) {
+            $this->conn->rollBack();
+            error_log("Delete service offering error: " . $e->getMessage());
+            throw new Exception("Failed to delete service offering: " . $e->getMessage());
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            error_log("Delete service offering general error: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    // Get vendor services (original method, fetches what's in vendor_service_offerings)
+    // Now also includes a count of packages for display in the management page
     public function getVendorServices($vendor_id) {
         try {
             $stmt = $this->conn->prepare("
-                SELECT vso.*, vs.service_name, vc.category_name
+                SELECT vso.*, vs.service_name, vc.category_name,
+                       (SELECT COUNT(sp.id) FROM service_packages sp WHERE sp.service_offering_id = vso.id) as package_count
                 FROM vendor_service_offerings vso
                 JOIN vendor_services vs ON vso.service_id = vs.id
                 JOIN vendor_categories vc ON vs.category_id = vc.id
                 WHERE vso.vendor_id = ? AND vso.is_active = TRUE
+                ORDER BY vc.category_name, vs.service_name
             ");
             $stmt->execute([$vendor_id]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -210,57 +295,221 @@ class Vendor {
         }
     }
 
-    // NEW METHOD: Update vendor's service offerings (delete existing and insert new ones)
-    // Modified to accept min_price and max_price for each service
-    public function updateVendorServiceOfferings($vendor_profile_id, $services_data_array) { // Changed parameter name
+    // NEW METHOD: Get a single service offering by its ID
+    // Now also fetches associated packages and their images
+    public function getServiceOfferingById($service_offering_id, $vendor_id) {
         try {
-            // REMOVED: $this->conn->beginTransaction(); // Transaction managed by calling script
-            error_log("DEBUG: updateVendorServiceOfferings - Starting operations for Vendor ID: " . $vendor_profile_id);
+            $stmt = $this->conn->prepare("
+                SELECT vso.*, vs.service_name, vc.category_name
+                FROM vendor_service_offerings vso
+                JOIN vendor_services vs ON vso.service_id = vs.id
+                JOIN vendor_categories vc ON vs.category_id = vc.id
+                WHERE vso.id = ? AND vso.vendor_id = ?
+            ");
+            $stmt->execute([$service_offering_id, $vendor_id]);
+            $offering = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            error_log("DEBUG: updateVendorServiceOfferings - Services data to insert: " . print_r($services_data_array, true));
+            if ($offering) {
+                // Fetch packages for this service offering
+                $offering['packages'] = $this->getPackagesByServiceOfferingId($service_offering_id);
+            }
+            return $offering;
+        } catch (PDOException $e) {
+            error_log("Get service offering by ID error: " . $e->getMessage());
+            return false;
+        }
+    }
 
-            // 1. Delete all existing offerings for this vendor
-            $stmt_delete = $this->conn->prepare("DELETE FROM vendor_service_offerings WHERE vendor_id = ?");
-            $stmt_delete->execute([$vendor_profile_id]);
-            $deleted_rows = $stmt_delete->rowCount();
-            error_log("DEBUG: updateVendorServiceOfferings - Deleted " . $deleted_rows . " existing offerings.");
+    // NEW METHOD: Get all packages for a specific service offering
+    public function getPackagesByServiceOfferingId($service_offering_id) {
+        try {
+            $stmt = $this->conn->prepare("SELECT * FROM service_packages WHERE service_offering_id = ? ORDER BY display_order ASC, created_at ASC");
+            $stmt->execute([$service_offering_id]);
+            $packages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // 2. Insert new offerings with price ranges
-            $inserted_count = 0;
-            if (!empty($services_data_array)) {
-                $insert_sql = "INSERT INTO vendor_service_offerings (vendor_id, service_id, price_range_min, price_range_max) VALUES (?, ?, ?, ?)";
-                $insert_stmt = $this->conn->prepare($insert_sql);
-                foreach ($services_data_array as $service_data) { // Loop through structured data
-                    $service_id = (int)$service_data['service_id'];
-                    $min_price = $service_data['min_price'];
-                    $max_price = $service_data['max_price'];
+            foreach ($packages as &$package) {
+                $package['images'] = $this->getServicePackageImages($package['id']);
+            }
+            return $packages;
+        } catch (PDOException $e) {
+            error_log("Get packages by service offering ID error: " . $e->getMessage());
+            return [];
+        }
+    }
 
-                    if ($service_id > 0) {
-                        $insert_stmt->execute([$vendor_profile_id, $service_id, $min_price, $max_price]);
-                        $inserted_count++;
+    // NEW METHOD: Add a new service package
+    public function addServicePackage($service_offering_id, $data) {
+        try {
+            $stmt = $this->conn->prepare("INSERT INTO service_packages
+                (service_offering_id, package_name, package_description, price_min, price_max, is_active, display_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $result = $stmt->execute([
+                $service_offering_id,
+                $data['package_name'],
+                $data['package_description'] ?? null,
+                $data['price_min'] ?? null,
+                $data['price_max'] ?? null,
+                $data['is_active'] ?? 1,
+                $data['display_order'] ?? 0
+            ]);
+            return $result ? $this->conn->lastInsertId() : false;
+        } catch (PDOException $e) {
+            error_log("Add service package error: " . $e->getMessage());
+            throw new Exception("Failed to add package: " . $e->getMessage());
+        }
+    }
+
+    // NEW METHOD: Update a service package
+    public function updateServicePackage($package_id, $service_offering_id, $data) {
+        try {
+            $query = "UPDATE service_packages SET
+                package_name = ?,
+                package_description = ?,
+                price_min = ?,
+                price_max = ?,
+                is_active = ?,
+                display_order = ?,
+                updated_at = NOW()
+                WHERE id = ? AND service_offering_id = ?"; // Ensure ownership through service_offering_id
+
+            $params = [
+                $data['package_name'],
+                $data['package_description'] ?? null,
+                $data['price_min'] ?? null,
+                $data['price_max'] ?? null,
+                $data['is_active'] ?? 1,
+                $data['display_order'] ?? 0,
+                $package_id,
+                $service_offering_id
+            ];
+
+            $stmt = $this->conn->prepare($query);
+            return $stmt->execute($params);
+        } catch (PDOException $e) {
+            error_log("Update service package error: " . $e->getMessage());
+            throw new Exception("Failed to update package: " . $e->getMessage());
+        }
+    }
+
+    // NEW METHOD: Delete a service package
+    public function deleteServicePackage($package_id, $service_offering_id) {
+        try {
+            $this->conn->beginTransaction();
+
+            // Fetch images to delete physical files
+            $images_to_delete = $this->getServicePackageImages($package_id);
+
+            // Delete package from database
+            $stmt = $this->conn->prepare("DELETE FROM service_packages WHERE id = ? AND service_offering_id = ?");
+            $success = $stmt->execute([$package_id, $service_offering_id]);
+
+            if ($success) {
+                require_once __DIR__ . '/UploadHandler.class.php';
+                $uploader = new UploadHandler();
+
+                foreach ($images_to_delete as $image) {
+                    $relative_path_from_web_root = str_replace(BASE_URL, '', $image['image_url']);
+                    $physical_path = realpath(__DIR__ . '/../../') . '/' . $relative_path_from_web_root;
+
+                    if (file_exists($physical_path)) {
+                        $uploader->deleteFile(basename($physical_path), dirname($relative_path_from_web_root) . '/');
+                    } else {
+                        error_log("File not found for deletion during package delete: " . $physical_path);
                     }
                 }
+                $this->conn->commit();
+                return true;
             }
-            error_log("DEBUG: updateVendorServiceOfferings - Attempted to insert " . $inserted_count . " new offerings.");
-
-            // REMOVED: $this->conn->commit(); // Transaction managed by calling script
-            error_log("DEBUG: updateVendorServiceOfferings - Operations completed.");
-            return true;
+            $this->conn->rollBack();
+            return false;
         } catch (PDOException $e) {
-            // REMOVED: $this->conn->rollBack(); // Transaction managed by calling script
-            error_log("ERROR: Vendor.updateVendorServiceOfferings PDO Exception: " . $e->getMessage() . " (Code: " . $e->getCode() . ") SQLSTATE: " . $e->errorInfo[0]);
-            throw new Exception("Database error updating services: " . $e->getMessage());
+            $this->conn->rollBack();
+            error_log("Delete service package error: " . $e->getMessage());
+            throw new Exception("Failed to delete package: " . $e->getMessage());
         } catch (Exception $e) {
-            // REMOVED: $this->conn->rollBack(); // Transaction managed by calling script
-            error_log("ERROR: Vendor.updateVendorServiceOfferings General Exception: " . $e->getMessage());
+            $this->conn->rollBack();
+            error_log("Delete service package general error: " . $e->getMessage());
             throw $e;
         }
     }
 
-    /**
-     * Add a new portfolio item.
-     * Modified to return the new item ID for image association and to include venue fields.
-     */
+    // NEW METHOD: Add images for a service package
+    public function addServicePackageImages($service_package_id, $image_urls) {
+        if (empty($image_urls)) {
+            return true;
+        }
+        try {
+            $sql = "INSERT INTO service_package_images (service_package_id, image_url) VALUES ";
+            $values = [];
+            $params = [];
+            foreach ($image_urls as $url) {
+                $values[] = "(?, ?)";
+                $params[] = $service_package_id;
+                $params[] = $url;
+            }
+            $sql .= implode(", ", $values);
+            $stmt = $this->conn->prepare($sql);
+            return $stmt->execute($params);
+        } catch (PDOException $e) {
+            error_log("Add service package images error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // NEW METHOD: Get images for a service package
+    public function getServicePackageImages($service_package_id) {
+        try {
+            $stmt = $this->conn->prepare("SELECT id, image_url FROM service_package_images WHERE service_package_id = ? ORDER BY display_order ASC, created_at ASC");
+            $stmt->execute([$service_package_id]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Get service package images error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    // NEW METHOD: Delete a specific image from a service package
+    public function deleteServicePackageImage($image_id, $service_package_id) {
+        try {
+            $this->conn->beginTransaction();
+            // Get image URL to delete physical file
+            $stmt = $this->conn->prepare("SELECT image_url FROM service_package_images WHERE id = ? AND service_package_id = ?");
+            $stmt->execute([$image_id, $service_package_id]);
+            $image_data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($image_data) {
+                $stmt_delete_db = $this->conn->prepare("DELETE FROM service_package_images WHERE id = ? AND service_package_id = ?");
+                $success = $stmt_delete_db->execute([$image_id, $service_package_id]);
+
+                if ($success) {
+                    require_once __DIR__ . '/UploadHandler.class.php';
+                    $uploader = new UploadHandler();
+                    $relative_path_from_web_root = str_replace(BASE_URL, '', $image_data['image_url']);
+                    $physical_path = realpath(__DIR__ . '/../../') . '/' . $relative_path_from_web_root;
+
+                    if (file_exists($physical_path)) {
+                        $uploader->deleteFile(basename($physical_path), dirname($relative_path_from_web_root) . '/');
+                    } else {
+                        error_log("File not found for deletion (service package image): " . $physical_path);
+                    }
+                }
+                $this->conn->commit();
+                return $success;
+            }
+            $this->conn->rollBack();
+            return false;
+        } catch (PDOException $e) {
+            $this->conn->rollBack();
+            error_log("Delete service package image error: " . $e->getMessage());
+            return false;
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            error_log("Delete service package image general error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Add a new portfolio item.
     public function addPortfolioItem($vendor_id, $data) {
         try {
             $stmt = $this->conn->prepare("INSERT INTO vendor_portfolios
@@ -297,10 +546,7 @@ class Vendor {
         }
     }
 
-    /**
-     * Updates an existing portfolio item.
-     * Modified to include venue fields.
-     */
+    // Updates an existing portfolio item.
     public function updatePortfolioItem($portfolioItemId, $vendorId, $data) {
         try {
             $query = "UPDATE vendor_portfolios SET
@@ -349,12 +595,7 @@ class Vendor {
     }
 
 
-    /**
-     * Deletes a portfolio item.
-     * @param int $portfolioItemId The ID of the portfolio item to delete.
-     * @param int $vendorId The ID of the vendor owning the item (for security).
-     * @return bool True on success, false on failure.
-     */
+    // Deletes a portfolio item.
     public function deletePortfolioItem($portfolioItemId, $vendorId) {
         // NOTE: The portfolio_images table has ON DELETE CASCADE on portfolio_item_id,
         // so deleting from vendor_portfolios will automatically delete associated image records.
@@ -369,7 +610,6 @@ class Vendor {
             $stmt = $this->conn->prepare("DELETE FROM vendor_portfolios WHERE id = ? AND vendor_id = ?");
             $success = $stmt->execute([$portfolioItemId, $vendorId]);
 
-            // If database deletion was successful, proceed to delete physical image files
             if ($success) {
                 // Ensure UploadHandler is available. This class will use it.
                 require_once __DIR__ . '/UploadHandler.class.php';
@@ -925,7 +1165,7 @@ class Vendor {
     public function getAllVendorProfiles() {
         try {
             $stmt = $this->conn->prepare("
-                SELECT 
+                SELECT
                     vp.id,
                     vp.business_name,
                     vp.business_city,
@@ -949,4 +1189,86 @@ class Vendor {
             return [];
         }
     }
+
+    // NEW METHOD: Add multiple images for a service offering
+    public function addServiceOfferingImages($service_offering_id, $image_urls) {
+        if (empty($image_urls)) {
+            return true;
+        }
+        try {
+            $sql = "INSERT INTO service_offering_images (service_offering_id, image_url) VALUES ";
+            $values = [];
+            $params = [];
+            foreach ($image_urls as $url) {
+                $values[] = "(?, ?)";
+                $params[] = $service_offering_id;
+                $params[] = $url;
+            }
+            $sql .= implode(", ", $values);
+            $stmt = $this->conn->prepare($sql);
+            return $stmt->execute($params);
+        } catch (PDOException $e) {
+            error_log("Add service offering images error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // NEW METHOD: Get all images for a specific service offering
+    public function getServiceOfferingImages($service_offering_id) {
+        try {
+            $stmt = $this->conn->prepare("SELECT id, image_url FROM service_offering_images WHERE service_offering_id = ? ORDER BY created_at ASC");
+            $stmt->execute([$service_offering_id]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Get service offering images error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    // NEW METHOD: Delete a specific image from a service offering
+    public function deleteServiceOfferingImage($image_id, $service_offering_id, $vendor_id) {
+        try {
+            // First, get the image URL and verify ownership
+            $stmt = $this->conn->prepare("
+                SELECT soi.image_url
+                FROM service_offering_images soi
+                JOIN vendor_service_offerings vso ON soi.service_offering_id = vso.id
+                WHERE soi.id = ? AND soi.service_offering_id = ? AND vso.vendor_id = ?
+            ");
+            $stmt->execute([$image_id, $service_offering_id, $vendor_id]);
+            $image_data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($image_data) {
+                // Ensure UploadHandler is available.
+                require_once __DIR__ . '/UploadHandler.class.php';
+                $uploader = new UploadHandler();
+
+                // Adjust path for physical deletion (similar to deletePortfolioItem)
+                $relative_path_from_web_root = str_replace(BASE_URL, '', $image_data['image_url']);
+                $physical_path = realpath(__DIR__ . '/../../') . '/' . $relative_path_from_web_root;
+
+                // Delete from DB
+                $stmt_delete_db = $this->conn->prepare("DELETE FROM service_offering_images WHERE id = ? AND service_offering_id = ?");
+                $success = $stmt_delete_db->execute([$image_id, $service_offering_id]);
+
+                // Delete physical file only if DB delete was successful
+                if ($success) {
+                    if (file_exists($physical_path)) {
+                        $uploader->deleteFile(basename($physical_path), dirname($relative_path_from_web_root) . '/');
+                    } else {
+                        error_log("File not found for deletion (service offering image): " . $physical_path);
+                    }
+                }
+                return $success;
+            }
+            return false; // Image not found or not owned by vendor
+        } catch (PDOException $e) {
+            error_log("Delete service offering image error: " . $e->getMessage());
+            return false;
+        } catch (Exception $e) {
+            error_log("Delete service offering image general error: " . $e->getMessage());
+            return false;
+        }
+    }
+
 }
