@@ -36,7 +36,7 @@ try {
                     $redirect_url = BASE_URL . 'public/vendor_dashboard.php'; // Assuming you'll rename the current dashboard.php
                     break;
                 case 3: // Admin
-                    $redirect_url = BASE_URL . 'admin/dashboard.php';
+                    $redirect_url = BASE_URL . 'admin/admin_dashboard.php';
                     break;
                 default:
                     // Fallback for unknown user types
