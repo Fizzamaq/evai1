@@ -267,6 +267,46 @@
     padding: 12px 30px;
 }
 
+/* NEW: Styles for Activity Log (consistent with admin dashboard) */
+.activity-log {
+    border-top: 1px solid #eee; /* Subtle top border */
+    padding-top: 15px; /* Space from heading */
+}
+.activity-item {
+    display: flex;
+    align-items: flex-start; /* Align icon to the top of message */
+    gap: 15px;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+.activity-item:last-child {
+    border-bottom: none;
+}
+.activity-icon {
+    flex-shrink: 0; /* Prevent icon from shrinking */
+    font-size: 1.4em; /* Slightly larger icon */
+    color: var(--primary-color);
+    width: 30px; /* Fixed width for consistent alignment */
+    text-align: center;
+}
+.activity-content {
+    flex-grow: 1; /* Allow content to take remaining space */
+}
+.activity-message {
+    font-size: 0.95em;
+    color: var(--text-dark);
+    line-height: 1.4;
+}
+.activity-time {
+    font-size: 0.8em;
+    color: var(--text-subtle);
+    margin-top: 5px;
+    display: flex; /* For aligning time and view link */
+    justify-content: space-between;
+    align-items: center;
+}
+
+
 /* --- Responsive Adjustments (Dashboard Specific) --- */
 @media (max-width: 992px) {
     .dashboard-sections {
