@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once '../includes/config.php';
 include 'header.php';
 
@@ -81,11 +82,16 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
                 <p><strong>Member Since:</b> <?= date('F Y', strtotime($profile['created_at'])) ?>
 </p>
 
-                <a href="edit_profile.php" class="btn">Edit Profile</a>
+                <div class="profile-actions-row">
+                    <a href="edit_profile.php" class="btn">Edit Profile</a>
+                    <?php if (isset($is_vendor) && $is_vendor && isset($vendor_data) && $vendor_data): // Only show for vendors with a complete profile?>
+                        <a href="<?= BASE_URL ?>public/vendor_manage_services.php" class="btn btn-secondary">Manage Services</a>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
 
-        <?php if ($is_vendor && $vendor_data): // Display vendor specific info ?>
+        <?php if (isset($is_vendor) && $is_vendor && isset($vendor_data) && $vendor_data): // Display vendor specific info?>
             <div class="profile-section" style="margin-top: 30px;">
                 <div class="profile-info">
                     <h2>Business Information</h2>
@@ -101,73 +107,27 @@ if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 
 
             <div class="profile-section" style="margin-top: 30px;">
                 <div class="profile-info">
-                    <h2>Services Offered</h2>
+                    <h2>Services Offered Overview</h2>
                     <?php if (!empty($vendor_services_offered)): ?>
-                        <?php foreach ($vendor_services_offered as $category_name => $services): ?>
-                            <h4><?= htmlspecialchars($category_name) ?></h4>
-                            <ul>
-                                <?php foreach ($services as $service): ?>
-                                    <li>
-                                        <?= htmlspecialchars($service['service_name']) ?>
-                                        <?php if (!empty($service['price_range_min']) || !empty($service['price_range_max'])): ?>
-                                            (PKR <?= number_format($service['price_range_min'] ?? 0) ?> - <?= number_format($service['price_range_max'] ?? 0) ?>)
-                                        <?php endif; ?>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php endforeach; ?>
+                        <p>You offer services in the following categories:</p>
+                        <ul>
+                            <?php foreach ($vendor_services_offered as $category_name => $services): ?>
+                                <li>
+                                    <strong><?= htmlspecialchars($category_name) ?>:</strong>
+                                    <?php
+                                        $service_names = array_column($services, 'service_name');
+                                        echo htmlspecialchars(implode(', ', $service_names));
+                                    ?>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                        <p>For detailed pricing and offers, please visit the <a href="<?= BASE_URL ?>public/vendor_manage_services.php">Manage Services</a> page.</p>
                     <?php else: ?>
                         <p>No services currently listed. Go to <a href="edit_profile.php">Edit Profile</a> to add your services.</p>
                     <?php endif; ?>
                 </div>
             </div>
 
-            <?php /*
-            // REMOVED: My Portfolio Items section
-            <div class="profile-section" style="margin-top: 30px;">
-                <h2>My Portfolio Items</h2>
-                <?php if (!empty($portfolio_items)): ?>
-                    <div class="portfolio-grid">
-                        <?php foreach ($portfolio_items as $item): ?>
-                            <div class="portfolio-item-card">
-                                <div class="portfolio-image-wrapper">
-                                    <?php if ($item['image_url']): ?>
-                                        <img src="<?= BASE_URL . htmlspecialchars($item['image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
-                                    <?php else: ?>
-                                        <div class="portfolio-placeholder">
-                                            <i class="fas fa-image"></i>
-                                            <span>No Image</span>
-                                        </div>
-                                    <?php endif; ?>
-                                    <div class="portfolio-item-overlay">
-                                        <?php if (!empty($item['video_url'])): ?>
-                                            <a href="<?= htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-light-overlay"><i class="fas fa-video"></i> Watch Video</a>
-                                        <?php endif; ?>
-                                        <?php if (!empty($item['client_testimonial'])): ?>
-                                            <p class="testimonial-overlay">"<?= htmlspecialchars(substr($item['client_testimonial'], 0, 100)) ?><?= (strlen($item['client_testimonial']) > 100) ? '...' : '' ?>"</p>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                                <div class="portfolio-description-content">
-                                    <h3><?= htmlspecialchars($item['title']) ?></h3>
-                                    <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 100)) ?><?= (strlen($item['description'] ?? '') > 100) ? '...' : '' ?></p>
-                                    <div class="portfolio-meta-info">
-                                        <?php if ($item['event_type_name']): ?>
-                                            <span><i class="fas fa-tag"></i> <?= htmlspecialchars($item['event_type_name']); ?></span>
-                                        <?php endif; ?>
-                                        <?php if ($item['project_date']): ?>
-                                            <span><i class="fas fa-calendar-alt"></i> <?= date('M Y', strtotime($item['project_date'])); ?></span>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <p>No portfolio items added yet. Go to <a href="edit_profile.php">Edit Profile</a> to add your first item!</p>
-                <?php endif; ?>
-            </div>
-            */ ?>
         <?php endif; ?>
     </div>
 <?php include 'footer.php'; ?>
