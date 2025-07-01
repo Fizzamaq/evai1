@@ -51,7 +51,7 @@ unset($_SESSION['ai_form_data'], $_SESSION['ai_form_errors']);
 
 // Fetch necessary data for form dropdowns
 $event_types = dbFetchAll("SELECT id, type_name FROM event_types WHERE is_active = TRUE ORDER BY type_name ASC");
-$all_services = dbFetchAll("SELECT id, service_name FROM vendor_services WHERE is_active = TRUE ORDER BY service_name ASC");
+// $all_services = dbFetchAll("SELECT id, service_name FROM vendor_services WHERE is_active = TRUE ORDER BY service_name ASC"); // No longer needed directly
 $vendor_categories = $vendor_class->getAllVendorCategories(); // For grouping services
 
 // --- Handle Form Submission ---
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['get_recommendations']
         'budget_max' => filter_var($_POST['budget_max'] ?? '', FILTER_VALIDATE_FLOAT),
         'event_date' => $_POST['event_date'] ?? '',
         'location_string' => trim($_POST['location_string'] ?? ''),
-        'service_ids' => $_POST['services'] ?? [] // Array of selected service IDs (already correctly named here)
+        'service_ids' => $_POST['services'] ?? [] // Array of selected service IDs (now from checkboxes)
     ];
 
     $validation_errors = [];
@@ -78,15 +78,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['get_recommendations']
     if (empty($event_details_input['location_string'])) {
         $validation_errors[] = "Event Location is required.";
     }
-    if (!empty($event_details_input['budget_min']) && !is_numeric($event_details_input['budget_min'])) {
-        $validation_errors[] = "Minimum budget must be a valid number.";
+    
+    // Make budget fields compulsory and validate
+    if (empty(trim($_POST['budget_min'])) || !is_numeric($event_details_input['budget_min'])) {
+        $validation_errors[] = "Minimum Budget is required and must be a valid number.";
     }
-    if (!empty($event_details_input['budget_max']) && !is_numeric($event_details_input['budget_max'])) {
-        $validation_errors[] = "Maximum budget must be a valid number.";
+    if (empty(trim($_POST['budget_max'])) || !is_numeric($event_details_input['budget_max'])) {
+        $validation_errors[] = "Maximum Budget is required and must be a valid number.";
     }
     if (is_numeric($event_details_input['budget_min']) && is_numeric($event_details_input['budget_max']) && $event_details_input['budget_min'] > $event_details_input['budget_max']) {
         $validation_errors[] = "Minimum budget cannot be greater than maximum budget.";
     }
+
     if (empty($event_details_input['service_ids'])) {
         $validation_errors[] = "At least one preferred service is required.";
     }
@@ -99,17 +102,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['get_recommendations']
     }
 
     try {
-        // Fetch full event type name for context (not strictly needed by getVendorRecommendationsFromForm but good for overall context)
+        // Fetch full event type name for context
         $selected_event_type = dbFetch("SELECT type_name FROM event_types WHERE id = ?", [$event_details_input['event_type_id']]);
         
-        // Prepare event data for AI Assistant - CORRECTED KEY HERE
+        // Prepare event data for AI Assistant
         $event_data_for_ai = [
             'event_type_name' => $selected_event_type['type_name'] ?? 'General Event',
-            'budget_min' => $event_details_input['budget_min'] ?? 0,
-            'budget_max' => $event_details_input['budget_max'] ?? 0,
+            'budget_min' => $event_details_input['budget_min'],
+            'budget_max' => $event_details_input['budget_max'],
             'event_date' => $event_details_input['event_date'],
             'location_string' => $event_details_input['location_string'],
-            'service_ids' => $event_details_input['service_ids'] // <--- CORRECTED: Pass service_ids directly
+            'service_ids' => $event_details_input['service_ids']
         ];
 
         $recommended_vendors = $ai_assistant->getVendorRecommendationsFromForm($event_data_for_ai);
@@ -157,13 +160,13 @@ include 'header.php';
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="budget_min">Minimum Budget ($)</label>
-                    <input type="number" id="budget_min" name="budget_min" min="0" step="100"
+                    <label for="budget_min">Minimum Budget (PKR) <span class="required">*</span></label>
+                    <input type="number" id="budget_min" name="budget_min" min="0" step="100" required
                            value="<?= htmlspecialchars($form_data['budget_min'] ?? '') ?>" placeholder="e.g., 5000">
                 </div>
                 <div class="form-group">
-                    <label for="budget_max">Maximum Budget ($)</label>
-                    <input type="number" id="budget_max" name="budget_max" min="0" step="100"
+                    <label for="budget_max">Maximum Budget (PKR) <span class="required">*</span></label>
+                    <input type="number" id="budget_max" name="budget_max" min="0" step="100" required
                            value="<?= htmlspecialchars($form_data['budget_max'] ?? '') ?>" placeholder="e.g., 10000">
                 </div>
             </div>
@@ -183,28 +186,37 @@ include 'header.php';
             </div>
 
             <div class="form-group">
-                <label for="services">Preferred Services <span class="required">*</span></label>
-                <select id="services" name="services[]" multiple size="8" required>
+                <label>Preferred Services <span class="required">*</span></label>
+                <div class="services-checkbox-grid">
                     <?php
                     $selected_services_from_form = $form_data['services'] ?? [];
                     foreach ($vendor_categories as $category): ?>
-                        <optgroup label="<?= htmlspecialchars($category['category_name']) ?>">
-                            <?php
-                            // Filter all_services by current category_id
-                            $stmt_category_services = $pdo->prepare("SELECT id, service_name FROM vendor_services WHERE category_id = ? AND is_active = TRUE ORDER BY service_name ASC");
-                            $stmt_category_services->execute([$category['id']]);
-                            $services_in_category = $stmt_category_services->fetchAll(PDO::FETCH_ASSOC);
+                        <div class="service-category-group">
+                            <h4><?= htmlspecialchars($category['category_name']) ?></h4>
+                            <div class="checkbox-group-inner">
+                                <?php
+                                // Filter all_services by current category_id
+                                $stmt_category_services = $pdo->prepare("SELECT id, service_name FROM vendor_services WHERE category_id = ? AND is_active = TRUE ORDER BY service_name ASC");
+                                $stmt_category_services->execute([$category['id']]);
+                                $services_in_category = $stmt_category_services->fetchAll(PDO::FETCH_ASSOC);
 
-                            foreach ($services_in_category as $service): ?>
-                                <option value="<?= htmlspecialchars($service['id']) ?>"
-                                    <?= in_array($service['id'], $selected_services_from_form) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($service['service_name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </optgroup>
+                                foreach ($services_in_category as $service): ?>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox"
+                                               id="service_<?= htmlspecialchars($service['id']) ?>"
+                                               name="services[]"
+                                               value="<?= htmlspecialchars($service['id']) ?>"
+                                               <?= in_array($service['id'], $selected_services_from_form) ? 'checked' : '' ?>>
+                                        <label for="service_<?= htmlspecialchars($service['id']) ?>"><?= htmlspecialchars($service['service_name']) ?></label>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
                     <?php endforeach; ?>
-                </select>
-                <small class="form-text-muted">Hold CTRL/CMD to select multiple services.</small>
+                </div>
+                <?php if (empty($vendor_categories)): ?>
+                    <p class="text-subtle">No service categories found.</p>
+                <?php endif; ?>
             </div>
 
             <button type="submit" name="get_recommendations" class="btn btn-primary btn-large">Get Recommendations</button>
