@@ -43,13 +43,16 @@ if (isset($_SESSION['user_id'])) {
     $user_events = $event->getUserEvents($_SESSION['user_id']);
 }
 
-// Fetch vendor's services offered with their price ranges
-$vendor_services_offered_raw = $vendor->getVendorServices($vendor_profile['id']);
+// Fetch vendor's service offerings, now including their packages
+$vendor_service_offerings_raw = $vendor->getVendorServices($vendor_profile['id']);
 
-// Group services by category for display
+// Group services by category for display, and attach packages to each
 $vendor_services_grouped = [];
-foreach ($vendor_services_offered_raw as $service) {
-    $vendor_services_grouped[$service['category_name']][] = $service;
+foreach ($vendor_service_offerings_raw as $service_offering) {
+    $full_service_offering = $vendor->getServiceOfferingById($service_offering['id'], $vendor_profile['id']);
+    if ($full_service_offering) {
+        $vendor_services_grouped[$full_service_offering['category_name']][] = $full_service_offering;
+    }
 }
 
 
@@ -67,6 +70,95 @@ $vendor_profile_id_js = $vendor_profile['id'];
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <style>
+        /* New styles for service packages on public profile */
+        .service-category-section {
+            margin-bottom: var(--spacing-lg);
+        }
+        .service-category-section h4 {
+            font-size: 1.5em;
+            color: var(--text-dark);
+            margin-bottom: var(--spacing-md);
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: var(--spacing-sm);
+        }
+        .service-packages-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--spacing-md);
+        }
+        .service-package-card {
+            background: var(--background-light);
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            padding: var(--spacing-md);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border: 1px solid var(--light-grey-border);
+        }
+        .service-package-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .service-package-card h5 {
+            font-size: 1.2em;
+            color: var(--primary-color);
+            margin-top: 0;
+            margin-bottom: var(--spacing-xs);
+        }
+        .service-package-card .package-price {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: var(--secondary-color);
+            margin-bottom: var(--spacing-sm);
+        }
+        .service-package-card .package-description {
+            font-size: 0.9em;
+            color: var(--text-subtle);
+            line-height: 1.4;
+            margin-bottom: var(--spacing-md);
+            flex-grow: 1;
+        }
+        .service-package-card .package-images {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+        }
+        .service-package-card .package-images img {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 5px;
+            border: 1px solid var(--border-color);
+        }
+        .service-package-card .package-images .image-count-overlay {
+            width: 60px;
+            height: 60px;
+            border-radius: 5px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.9em;
+        }
+
+        .service-package-card .action-button {
+            margin-top: auto; /* Push button to bottom */
+            text-align: center;
+            border-top: 1px dashed var(--border-color);
+            padding-top: var(--spacing-md);
+        }
+        .service-package-card .action-button .btn {
+            width: 100%;
+            padding: 10px 15px;
+            font-size: 0.9em;
+        }
+    </style>
 </head>
 <body>
     <div class="vendor-profile-container">
@@ -127,31 +219,71 @@ $vendor_profile_id_js = $vendor_profile['id'];
                     <p><strong>Experience:</strong> <?= htmlspecialchars($vendor_profile['experience_years']) ?> Years</p>
                 <?php endif; ?>
                 <?php if (!empty($vendor_profile['min_budget']) && !empty($vendor_profile['max_budget'])): ?>
-                    <p><strong>Budget Range:</strong> $<?= number_format($vendor_profile['min_budget'], 0) ?> - $<?= number_format($vendor_profile['max_budget'], 0) ?></p>
+                    <p><strong>Overall Budget Range:</strong> $<?= number_format($vendor_profile['min_budget'], 0) ?> - $<?= number_format($vendor_profile['max_budget'], 0) ?></p>
                 <?php endif; ?>
             </div>
         </div>
 
         <div class="profile-section">
-            <h2>Services Offered</h2>
+            <h2>Services & Packages Offered</h2>
             <?php if (!empty($vendor_services_grouped)): ?>
-                <?php foreach ($vendor_services_grouped as $category_name => $services): ?>
-                    <h4><?= htmlspecialchars($category_name) ?></h4>
-                    <ul>
-                        <?php foreach ($services as $service): ?>
-                            <li>
-                                <?= htmlspecialchars($service['service_name']) ?>
-                                <?php if (!empty($service['price_range_min']) || !empty($service['price_range_max'])): ?>
-                                    (PKR <?= number_format($service['price_range_min'] ?? 0) ?> - <?= number_format($service['price_range_max'] ?? 0) ?>)
-                                <?php endif; ?>
-                            </li>
+                <?php foreach ($vendor_services_grouped as $category_name => $services_in_category): ?>
+                    <div class="service-category-section">
+                        <h4><?= htmlspecialchars($category_name) ?></h4>
+                        <?php foreach ($services_in_category as $service_offering): ?>
+                            <h5 style="margin-top: var(--spacing-sm); margin-bottom: var(--spacing-xs); color: var(--text-dark);">
+                                <?= htmlspecialchars($service_offering['service_name']) ?>
+                            </h5>
+                            <?php if (!empty($service_offering['description'])): ?>
+                                <p style="font-size: 0.9em; color: var(--text-subtle); margin-bottom: var(--spacing-md);">
+                                    <?= nl2br(htmlspecialchars($service_offering['description'])) ?>
+                                </p>
+                            <?php endif; ?>
+
+                            <?php if (!empty($service_offering['packages'])): ?>
+                                <div class="service-packages-grid">
+                                    <?php foreach ($service_offering['packages'] as $package): ?>
+                                        <div class="service-package-card">
+                                            <div>
+                                                <h5><?= htmlspecialchars($package['package_name']) ?></h5>
+                                                <p class="package-price">
+                                                    PKR <?= number_format($package['price_min'] ?? 0, 0) ?> - 
+                                                    PKR <?= number_format($package['price_max'] ?? 0, 0) ?>
+                                                </p>
+                                                <p class="package-description">
+                                                    <?= nl2br(htmlspecialchars(substr($package['package_description'] ?? 'No description.', 0, 150))) ?><?= (strlen($package['package_description'] ?? '') > 150 ? '...' : '') ?>
+                                                </p>
+                                                <?php if (!empty($package['images'])): ?>
+                                                    <div class="package-images">
+                                                        <?php foreach (array_slice($package['images'], 0, 3) as $index => $img): ?>
+                                                            <img src="<?= BASE_URL . htmlspecialchars($img['image_url']) ?>" alt="<?= htmlspecialchars($package['package_name']) ?> Image <?= $index + 1 ?>">
+                                                        <?php endforeach; ?>
+                                                        <?php if (count($package['images']) > 3): ?>
+                                                            <span class="image-count-overlay">+<?= count($package['images']) - 3 ?></span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="action-button">
+                                                <?php if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 1): // Only customer can book ?>
+                                                    <a href="<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>&service_offering_id=<?= htmlspecialchars($service_offering['id']) ?>&package_id=<?= htmlspecialchars($package['id']) ?>" class="btn btn-primary">Book This Package</a>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <p style="font-size: 0.9em; color: var(--text-subtle);">No specific packages defined for <?= htmlspecialchars($service_offering['service_name']) ?> yet.</p>
+                            <?php endif; ?>
+                            <hr style="border-top: 1px dashed var(--border-color); margin: var(--spacing-md) 0;">
                         <?php endforeach; ?>
-                    </ul>
+                    </div>
                 <?php endforeach; ?>
             <?php else: ?>
-                <p>No services currently listed by this vendor.</p>
+                <p>No services currently listed by this vendor. (Overall vendor service list empty).</p>
             <?php endif; ?>
         </div>
+
 
         <?php if (isset($_SESSION['user_id']) && $_SESSION['user_type'] == 1): ?>
         <div class="profile-section availability-section">
@@ -289,8 +421,8 @@ $vendor_profile_id_js = $vendor_profile['id'];
                                     return {
                                         id: event.id,
                                         title: '',
-                                        start: event.date + 'T' + event.start_time,
-                                        end: event.date + 'T' + event.end_time,
+                                        start: event.date + 'T' + event.start_time, // Full datetime string
+                                        end: event.date + 'T' + event.end_time,     // Full datetime string
                                         allDay: false,
                                         display: 'background',
                                         color: eventColor,
