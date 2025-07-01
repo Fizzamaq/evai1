@@ -1,0 +1,391 @@
+/* assets/css/vendor_services.css */
+
+/* Specific styles for vendor_manage_services.php */
+
+/* General Container */
+.manage-services-container {
+    max-width: 1000px; /* Wider container for tabs */
+    margin: var(--spacing-lg) auto;
+    padding: var(--spacing-md);
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.manage-services-header {
+    text-align: center;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.manage-services-header h1 {
+    font-size: 2.2em;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-sm);
+}
+
+.manage-services-header p {
+    color: var(--text-subtle);
+    font-size: 1.1em;
+}
+
+/* Tab Navigation */
+.service-tabs {
+    display: flex;
+    flex-wrap: wrap; /* Allow tabs to wrap */
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: 5px; /* Space for border-bottom of active tab */
+    background: var(--background-light); /* Light background for tab bar */
+    border-radius: 8px 8px 0 0; /* Rounded top corners */
+    overflow: hidden; /* Ensure border radius applies */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* Subtle shadow for tab bar */
+}
+
+.tab-button {
+    background: var(--background-light); /* Light background for inactive tabs */
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: var(--spacing-sm) var(--spacing-md); /* Increased padding */
+    font-size: 1.05em; /* Slightly larger font */
+    font-weight: 600;
+    color: var(--text-subtle);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap; /* Prevent tab text from wrapping */
+    flex-grow: 1; /* Allow tabs to share space */
+    text-align: center; /* Center tab text */
+    border-right: 1px solid var(--border-color); /* Separator between tabs */
+}
+.tab-button:last-child {
+    border-right: none; /* No separator for the last tab */
+}
+.tab-button:hover:not(.active) {
+    color: var(--primary-color);
+    background-color: #E6E6FA; /* Lighter hover background */
+}
+.tab-button.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    background-color: var(--white); /* White background for active tab */
+    box-shadow: inset 0 -3px 5px rgba(0,0,0,0.05); /* Subtle inner shadow for active tab */
+    transform: translateY(0); /* Ensure no unwanted transform from general hover */
+    position: relative; /* For z-index if needed */
+}
+.tab-content {
+    display: none; /* Hidden by default */
+    animation: fadeIn 0.5s ease-out; /* Fade in animation for content */
+    padding: var(--spacing-lg); /* Increased padding for content */
+    background: var(--background-light); /* Background for tab content */
+    border-radius: 0 0 8px 8px; /* Rounded bottom corners */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08); /* Consistent card shadow */
+    margin-bottom: var(--spacing-lg); /* Space after the content */
+}
+.tab-content.active {
+    display: block; /* Show active tab content */
+}
+.tab-content h2 {
+    font-size: 1.6em;
+    margin-top: 0;
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: var(--spacing-md);
+    color: var(--text-dark);
+}
+
+/* Form styling for overall service offering details within tabs */
+.overall-service-details-form {
+    background-color: var(--white);
+    padding: var(--spacing-md);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    margin-bottom: var(--spacing-lg);
+    border: 1px solid var(--light-grey-border);
+}
+.overall-service-details-form h3 {
+    font-size: 1.2em;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-md);
+}
+.overall-service-details-form .form-actions {
+    justify-content: flex-end; /* Align save button to the right */
+}
+
+
+/* Styles for packages (deals) */
+.packages-section h3 {
+    font-size: 1.4em;
+    color: var(--text-dark);
+    margin-top: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px dashed var(--border-color);
+}
+
+.packages-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.package-card {
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    padding: var(--spacing-md);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+    display: flex; /* Use flexbox for internal layout */
+    flex-direction: row; /* Image on left, details on right */
+    align-items: flex-start; /* Align items to the top */
+    gap: var(--spacing-md); /* Space between image and text */
+}
+
+.package-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.12);
+}
+
+.package-image-wrapper {
+    flex-shrink: 0; /* Prevent image from shrinking */
+    width: 120px; /* Fixed width for image container */
+    height: 120px; /* Fixed height for image container */
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    background-color: var(--background-light); /* Placeholder background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    cursor: pointer; /* Indicate clickable for lightbox */
+}
+
+.package-image-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.package-image-wrapper .package-placeholder {
+    font-size: 2.5em;
+    color: var(--text-subtle);
+}
+
+.package-image-wrapper .image-count-overlay {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 6px;
+    border-top-left-radius: 5px;
+    font-size: 0.8em;
+}
+
+.package-details-content {
+    flex-grow: 1; /* Allow details content to take remaining space */
+    display: flex;
+    flex-direction: column;
+}
+
+.package-card h4 {
+    font-size: 1.3em;
+    color: var(--primary-color);
+    margin-top: 0;
+    margin-bottom: var(--spacing-xs);
+}
+
+.package-card .price-display {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: var(--secondary-color);
+    margin-bottom: var(--spacing-sm);
+}
+.package-card .package-description {
+    font-size: 0.9em;
+    color: var(--text-subtle);
+    line-height: 1.4;
+    margin-bottom: var(--spacing-md);
+    flex-grow: 1;
+}
+
+.package-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin-top: auto; /* Push actions to bottom */
+    border-top: 1px dashed var(--border-color);
+    padding-top: var(--spacing-md);
+    flex-wrap: wrap;
+    align-self: flex-end; /* Align actions to the bottom-right within the card */
+}
+.package-actions .btn {
+    padding: 8px 16px;
+    font-size: 0.9em;
+    border-radius: 6px;
+}
+.add-package-button-container {
+    text-align: right;
+    margin-bottom: var(--spacing-lg);
+}
+
+/* Form styling for packages */
+.package-form-container {
+    background-color: var(--white);
+    padding: var(--spacing-md);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    margin-top: var(--spacing-md);
+    border: 1px solid var(--light-grey-border);
+}
+.package-form-container h3 {
+    font-size: 1.2em;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-md);
+}
+
+/* Image previews within forms (both current and new uploads) */
+.package-form-container .current-images-grid,
+.package-form-container .image-preview-grid {
+    display: flex; /* Use flex to align horizontally */
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 15px;
+    justify-content: flex-start; /* Align images to the left */
+}
+.package-form-container .current-image-item,
+.package-form-container .image-preview-item {
+    width: 100px; /* Smaller fixed size for form previews */
+    height: 100px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--background-light);
+    flex-shrink: 0; /* Prevent items from shrinking */
+}
+.package-form-container .current-image-item img,
+.package-form-container .image-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.package-form-container .current-image-item .delete-image-btn {
+    position: absolute; top: 5px; right: 5px; background: rgba(255, 0, 0, 0.7); color: white;
+    border: none; border-radius: 50%; width: 25px; height: 25px; font-size: 0.8em; cursor: pointer;
+    display: flex; justify-content: center; align-items: center; opacity: 0.8; z-index: 10;
+}
+.package-form-container .current-image-item .delete-image-btn:hover { opacity: 1; }
+.package-form-container .undo-delete-image-btn { background: rgba(0, 128, 0, 0.7); }
+
+.package-form-container .form-actions {
+    justify-content: flex-end;
+}
+
+/* Lightbox Styles */
+.lightbox-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85); /* Darker overlay */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999; /* Ensure it's on top of everything */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+.lightbox-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+.lightbox-content {
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+    border-radius: 8px; /* Slight roundness */
+    overflow: hidden; /* Ensure image doesn't overflow its own box-shadow/border-radius */
+}
+.lightbox-content img {
+    display: block; /* Remove extra space below image */
+    max-width: 1000px;
+    max-height: 1000px;
+    object-fit: fill; /* Contain image within its dimensions */
+    border-radius: 8px; /* Match content border-radius */
+}
+.lightbox-close {
+    position: absolute;
+    top: 15px; /* Slightly more padding */
+    right: 15px;
+    font-size: 2.5em; /* Larger close button */
+    color: #fff;
+    cursor: pointer;
+    z-index: 10000;
+    background-color: rgba(0, 0, 0, 0.4); /* Background for visibility */
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.2s ease;
+}
+.lightbox-close:hover {
+    background-color: rgba(255, 0, 0, 0.6); /* Red on hover */
+}
+
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .service-tabs {
+        flex-direction: column; /* Stack tabs vertically on small screens */
+        border-radius: 8px; /* Apply border radius to all corners when stacked */
+    }
+    .tab-button {
+        border-right: none; /* Remove right border when stacked */
+        border-bottom: 1px solid var(--border-color); /* Add bottom border between stacked tabs */
+    }
+    .tab-button:last-child {
+        border-bottom: none; /* No bottom border on the very last tab */
+    }
+    .tab-content {
+        padding: var(--spacing-md); /* Reduce padding for smaller screens */
+    }
+    .form-row {
+        grid-template-columns: 1fr; /* Stack form fields */
+    }
+    .overall-service-details-form .form-actions {
+        flex-direction: column;
+    }
+    .overall-service-details-form .form-actions .btn {
+        width: 100%;
+    }
+    .packages-grid {
+        grid-template-columns: 1fr; /* Stack package cards */
+    }
+    .package-card {
+        flex-direction: column; /* Stack image and details vertically on small screens */
+        align-items: center;
+        text-align: center;
+    }
+    .package-image-wrapper {
+        margin-bottom: var(--spacing-sm);
+    }
+    .package-details-content {
+        align-items: center;
+        text-align: center;
+    }
+    .package-actions {
+        flex-direction: column;
+        width: 100%;
+        align-self: center; /* Center actions */
+    }
+    .package-actions .btn {
+        width: 100%;
+    }
+}
