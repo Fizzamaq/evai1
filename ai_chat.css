@@ -1,14 +1,31 @@
 /* assets/css/ai_chat.css */
 
 .ai-recommendation-container {
-    max-width: 900px; /* Slightly wider container for the form and results */
-    margin: var(--spacing-lg) auto;
+    /* Removed max-width to allow it to be fully wide */
+    width: 100%; /* Ensure it explicitly takes full width of its parent */
+    margin: var(--spacing-lg) auto; /* Still keeps it centered with top/bottom margin */
     padding: var(--spacing-lg);
-    background: var(--white);
-    border-radius: 12px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.1); /* More refined shadow */
+    
+    /* ENHANCED DESIGN FOR CONTAINER */
+    background: linear-gradient(145deg, var(--white) 0%, var(--background-light) 100%); /* Soft gradient background */
+    border-radius: 20px; /* More pronounced border-radius */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), /* Stronger main shadow */
+                0 0 0 3px rgba(var(--primary-color-rgb, 138, 43, 226), 0.05); /* Subtle outer border/glow */
+    transition: all 0.3s ease-in-out; /* Smooth transitions for hover/state changes */
+    position: relative;
+    overflow: hidden; /* Ensures inner elements don't break rounded corners */
+    /* END ENHANCED DESIGN */
+
     box-sizing: border-box;
 }
+
+/* Add a subtle animation to the container on load or hover (optional, for "advanced" feel) */
+.ai-recommendation-container:hover {
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2),
+                0 0 0 4px rgba(var(--primary-color-rgb, 138, 43, 226), 0.1);
+    transform: translateY(-2px); /* Slight lift */
+}
+
 
 .ai-recommendation-container h1 {
     text-align: center;
@@ -40,10 +57,6 @@
     margin-bottom: var(--spacing-lg); /* More space for form rows */
 }
 
-/* Specific styling for select[multiple] in this context */
-.ai-event-form select[multiple] {
-    min-height: 180px; /* Make multi-select taller */
-}
 
 .ai-event-form .btn-large {
     width: auto; /* Allow button to size based on content, not full width */
@@ -73,7 +86,7 @@
 
 .vendor-recommendations-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Responsive grid for vendor cards */
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Responsive grid for vendor cards */
     gap: var(--spacing-lg); /* Space between cards */
     padding: var(--spacing-md); /* Padding around the grid */
 }
@@ -161,6 +174,151 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* STYLES FOR CHECKBOXES (Luminous Orb) - as provided previously */
+.services-checkbox-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--white);
+}
+
+.service-category-group {
+    border: 1px solid var(--background-light);
+    border-radius: 6px;
+    padding: var(--spacing-sm);
+    background-color: var(--background-light);
+}
+
+.service-category-group h4 {
+    font-size: 1.1em;
+    color: var(--primary-color);
+    margin-top: 0;
+    margin-bottom: var(--spacing-sm); /* Adjusted from md to sm */
+    padding-bottom: var(--spacing-xs);
+    border-bottom: 1px dashed var(--border-color);
+}
+
+.checkbox-group-inner {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--spacing-xs);
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px; /* Increased padding */
+    background: var(--white);
+    border: 1px solid var(--light-grey-border);
+    border-radius: 8px; /* More rounded corners for the item */
+    transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-dark);
+    position: relative;
+    overflow: hidden; /* Important for containing inner glows/animations */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* Base style for the orb */
+.checkbox-item label::before {
+    content: '';
+    display: inline-block;
+    width: 22px; /* Size of the orb */
+    height: 22px;
+    flex-shrink: 0;
+    border-radius: 50%; /* Make it a circle */
+    margin-right: 12px; /* Space between orb and text */
+    background: radial-gradient(circle at 30% 30%, #555, #333 70%); /* Dark, metallic-like orb */
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.5); /* Inner shadow for depth */
+    transition: all 0.3s ease-out;
+    box-sizing: border-box;
+    border: 1px solid rgba(255,255,255,0.1); /* Subtle highlight on dark orb */
+}
+
+/* Hidden original checkbox */
+.checkbox-item input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+/* Luminous Orb when checked */
+.checkbox-item input[type="checkbox"]:checked + label::before {
+    background: radial-gradient(circle at 30% 30%, var(--accent-color), var(--primary-color) 70%); /* Luminous gradient */
+    border-color: var(--primary-color);
+    box-shadow: 0 0 15px var(--primary-color), /* Outer glow */
+                0 0 8px var(--accent-color), /* Inner glow */
+                inset 0 0 5px rgba(255,255,255,0.8); /* Highlight */
+    transform: scale(1.05); /* Slightly pop out */
+}
+
+/* Energy signature (instead of checkmark) when checked */
+.checkbox-item input[type="checkbox"]:checked + label::after {
+    content: ''; /* No text content, it's a visual effect */
+    position: absolute;
+    width: 14px; /* Size of the energy signature */
+    height: 14px;
+    border-radius: 50%;
+    background: var(--white); /* White core for energy */
+    box-shadow: 0 0 8px rgba(255,255,255,0.8), 0 0 15px var(--accent-color); /* Inner glow */
+    top: 50%;
+    left: 20px; /* Aligned within the orb area */
+    transform: translate(-50%, -50%) scale(0); /* Start hidden */
+    animation: activateOrb 0.5s forwards ease-out; /* Animation */
+    filter: blur(1px); /* Soft blur effect */
+    opacity: 0.8;
+}
+
+/* Animation for the energy signature */
+@keyframes activateOrb {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+
+/* Subtle changes to item card when checked */
+.checkbox-item input[type="checkbox"]:checked { /* Corrected selector */
+    background-color: rgba(var(--primary-color-rgb, 138, 43, 226), 0.05); /* Very faint primary background for the item */
+    border-color: var(--primary-color); /* Item border changes to primary color */
+    box-shadow: 0 4px 10px rgba(var(--primary-color-rgb, 138, 43, 226), 0.1); /* Subtle shadow for checked item */
+}
+
+
+/* Hover state for the item itself (when unchecked) */
+.checkbox-item:hover:not(input[type="checkbox"]:checked + label) { /* Corrected selector for hover */
+    background-color: var(--light-bg-hover);
+    border-color: var(--primary-color); /* Highlight border on hover */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+/* Hover state for the orb within the item */
+.checkbox-item:hover label::before {
+    background: radial-gradient(circle at 30% 30%, #777, #444 70%); /* Orb brightens on hover */
+    box-shadow: inset 0 0 8px rgba(0,0,0,0.6);
+}
+
+
+/* Focus state for accessibility (on the label, as input is hidden) */
+.checkbox-item input[type="checkbox"]:focus + label::before {
+    box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.6); /* Stronger glow for focus */
+    border-color: var(--primary-color);
+}
+
+/* Ensure label click toggles the hidden checkbox */
+.checkbox-item label {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding-left: 0;
+}
+
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .ai-recommendation-container {
@@ -178,6 +336,9 @@
     .vendor-card-image {
         height: 200px; /* Adjust image height for single column */
     }
+    .checkbox-group-inner {
+        grid-template-columns: 1fr; /* Stack checkboxes on very small screens */
+    }
 }
 
 @media (max-width: 480px) {
@@ -187,7 +348,7 @@
     .ai-recommendation-container h1 {
         font-size: 1.8em;
     }
-    .ai-recommendations-results h2 {
+    .ai-recommendation-results h2 {
         font-size: 1.6em;
     }
     .ai-event-form .btn-large {
