@@ -128,6 +128,134 @@ class ReportGenerator {
         }
     }
 
+    /**
+     * Retrieves recent activities for a specific customer user.
+     * @param int $userId The ID of the customer user.
+     * @param int $limit The maximum number of activities to retrieve.
+     * @return array An array of associative arrays, each representing an activity.
+     */
+    public function getUserRecentActivity($userId, $limit = 10) {
+        try {
+            $stmt = $this->pdo->prepare("
+                -- New Event Created
+                (SELECT 'New Event Created: ' AS type_prefix, e.title AS message_detail, e.created_at, 'fas fa-calendar-plus' AS icon_class, NULL AS related_url
+                FROM events e WHERE e.user_id = :user_id1 ORDER BY e.created_at DESC LIMIT :limit1)
+                
+                UNION ALL
+                
+                -- New Booking Made
+                (SELECT 'Booking Made: ' AS type_prefix, CONCAT('for event ', e.title, ' with ', vp.business_name) AS message_detail, b.created_at, 'fas fa-calendar-check' AS icon_class, CONCAT('public/booking.php?id=', b.id) AS related_url
+                FROM bookings b JOIN events e ON b.event_id = e.id JOIN vendor_profiles vp ON b.vendor_id = vp.id
+                WHERE b.user_id = :user_id2 ORDER BY b.created_at DESC LIMIT :limit2)
+                
+                UNION ALL
+                
+                -- Chat Message Sent by user (only if it's the latest message in conversation)
+                (SELECT 'Chat Message: ' AS type_prefix, CONCAT('You sent a message to ', CASE WHEN cc.user_id = :user_id3 THEN vp.business_name ELSE CONCAT(u_other.first_name, ' ', u_other.last_name) END) AS message_detail, cm.created_at, 'fas fa-comment' AS icon_class, CONCAT('public/chat.php?conversation_id=', cc.id) AS related_url
+                FROM chat_messages cm
+                JOIN chat_conversations cc ON cm.conversation_id = cc.id
+                LEFT JOIN users u_other ON (CASE WHEN cc.user_id = :user_id4 THEN cc.vendor_id ELSE cc.user_id END) = u_other.id
+                LEFT JOIN vendor_profiles vp ON u_other.id = vp.user_id
+                WHERE cm.sender_id = :user_id5 AND cm.id = (SELECT MAX(id) FROM chat_messages WHERE conversation_id = cm.conversation_id)
+                ORDER BY cm.created_at DESC LIMIT :limit3)
+
+                UNION ALL
+
+                -- AI Recommendation Viewed (or event saved from AI)
+                (SELECT 'AI Plan Saved: ' AS type_prefix, e.title AS message_detail, e.created_at, 'fas fa-robot' AS icon_class, CONCAT('public/event.php?id=', e.id) AS related_url
+                FROM events e
+                WHERE e.user_id = :user_id6 AND e.ai_preferences IS NOT NULL AND e.status != 'deleted'
+                ORDER BY e.created_at DESC LIMIT :limit4)
+
+                ORDER BY created_at DESC
+                LIMIT :final_limit
+            ");
+
+            $stmt->bindParam(':user_id1', $userId, PDO::PARAM_INT);
+            $stmt->bindParam(':limit1', $limit, PDO::PARAM_INT);
+            $stmt->bindParam(':user_id2', $userId, PDO::PARAM_INT);
+            $stmt->bindParam(':limit2', $limit, PDO::PARAM_INT);
+            $stmt->bindParam(':user_id3', $userId, PDO::PARAM_INT);
+            $stmt->bindParam(':user_id4', $userId, PDO::PARAM_INT);
+            $stmt->bindParam(':user_id5', $userId, PDO::PARAM_INT);
+            $stmt->bindParam(':limit3', $limit, PDO::PARAM_INT);
+            $stmt->bindParam(':user_id6', $userId, PDO::PARAM_INT);
+            $stmt->bindParam(':limit4', $limit, PDO::PARAM_INT);
+            $stmt->bindParam(':final_limit', $limit, PDO::PARAM_INT);
+            
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting user recent activity for user {$userId}: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Retrieves recent activities for a specific vendor.
+     * @param int $vendorProfileId The ID of the vendor profile.
+     * @param int $limit The maximum number of activities to retrieve.
+     * @return array An array of associative arrays, each representing an activity.
+     */
+    public function getVendorRecentActivity($vendorProfileId, $limit = 10) {
+        try {
+            // First, get the user_id associated with this vendor_profile_id
+            $stmt_user_id = $this->pdo->prepare("SELECT user_id FROM vendor_profiles WHERE id = ?");
+            $stmt_user_id->execute([$vendorProfileId]);
+            $vendorUserId = $stmt_user_id->fetchColumn();
+
+            if (!$vendorUserId) {
+                return []; // Vendor profile not found or no associated user.
+            }
+
+            $stmt = $this->pdo->prepare("
+                -- New Booking Received
+                (SELECT 'New Booking: ' AS type_prefix, CONCAT('for event ', e.title, ' from ', u.first_name, ' ', u.last_name) AS message_detail, b.created_at, 'fas fa-calendar-check' AS icon_class, CONCAT('public/booking.php?id=', b.id) AS related_url
+                FROM bookings b JOIN events e ON b.event_id = e.id JOIN users u ON b.user_id = u.id
+                WHERE b.vendor_id = :vendor_user_id1 ORDER BY b.created_at DESC LIMIT :limit1)
+
+                UNION ALL
+                
+                -- Chat Message Received by vendor (only if it's the latest message in conversation)
+                (SELECT 'Chat Message: ' AS type_prefix, CONCAT('You received a message from ', CONCAT(u_other.first_name, ' ', u_other.last_name)) AS message_detail, cm.created_at, 'fas fa-comment' AS icon_class, CONCAT('public/vendor_chat.php?conversation_id=', cc.id) AS related_url
+                FROM chat_messages cm
+                JOIN chat_conversations cc ON cm.conversation_id = cc.id
+                JOIN users u_other ON (CASE WHEN cc.user_id = :vendor_user_id2 THEN cc.vendor_id ELSE cc.user_id END) = u_other.id
+                WHERE cm.sender_id != :vendor_user_id3 AND (cc.user_id = :vendor_user_id4 OR cc.vendor_id = :vendor_user_id5)
+                AND cm.id = (SELECT MAX(id) FROM chat_messages WHERE conversation_id = cm.conversation_id)
+                ORDER BY cm.created_at DESC LIMIT :limit2)
+
+                UNION ALL
+                
+                -- New Review Received
+                (SELECT 'New Review: ' AS type_prefix, CONCAT('for your service from ', u.first_name, ' ', u.last_name) AS message_detail, r.created_at, 'fas fa-star' AS icon_class, NULL AS related_url
+                FROM reviews r JOIN users u ON r.reviewer_id = u.id
+                WHERE r.reviewed_id = :vendor_user_id6 ORDER BY r.created_at DESC LIMIT :limit3)
+
+                ORDER BY created_at DESC
+                LIMIT :final_limit
+            ");
+
+            $stmt->bindParam(':vendor_user_id1', $vendorUserId, PDO::PARAM_INT);
+            $stmt->bindParam(':limit1', $limit, PDO::PARAM_INT);
+            $stmt->bindParam(':vendor_user_id2', $vendorUserId, PDO::PARAM_INT);
+            $stmt->bindParam(':vendor_user_id3', $vendorUserId, PDO::PARAM_INT);
+            $stmt->bindParam(':vendor_user_id4', $vendorUserId, PDO::PARAM_INT);
+            $stmt->bindParam(':vendor_user_id5', $vendorUserId, PDO::PARAM_INT);
+            $stmt->bindParam(':limit2', $limit, PDO::PARAM_INT);
+            $stmt->bindParam(':vendor_user_id6', $vendorUserId, PDO::PARAM_INT);
+            $stmt->bindParam(':limit3', $limit, PDO::PARAM_INT);
+            $stmt->bindParam(':final_limit', $limit, PDO::PARAM_INT);
+
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting vendor recent activity for vendor profile {$vendorProfileId} (user {$vendorUserId}): " . $e->getMessage());
+            return [];
+        }
+    }
+
+
     public function exportToCSV($data, $filename) {
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
