@@ -5,6 +5,7 @@ require_once '../classes/Vendor.class.php'; // Might not be directly needed here
 require_once '../classes/Booking.class.php';
 require_once '../classes/PaymentProcessor.class.php';
 require_once '../classes/Chat.class.php'; // Needed to potentially start a chat
+require_once '../classes/Notification.class.php'; // Include Notification class
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . 'public/login.php');
@@ -14,6 +15,7 @@ if (!isset($_SESSION['user_id'])) {
 $bookingSystem = new Booking($pdo);
 $paymentProcessor = new PaymentProcessor($pdo);
 $chat = new Chat($pdo);
+$notification = new Notification($pdo); // Instantiate Notification class
 
 try {
     $event_id = $_POST['event_id'] ?? null;
@@ -51,15 +53,19 @@ try {
     }
 
     // Create chat conversation for this booking
-    // The startConversation method expects user_id and vendor_id to start a new chat
     $conversation_id = $chat->startConversation($event_id, $_SESSION['user_id'], $vendor_id);
     if ($conversation_id) {
-        // Update the booking with the chat_conversation_id
         $bookingSystem->updateBookingChatConversationId($newBookingId, $conversation_id);
     } else {
         error_log("Failed to create chat conversation for booking ID: $newBookingId");
         // Decide how to handle this: still proceed with payment or fail booking
         // For now, allow to proceed, but log it.
+        $notification->createNotification(
+            $_SESSION['user_id'],
+            "Warning: Could not start chat for your booking (ID: {$newBookingId}). Please contact support if you need to chat with the vendor.",
+            'booking',
+            $newBookingId
+        );
     }
 
     // Create payment intent using PaymentProcessor
@@ -73,17 +79,38 @@ try {
         $bookingSystem->updateBookingStripePaymentId($newBookingId, $paymentIntent->id);
 
         $_SESSION['success_message'] = "Booking initiated. Redirecting to payment!";
+        $notification->createNotification(
+            $_SESSION['user_id'],
+            "Your booking (ID: {$newBookingId}) has been initiated successfully! Please complete the payment.",
+            'booking',
+            $newBookingId
+        );
         // Redirect to a page where payment can be completed (e.g., Stripe Checkout/Elements)
         header('Location: ' . BASE_URL . 'public/booking_confirmation.php?booking_id=' . $newBookingId . '&client_secret=' . $paymentIntent->client_secret);
         exit();
     } else {
         // If payment intent creation fails, cancel the booking or mark it appropriately
         $bookingSystem->updateBookingStatus($newBookingId, 'cancelled');
-        throw new Exception("Payment intent creation failed. Booking cancelled.");
+        $error_message = "Payment intent creation failed. Booking (ID: {$newBookingId}) cancelled.";
+        error_log($error_message);
+        $notification->createNotification(
+            $_SESSION['user_id'],
+            "Failed to initiate payment for your booking (ID: {$newBookingId}). Please try again or contact support.",
+            'booking',
+            $newBookingId
+        );
+        throw new Exception($error_message);
     }
 
 } catch (Exception $e) {
     $_SESSION['error_message'] = $e->getMessage();
+    error_log("Booking processing error for user " . ($_SESSION['user_id'] ?? 'N/A') . ": " . $e->getMessage());
+    $notification->createNotification(
+        $_SESSION['user_id'],
+        "Booking Failed: " . $e->getMessage(),
+        'booking',
+        $newBookingId ?? null // Pass booking ID if available, else null
+    );
     // Redirect back to the previous page or a specific error page
     header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . 'public/')); // Fallback to homepage
     exit();
