@@ -22,15 +22,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($user_id_target && is_numeric($user_id_target)) {
         try {
-            if ($action === 'activate') {
-                $user_obj->updateUserStatus($user_id_target, 1);
-                $_SESSION['success_message'] = "User activated successfully.";
-            } elseif ($action === 'deactivate') {
-                $user_obj->updateUserStatus($user_id_target, 0);
-                $_SESSION['success_message'] = "User deactivated successfully.";
-            } elseif ($action === 'delete') {
-                $user_obj->deleteUser($user_id_target);
-                $_SESSION['success_message'] = "User deleted successfully.";
+            // Prevent admin from deactivating/deleting themselves
+            if ($user_id_target == $_SESSION['user_id'] && ($_SESSION['user_type'] ?? null) == 3 && ($action === 'deactivate' || $action === 'delete')) {
+                $_SESSION['error_message'] = "Admins cannot deactivate or delete their own account from here.";
+            } else {
+                if ($action === 'activate') {
+                    $user_obj->updateUserStatus($user_id_target, 1);
+                    $_SESSION['success_message'] = "User activated successfully.";
+                } elseif ($action === 'deactivate') {
+                    $user_obj->updateUserStatus($user_id_target, 0);
+                    $_SESSION['success_message'] = "User deactivated successfully.";
+                } elseif ($action === 'delete') {
+                    $user_obj->deleteUser($user_id_target);
+                    $_SESSION['success_message'] = "User deleted successfully.";
+                }
             }
         } catch (Exception $e) {
             $_SESSION['error_message'] = "Action failed: " . $e->getMessage();
@@ -59,7 +64,7 @@ include '../../includes/admin_header.php';
         <div class="alert error"><?php echo htmlspecialchars($_SESSION['error_message']); unset($_SESSION['error_message']); ?></div>
     <?php endif; ?>
 
-    <div class="table-responsive">
+    <div class="admin-table-responsive">
         <table class="admin-table">
             <thead>
                 <tr>
@@ -78,9 +83,17 @@ include '../../includes/admin_header.php';
                             <td><?php echo htmlspecialchars($user['id']); ?></td>
                             <td><?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?></td>
                             <td><?php echo htmlspecialchars($user['email']); ?></td>
-                            <td><?php echo htmlspecialchars($user['type_name']); ?></td>
-                            <td><?php echo $user['is_active'] ? 'Active' : 'Inactive'; ?></td>
+                            <td><?php echo htmlspecialchars($user['user_type']); ?></td> <td>
+                                <?php 
+                                    if ($user['is_active']) {
+                                        echo '<span class="status-badge status-active">Active</span>';
+                                    } else {
+                                        echo '<span class="status-badge status-inactive">Inactive</span>';
+                                    }
+                                ?>
+                            </td>
                             <td>
+                                <a href="<?= BASE_URL ?>public/profile.php?id=<?php echo htmlspecialchars($user['id']); ?>" class="btn btn-sm btn-info" style="margin-right: 5px;">View Profile</a>
                                 <form method="POST" style="display: inline-block;">
                                     <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($user['id']); ?>">
                                     <?php if ($user['is_active']): ?>
