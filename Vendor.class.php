@@ -896,22 +896,27 @@ class Vendor {
 
     // Get vendor availability (Unified method)
     public function getAvailability($vendorId, $startDate, $endDate) {
-        $stmt = $this->conn->prepare("
-            SELECT
-                id,
-                date, // Select 'date' column
-                start_time,
-                end_time,
-                status
-            FROM vendor_availability
-            WHERE
-                vendor_id = ? AND
-                date BETWEEN ? AND ?
-            ORDER BY date, start_time
-        ");
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    id,
+                    date,
+                    start_time,
+                    end_time,
+                    status
+                FROM vendor_availability
+                WHERE
+                    vendor_id = ? AND
+                    date BETWEEN ? AND ?
+                ORDER BY date, start_time
+            ");
 
-        $stmt->execute([$vendorId, $startDate, $endDate]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $stmt->execute([$vendorId, $startDate, $endDate]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Vendor.class.php getAvailability error: " . $e->getMessage() . " for vendor: {$vendorId}, start: {$startDate}, end: {$endDate}");
+            return false; // Return false on error
+        }
     }
 
     // Get recommended vendors for an event
@@ -1190,7 +1195,9 @@ class Vendor {
         }
     }
 
-    // NEW METHOD: Add multiple images for a service offering
+    /**
+     * NEW METHOD: Add multiple images for a service offering
+     */
     public function addServiceOfferingImages($service_offering_id, $image_urls) {
         if (empty($image_urls)) {
             return true;
@@ -1213,7 +1220,9 @@ class Vendor {
         }
     }
 
-    // NEW METHOD: Get all images for a specific service offering
+    /**
+     * NEW METHOD: Get all images for a specific service offering
+     */
     public function getServiceOfferingImages($service_offering_id) {
         try {
             $stmt = $this->conn->prepare("SELECT id, image_url FROM service_offering_images WHERE service_offering_id = ? ORDER BY created_at ASC");
@@ -1225,7 +1234,9 @@ class Vendor {
         }
     }
 
-    // NEW METHOD: Delete a specific image from a service offering
+    /**
+     * NEW METHOD: Delete a specific image from a service offering
+     */
     public function deleteServiceOfferingImage($image_id, $service_offering_id, $vendor_id) {
         try {
             // First, get the image URL and verify ownership
