@@ -8,7 +8,7 @@ require_once __DIR__ . '/../classes/Vendor.class.php';
 require_once __DIR__ . '/../classes/ReportGenerator.class.php'; // Include ReportGenerator for recent activities
 
 $vendor = new Vendor($pdo); // Pass PDO
-$report_generator = new ReportGenerator($pdo); // Instantiate ReportGenerator
+$report_generator = new ReportGenerator($pdo);
 
 // Verify vendor access: This method ensures the user is logged in, is a vendor,
 // and sets $_SESSION['vendor_id'] if successful. It redirects otherwise.
@@ -150,6 +150,10 @@ $recent_activities = $report_generator->getVendorRecentActivity($vendor_data['id
             if (calendarEl) {
                 const calendar = new FullCalendar.Calendar(calendarEl, {
                     initialView: 'dayGridMonth',
+                    // Restrict calendar navigation to current and future dates
+                    validRange: {
+                        start: '<?= date('Y-m-d') ?>' // Sets the start of the valid range to today
+                    },
                     // Events are fetched from the dedicated public/availability.php API endpoint
                     events: function(fetchInfo, successCallback, failureCallback) {
                         fetch(`<?= BASE_URL ?>public/availability.php?vendor_id=<?= $_SESSION['vendor_id'] ?>&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
