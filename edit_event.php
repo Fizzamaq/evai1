@@ -1,4 +1,5 @@
 <?php
+// public/edit_event.php
 require_once '../includes/config.php';
 require_once '../classes/Event.class.php'; // Include Event class
 include 'header.php';
@@ -27,6 +28,10 @@ $allServices = dbFetchAll("SELECT * FROM vendor_services"); // Use dbFetchAll
 
 $error = $_SESSION['event_error'] ?? null;
 unset($_SESSION['event_error']);
+
+// Set minimum date for event_date to today
+$min_event_date = date('Y-m-d');
+
 ?>
 <div class="event-form-container">
     <h1>Edit Event: <?= htmlspecialchars($eventDetails['title']) ?></h1>
@@ -59,11 +64,11 @@ unset($_SESSION['event_error']);
         <div class="form-row">
             <div class="form-group">
                 <label>Start Date</label>
-                <input type="date" name="event_date" value="<?= htmlspecialchars($eventDetails['event_date']) ?>" required>
+                <input type="date" name="event_date" value="<?= htmlspecialchars($eventDetails['event_date']) ?>" min="<?= $min_event_date ?>" required>
             </div>
             <div class="form-group">
                 <label>End Date (optional)</label>
-                <input type="date" name="end_date" value="<?= htmlspecialchars($eventDetails['end_date']) ?>">
+                <input type="date" name="end_date" value="<?= htmlspecialchars($eventDetails['end_date']) ?>" min="<?= $min_event_date ?>">
             </div>
         </div>
 
