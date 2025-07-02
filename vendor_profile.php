@@ -1,5 +1,5 @@
 <?php
-// public/vendor_profile.php
+session_start();
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';
 require_once '../classes/Vendor.class.php';
@@ -47,14 +47,29 @@ if (isset($_SESSION['user_id'])) {
 $vendor_service_offerings_raw = $vendor->getVendorServices($vendor_profile['id']);
 
 // Group services by category for display, and attach packages to each
+// This variable will hold ALL service offerings, grouped by category
 $vendor_services_grouped = [];
 foreach ($vendor_service_offerings_raw as $service_offering) {
+    // getServiceOfferingById fetches the offering and its packages
     $full_service_offering = $vendor->getServiceOfferingById($service_offering['id'], $vendor_profile['id']);
     if ($full_service_offering) {
         $vendor_services_grouped[$full_service_offering['category_name']][] = $full_service_offering;
     }
 }
 
+// This variable will hold ONLY service offerings that have actual packages, grouped by category
+$vendor_services_grouped_with_packages = [];
+foreach ($vendor_services_grouped as $category_name => $services_in_category) {
+    $filtered_services_for_category = [];
+    foreach ($services_in_category as $service_offering) {
+        if (!empty($service_offering['packages'])) {
+            $filtered_services_for_category[] = $service_offering;
+        }
+    }
+    if (!empty($filtered_services_for_category)) {
+        $vendor_services_grouped_with_packages[$category_name] = $filtered_services_for_category;
+    }
+}
 
 $vendor_profile_id_js = $vendor_profile['id'];
 ?>
@@ -154,7 +169,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
             padding-top: var(--spacing-md);
         }
         .service-package-card .action-button .btn {
-            width: 100%;
+            /*width: 100%;*/
             padding: 10px 15px;
             font-size: 0.9em;
         }
@@ -186,7 +201,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
                         }
                     endfor;
                     ?>
-                    <span><?= number_format($vendor_profile['rating'], 1) ?? 'N/A' ?> (<?= $vendor_profile['total_reviews'] ?? 0 ?> reviews)</span>
+                    <span><?= number_format($vendor_profile['rating'], 1) ?? 'N/A' ?> (<?= htmlspecialchars($vendor_profile['total_reviews'] ?? 0) ?> reviews)</span>
                 </div>
                 <div class="contact-buttons">
                     <?php if (isset($_SESSION['user_id'])): ?>
@@ -221,26 +236,45 @@ $vendor_profile_id_js = $vendor_profile['id'];
                 <?php if (!empty($vendor_profile['min_budget']) && !empty($vendor_profile['max_budget'])): ?>
                     <p><strong>Overall Budget Range:</strong> $<?= number_format($vendor_profile['min_budget'], 0) ?> - $<?= number_format($vendor_profile['max_budget'], 0) ?></p>
                 <?php endif; ?>
+                
+                <?php if (!empty($vendor_services_grouped)): ?>
+                    <div class="services-offered-summary">
+                        <p><strong>Services Offered:</strong></p>
+                        <ul>
+                            <?php 
+                            $all_service_names = [];
+                            foreach ($vendor_services_grouped as $category_name => $services):
+                                foreach ($services as $service_offering_item):
+                                    $all_service_names[] = htmlspecialchars($service_offering_item['service_name']);
+                                endforeach;
+                            endforeach;
+                            echo implode(', ', $all_service_names);
+                            ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
-        <div class="profile-section">
-            <h2>Services & Packages Offered</h2>
-            <?php if (!empty($vendor_services_grouped)): ?>
-                <?php foreach ($vendor_services_grouped as $category_name => $services_in_category): ?>
+        <div class="profile-section service-deals-section">
+            <h2>Service Deals</h2>
+            <?php if (!empty($vendor_services_grouped_with_packages)): // Display only if there are services with packages ?>
+                <?php foreach ($vendor_services_grouped_with_packages as $category_name => $services_in_category): ?>
                     <div class="service-category-section">
                         <h4><?= htmlspecialchars($category_name) ?></h4>
                         <?php foreach ($services_in_category as $service_offering): ?>
-                            <h5 style="margin-top: var(--spacing-sm); margin-bottom: var(--spacing-xs); color: var(--text-dark);">
-                                <?= htmlspecialchars($service_offering['service_name']) ?>
-                            </h5>
-                            <?php if (!empty($service_offering['description'])): ?>
-                                <p style="font-size: 0.9em; color: var(--text-subtle); margin-bottom: var(--spacing-md);">
-                                    <?= nl2br(htmlspecialchars($service_offering['description'])) ?>
-                                </p>
-                            <?php endif; ?>
-
-                            <?php if (!empty($service_offering['packages'])): ?>
+                            <?php 
+                            // Only show service name heading if this specific service_offering has packages (which it should, due to the filtering of $vendor_services_grouped_with_packages)
+                            if (!empty($service_offering['packages'])): 
+                            ?>
+                                <h5 style="margin-top: var(--spacing-sm); margin-bottom: var(--spacing-xs); color: var(--text-dark);">
+                                    <?= htmlspecialchars($service_offering['service_name']) ?>
+                                </h5>
+                                <?php if (!empty($service_offering['description'])): ?>
+                                    <p style="font-size: 0.9em; color: var(--text-subtle); margin-bottom: var(--spacing-md);">
+                                        <?= nl2br(htmlspecialchars($service_offering['description'])) ?>
+                                    </p>
+                                <?php endif; ?>
                                 <div class="service-packages-grid">
                                     <?php foreach ($service_offering['packages'] as $package): ?>
                                         <div class="service-package-card">
@@ -272,15 +306,13 @@ $vendor_profile_id_js = $vendor_profile['id'];
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
-                            <?php else: ?>
-                                <p style="font-size: 0.9em; color: var(--text-subtle);">No specific packages defined for <?= htmlspecialchars($service_offering['service_name']) ?> yet.</p>
-                            <?php endif; ?>
+                            <?php endif; // End of checking $service_offering['packages'] ?>
                             <hr style="border-top: 1px dashed var(--border-color); margin: var(--spacing-md) 0;">
                         <?php endforeach; ?>
                     </div>
                 <?php endforeach; ?>
-            <?php else: ?>
-                <p>No services currently listed by this vendor. (Overall vendor service list empty).</p>
+            <?php else: // If no services have packages, display this message ?>
+                <p>No service deals currently available from this vendor.</p>
             <?php endif; ?>
         </div>
 
@@ -316,7 +348,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
                                     <?php endif; ?>
                                     <div class="portfolio-item-overlay">
                                         <?php if (!empty($item['video_url'])): ?>
-                                            <a href="<?= htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-light-overlay"><i class="fas fa-video"></i> Watch Video</a>
+                                            <a href="<?= BASE_URL . htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-light-overlay"><i class="fas fa-video"></i> Watch Video</a>
                                         <?php endif; ?>
                                         <?php if (!empty($item['client_testimonial'])): ?>
                                             <p class="testimonial-overlay">"<?= htmlspecialchars(substr($item['client_testimonial'], 0, 100)) ?><?= (strlen($item['client_testimonial']) > 100) ? '...' : '' ?>"</p>
@@ -348,7 +380,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
         </div>
 
         <div class="profile-section">
-            <h2>Reviews (<?= $vendor_profile['total_reviews'] ?? 0 ?>)</h2>
+            <h2>Reviews (<?= htmlspecialchars($vendor_profile['total_reviews'] ?? 0) ?>)</h2>
             <?php if (!empty($vendor_reviews)): ?>
                 <div class="reviews-list">
                     <?php foreach ($vendor_reviews as $review_item): ?>
@@ -370,7 +402,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
                                 <?php endfor; ?>
                             </div>
                             <h3><?= htmlspecialchars($review_item['review_title']) ?></h3>
-                            <p><?= nl2br(htmlspecialchars($review_item['review_content'])) ?></p>
+                            <p><?= nl2br(htmlspecialchars(substr($review_item['review_content'] ?? '', 0, 200))) ?><?= (strlen($review_item['review_content'] ?? '') > 200 ? '...' : '') ?></p>
                         </div>
                     <?php endforeach; ?>
                 </div>
@@ -401,7 +433,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
                         fetch(`<?= BASE_URL ?>public/availability.php?vendor_id=${vendorProfileId}&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
                             .then(response => {
                                 if (!response.ok) {
-                                    throw new Error('Network response was not ok');
+                                    throw new Error(`HTTP error! status: ${response.status}`);
                                 }
                                 return response.json();
                             })
@@ -435,11 +467,11 @@ $vendor_profile_id_js = $vendor_profile['id'];
                             })
                             .catch(error => {
                                 console.error('Error fetching availability:', error);
-                                // The message display removal was requested by the user previously.
-                                // const calendarContainer = document.getElementById('public-availability-calendar');
-                                // if (calendarContainer) {
-                                //     calendarContainer.innerHTML = '<p class="text-subtle">Failed to load calendar. Please try again.</p>';
-                                // }
+                                // Optionally display an error message on the dashboard
+                                const calendarContainer = document.getElementById('public-availability-calendar');
+                                if (calendarContainer) {
+                                    calendarContainer.innerHTML = '<p class="text-subtle">Failed to load calendar. Please try again.</p>';
+                                }
                                 failureCallback(error);
                             });
                     },
@@ -452,9 +484,9 @@ $vendor_profile_id_js = $vendor_profile['id'];
                         info.jsEvent.preventDefault();
                         const clickedDate = info.event.startStr.slice(0, 10);
                         if (bookNowBtn && info.event.extendedProps.status === 'available') {
-                            bookNowBtn.href = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=${vendorProfileId}&prefill_date=${clickedDate}`;
+                            bookNowBtn.href = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>&prefill_date=${clickedDate}`;
                         } else if (bookNowBtn) {
-                            bookNowBtn.href = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=${vendorProfileId}`;
+                            bookNowBtn.href = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>`;
                         }
                     }
                 });
