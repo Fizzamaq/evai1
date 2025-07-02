@@ -16,9 +16,8 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $vendor_id = $_GET['vendor_id'] ?? null;
-$service_offering_id = $_GET['service_offering_id'] ?? null;
-$package_id = $_GET['package_id'] ?? null;
-$prefill_date = $_GET['prefill_date'] ?? null; // For pre-filling from availability calendar
+// Removed $prefill_date as it's no longer used in the form input
+// $prefill_date = $_GET['prefill_date'] ?? null;
 
 $user_obj = new User($pdo);
 $vendor_obj = new Vendor($pdo);
@@ -26,11 +25,7 @@ $event_obj = new Event($pdo);
 
 // Initialize all variables that will be used in the HTML to avoid 'Undefined variable' warnings
 $vendor_profile = null;
-$service_offering = null;
-$package = null;
-$final_amount = 0;
-$deposit_amount = 0;
-$user_events = [];
+$vendor_service_offerings_grouped = []; // To hold all services offered by the vendor, grouped by category
 $success_message = $_SESSION['success_message'] ?? null;
 $error_message = $_SESSION['error_message'] ?? null;
 
@@ -38,64 +33,35 @@ $error_message = $_SESSION['error_message'] ?? null;
 unset($_SESSION['success_message'], $_SESSION['error_message']);
 
 try {
-    // 1. Validate incoming IDs and fetch data
-    // This block catches if any critical IDs are genuinely missing from the URL
-    if (empty($vendor_id) || empty($service_offering_id) || empty($package_id)) {
-        throw new Exception("Booking request incomplete. Missing vendor, service, or package ID.");
+    // 1. Validate incoming Vendor ID and fetch data
+    if (empty($vendor_id)) {
+        throw new Exception("Booking request incomplete. Missing vendor ID.");
     }
 
-    // Fetch vendor profile first
+    // Fetch vendor profile
     $vendor_profile = $vendor_obj->getVendorProfileById($vendor_id);
 
-    // If vendor_profile is not found, redirect immediately
     if (!$vendor_profile) {
         throw new Exception("Invalid vendor ID provided. Vendor not found.");
     }
 
-    // Now that $vendor_profile is confirmed, fetch service offering
-    // Ensure the service offering belongs to this vendor
-    $service_offering = $vendor_obj->getServiceOfferingById($service_offering_id, $vendor_profile['id']);
-
-    // If service_offering is not found or doesn't belong to the vendor, redirect
-    if (!$service_offering) {
-        throw new Exception("Invalid service ID provided or service does not belong to this vendor.");
-    }
-
-    // Find the specific package within the service offering
-    if (!empty($service_offering['packages'])) {
-        foreach ($service_offering['packages'] as $pkg) {
-            if ($pkg['id'] == $package_id) { // Use == for comparison, not === to allow for type coercion if needed
-                $package = $pkg;
-                break;
-            }
+    // Fetch all service offerings for this vendor, grouped by category
+    $all_vendor_offerings_raw = $vendor_obj->getVendorServices($vendor_profile['id']); // This gets basic offerings
+    
+    // Now, retrieve full details (including packages) for each offering
+    foreach ($all_vendor_offerings_raw as $offering) {
+        $full_offering_details = $vendor_obj->getServiceOfferingById($offering['id'], $vendor_profile['id']);
+        if ($full_offering_details) {
+            $vendor_service_offerings_grouped[$full_offering_details['category_name']][] = $full_offering_details;
         }
     }
 
-    // If package is not found within the service offering, redirect
-    if (!$package) {
-        throw new Exception("Invalid package ID provided or package not found for this service.");
-    }
-
-    // 2. Fetch user's events (only if we've successfully validated vendor, service, and package)
-    $user_events = $event_obj->getUserEvents($_SESSION['user_id']);
-    if (empty($user_events)) {
-        throw new Exception("You must have at least one event planned to make a booking. Please create an event first.");
-    }
-
-    // Determine final amount for the form
-    // Use package's min_price, if not set, use max_price. Default to 0.
-    $final_amount = $package['price_min'] ?? $package['price_max'] ?? 0;
-    if ($final_amount == 0) { // If final_amount is still 0 after trying min/max
-        // Only log warning if original min/max were not null
-        if ($package['price_min'] !== null || $package['price_max'] !== null) {
-            error_log("Warning: Package ID {$package_id} has zero price range. Defaulting final_amount to 1.");
-        }
-        $final_amount = 1; // Set a minimum amount to avoid 0 bookings
-    }
-
-
-    // You might implement a deposit calculation here
-    $deposit_amount = round($final_amount * 0.20, 2); // Example: 20% deposit
+    // User events are no longer fetched for the form, but will be needed in process_booking_new.php
+    // $user_events = $event_obj->getUserEvents($_SESSION['user_id']);
+    // if (empty($user_events)) {
+    //     // This check is now moved to process_booking_new.php
+    //     // throw new Exception("You must have at least one event planned to make a booking. Please create an event first.");
+    // }
 
 } catch (Exception $e) {
     // If any exception occurs during data fetching/validation, redirect with error
@@ -172,6 +138,143 @@ include 'header.php';
             padding-top: var(--spacing-md);
             border-top: 1px solid var(--border-color);
         }
+        /* New Styles for Services Checkboxes */
+        .services-selection-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .service-item-checkbox {
+            background: var(--background-light);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative; /* Needed for absolute positioning of checkbox checkmark */
+        }
+        .service-item-checkbox:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        /* Style for checked state */
+        .service-item-checkbox input[type="checkbox"]:checked ~ label {
+            color: var(--primary-color);
+        }
+        .service-item-checkbox input[type="checkbox"]:checked + label + .service-details-content {
+            /* Adjust content style when checked if needed */
+        }
+        .service-item-checkbox input[type="checkbox"]:checked {
+            /* This is the hidden checkbox, styling applies to its siblings */
+        }
+        
+        .service-item-checkbox input[type="checkbox"] {
+            /* Hide the default checkbox */
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 0;
+            width: 0;
+        }
+
+        .service-item-checkbox label {
+            font-weight: 600;
+            color: var(--text-dark);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            /* Flex to align custom checkbox and text */
+            position: relative;
+            padding-left: 30px; /* Space for custom checkbox */
+            min-height: 20px; /* Ensure label height for clickable area */
+        }
+        
+        /* Custom checkbox indicator */
+        .service-item-checkbox label::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            background-color: var(--white);
+            transition: all 0.2s ease;
+        }
+
+        /* Custom checkmark */
+        .service-item-checkbox label::after {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 50%;
+            transform: translateY(-50%) rotate(45deg);
+            width: 6px;
+            height: 12px;
+            border: solid var(--white);
+            border-width: 0 2px 2px 0;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        /* Checked state for custom checkbox */
+        .service-item-checkbox input[type="checkbox"]:checked + label::before {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .service-item-checkbox input[type="checkbox"]:checked + label::after {
+            opacity: 1;
+        }
+
+        /* Optional: Highlight the entire item when checked */
+        .service-item-checkbox input[type="checkbox"]:checked ~ .service-details-content {
+            background-color: var(--primary-color-rgb, 138, 43, 226, 0.05); /* Lighter shade of primary color */
+            border-color: var(--primary-color); /* Highlight border */
+            box-shadow: 0 4px 10px rgba(var(--primary-color-rgb, 138, 43, 226), 0.1); /* Subtle shadow */
+        }
+        .service-item-checkbox input[type="checkbox"]:checked {
+            background-color: var(--primary-color-rgb, 138, 43, 226, 0.05); /* Lighter shade of primary color */
+            border-color: var(--primary-color); /* Highlight border */
+        }
+        .service-item-checkbox.is-checked { /* Class added by JS for fallback/consistency */
+            background-color: rgba(var(--primary-color-rgb, 138, 43, 226), 0.05); /* Lighter shade of primary color */
+            border-color: var(--primary-color); /* Highlight border */
+            box-shadow: 0 4px 10px rgba(var(--primary-color-rgb, 138, 43, 226), 0.1); /* Subtle shadow */
+        }
+
+        .service-details-content {
+            display: flex;
+            flex-direction: column;
+            width: 100%; /* Take full width within label */
+            padding-left: 30px; /* Offset for custom checkbox */
+            box-sizing: border-box;
+            line-height: 1.2; /* Tighter line-height for details */
+        }
+        
+        .service-details-content .service-name-text {
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 2px;
+        }
+
+        .service-details-content .price-range {
+            font-size: 0.9em;
+            color: var(--text-subtle);
+            margin-left: 0; /* No extra margin here, let padding handle it */
+            font-weight: normal;
+        }
+        .service-details-content .text-muted {
+            font-size: 0.75em;
+        }
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .booking-form-container {
@@ -183,14 +286,16 @@ include 'header.php';
             .form-actions .btn {
                 width: 100%;
             }
+            .services-selection-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     <div class="booking-form-container">
         <div class="booking-form-header">
-            <h1>Book Service: <?= htmlspecialchars($package['package_name']) ?></h1>
-            <p>From: **<?= htmlspecialchars($vendor_profile['business_name']) ?>**</p>
+            <h1>Book Services from <?= htmlspecialchars($vendor_profile['business_name']) ?></h1>
         </div>
 
         <?php if ($success_message): ?>
@@ -200,55 +305,61 @@ include 'header.php';
             <div class="alert error"><?= htmlspecialchars($error_message) ?></div>
         <?php endif; ?>
 
-        <div class="booking-summary">
-            <p><strong>Vendor:</strong> <?= htmlspecialchars($vendor_profile['business_name']) ?></p>
-            <p><strong>Service:</strong> <?= htmlspecialchars($service_offering['service_name']) ?></p>
-            <p><strong>Package:</strong> <?= htmlspecialchars($package['package_name']) ?></p>
-            <?php if (!empty($package['package_description'])): ?>
-                <p><strong>Package Details:</strong> <?= nl2br(htmlspecialchars($package['package_description'])) ?></p>
-            <?php endif; ?>
-            <p class="price-display">
-                <strong>Price Range:</strong> PKR <?= number_format($package['price_min'] ?? 0, 0) ?> - 
-                PKR <?= number_format($package['price_max'] ?? 0, 0) ?>
-            </p>
-            <p style="font-size: 0.9em; color: var(--text-subtle);">
-                *Actual final amount may vary based on specific requirements.
-            </p>
-        </div>
-
-        <form action="<?= BASE_URL ?>public/process_booking.php" method="POST">
+        <form action="<?= BASE_URL ?>public/process_booking_new.php" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="vendor_id" value="<?= htmlspecialchars($vendor_profile['user_id']) ?>">
-            <input type="hidden" name="service_id" value="<?= htmlspecialchars($service_offering['service_id']) ?>">
-            <input type="hidden" name="final_amount" value="<?= htmlspecialchars($final_amount) ?>">
-            <input type="hidden" name="deposit_amount" value="<?= htmlspecialchars($deposit_amount) ?>">
-            <input type="hidden" name="package_id" value="<?= htmlspecialchars($package['id']) ?>">
+
+            <?php /* Removed "Select Your Event" field */ ?>
+            <?php /* Removed "Desired Service Date" field */ ?>
 
             <div class="form-group">
-                <label for="event_id">Select Your Event <span class="required">*</span></label>
-                <select id="event_id" name="event_id" required>
-                    <option value="">Choose an existing event</option>
-                    <?php foreach ($user_events as $event): ?>
-                        <option value="<?= htmlspecialchars($event['id']) ?>">
-                            <?= htmlspecialchars($event['title']) ?> (<?= date('M j, Y', strtotime($event['event_date'])) ?>)
-                        </option>
+                <h3>Select Services <span class="required">*</span></h3>
+                <?php if (empty($vendor_service_offerings_grouped)): ?>
+                    <p>This vendor has no services listed yet.</p>
+                <?php else: ?>
+                    <?php foreach ($vendor_service_offerings_grouped as $category_name => $service_offerings_in_category): ?>
+                        <h4 style="margin-top: var(--spacing-md); color: var(--text-dark);"><?= htmlspecialchars($category_name) ?></h4>
+                        <div class="services-selection-grid">
+                            <?php foreach ($service_offerings_in_category as $offering): ?>
+                                <div class="service-item-checkbox">
+                                    <input type="checkbox" id="service_<?= htmlspecialchars($offering['service_id']) ?>" 
+                                           name="selected_services[]" value="<?= htmlspecialchars($offering['service_id']) ?>" 
+                                           data-offering-id="<?= htmlspecialchars($offering['id']) ?>" 
+                                           data-service-name="<?= htmlspecialchars($offering['service_name']) ?>">
+                                    <label for="service_<?= htmlspecialchars($offering['service_id']) ?>">
+                                        <span class="service-name-text"><?= htmlspecialchars($offering['service_name']) ?></span>
+                                        <span class="price-range">
+                                            <?php if ($offering['price_range_min'] !== null || $offering['price_range_max'] !== null): ?>
+                                                PKR <?= number_format($offering['price_range_min'] ?? 0, 0) ?> - 
+                                                PKR <?= number_format($offering['price_range_max'] ?? 0, 0) ?>
+                                            <?php else: ?>
+                                                Price upon request
+                                            <?php endif; ?>
+                                        </span>
+                                        <?php if (!empty($offering['packages'])): ?>
+                                            <span class="text-muted" style="font-size:0.8em;">(View packages on profile)</span>
+                                        <?php endif; ?>
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
                     <?php endforeach; ?>
-                </select>
+                <?php endif; ?>
             </div>
 
             <div class="form-group">
-                <label for="service_date">Desired Service Date <span class="required">*</span></label>
-                <input type="date" id="service_date" name="service_date" required 
-                       value="<?= htmlspecialchars($prefill_date ?? '') ?>">
+                <label for="instructions">Details</label>
+                <textarea id="instructions" name="instructions" rows="5" 
+                          placeholder="Provide any additional information, specific requests, or details for the vendor (e.g., 'Theme: Vintage', 'Dietary needs for 5 guests', etc.)."></textarea>
             </div>
 
             <div class="form-group">
-                <label for="instructions">Special Instructions (Optional)</label>
-                <textarea id="instructions" name="instructions" rows="4" 
-                          placeholder="Any specific requests, preferences, or details for the vendor..."></textarea>
+                <label for="picture_upload">Upload a screenshot <span class="required">*</span></h3></label>
+                <input type="file" id="picture_upload" name="picture_upload" accept="image/*">
+                <small class="text-muted">Minimum 2,000 of advance is mandatory</small>
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Proceed to Payment</button>
+                <button type="submit" class="btn btn-primary">Book</button>
                 <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_profile['id']) ?>" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
@@ -258,36 +369,31 @@ include 'header.php';
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Set minimum date for service_date to today
-            const serviceDateInput = document.getElementById('service_date');
-            const today = new Date().toISOString().split('T')[0];
-            serviceDateInput.min = today;
-
-            // Optional: If a prefill_date is provided, ensure it's valid and set
-            <?php if ($prefill_date): ?>
-                if (serviceDateInput.value < serviceDateInput.min) {
-                    serviceDateInput.value = serviceDateInput.min; // Adjust if prefill is in the past
-                }
-            <?php endif; ?>
-
             // Basic client-side validation
             document.querySelector('form').addEventListener('submit', function(event) {
-                const eventId = document.getElementById('event_id');
-                const serviceDate = document.getElementById('service_date');
+                const selectedServices = document.querySelectorAll('input[name="selected_services[]"]:checked');
 
-                if (!eventId.value) {
-                    alert('Please select an event for this booking.');
-                    eventId.focus();
+                if (selectedServices.length === 0) {
+                    alert('Please select at least one service to book.');
                     event.preventDefault();
                     return;
                 }
+            });
 
-                if (!serviceDate.value) {
-                    alert('Please select a desired service date.');
-                    serviceDate.focus();
-                    event.preventDefault();
-                    return;
+            // Add visual feedback for checked services
+            document.querySelectorAll('.service-item-checkbox input[type="checkbox"]').forEach(checkbox => {
+                const parentDiv = checkbox.closest('.service-item-checkbox');
+                if (checkbox.checked) {
+                    parentDiv.classList.add('is-checked');
                 }
+
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        parentDiv.classList.add('is-checked');
+                    } else {
+                        parentDiv.classList.remove('is-checked');
+                    }
+                });
             });
         });
     </script>
