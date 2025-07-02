@@ -1,4 +1,5 @@
 <?php
+// public/vendor_profile.php
 session_start();
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';
@@ -169,7 +170,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
             padding-top: var(--spacing-md);
         }
         .service-package-card .action-button .btn {
-            /*width: 100%;*/
+            width: 100%;
             padding: 10px 15px;
             font-size: 0.9em;
         }
@@ -240,17 +241,16 @@ $vendor_profile_id_js = $vendor_profile['id'];
                 <?php if (!empty($vendor_services_grouped)): ?>
                     <div class="services-offered-summary">
                         <p><strong>Services Offered:</strong></p>
-                        <ul>
-                            <?php 
-                            $all_service_names = [];
-                            foreach ($vendor_services_grouped as $category_name => $services):
-                                foreach ($services as $service_offering_item):
-                                    $all_service_names[] = htmlspecialchars($service_offering_item['service_name']);
-                                endforeach;
+                        <?php 
+                        $all_service_names = [];
+                        foreach ($vendor_services_grouped as $category_name => $services):
+                            foreach ($services as $service_offering_item):
+                                $all_service_names[] = htmlspecialchars($service_offering_item['service_name']);
                             endforeach;
-                            echo implode(', ', $all_service_names);
-                            ?>
-                        </ul>
+                        endforeach;
+                        // Implode and echo the service names, or display as a list
+                        echo '<span>' . implode(', ', $all_service_names) . '</span>';
+                        ?>
                     </div>
                 <?php endif; ?>
             </div>
@@ -263,18 +263,16 @@ $vendor_profile_id_js = $vendor_profile['id'];
                     <div class="service-category-section">
                         <h4><?= htmlspecialchars($category_name) ?></h4>
                         <?php foreach ($services_in_category as $service_offering): ?>
-                            <?php 
-                            // Only show service name heading if this specific service_offering has packages (which it should, due to the filtering of $vendor_services_grouped_with_packages)
-                            if (!empty($service_offering['packages'])): 
-                            ?>
-                                <h5 style="margin-top: var(--spacing-sm); margin-bottom: var(--spacing-xs); color: var(--text-dark);">
-                                    <?= htmlspecialchars($service_offering['service_name']) ?>
-                                </h5>
-                                <?php if (!empty($service_offering['description'])): ?>
-                                    <p style="font-size: 0.9em; color: var(--text-subtle); margin-bottom: var(--spacing-md);">
-                                        <?= nl2br(htmlspecialchars($service_offering['description'])) ?>
-                                    </p>
-                                <?php endif; ?>
+                            <h5 style="margin-top: var(--spacing-sm); margin-bottom: var(--spacing-xs); color: var(--text-dark);">
+                                <?= htmlspecialchars($service_offering['service_name']) ?>
+                            </h5>
+                            <?php if (!empty($service_offering['description'])): ?>
+                                <p style="font-size: 0.9em; color: var(--text-subtle); margin-bottom: var(--spacing-md);">
+                                    <?= nl2br(htmlspecialchars($service_offering['description'])) ?>
+                                </p>
+                            <?php endif; ?>
+
+                            <?php if (!empty($service_offering['packages'])): // This condition should always be true due to $vendor_services_grouped_with_packages filtering ?>
                                 <div class="service-packages-grid">
                                     <?php foreach ($service_offering['packages'] as $package): ?>
                                         <div class="service-package-card">
@@ -336,7 +334,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
                 <div class="portfolio-grid">
                     <?php foreach ($portfolio_items as $item): ?>
                         <div class="portfolio-item-card">
-                            <a href="<?= BASE_URL ?>public/view_portfolio_item.php?id=<?= $item['id'] ?>" class="portfolio-item-link-area">
+                            <a href="<?= BASE_URL ?>public/view_portfolio_item.php?id=<?= htmlspecialchars($item['id']) ?>" class="portfolio-item-link-area">
                                 <div class="portfolio-image-wrapper">
                                     <?php if (!empty($item['main_image_url'])): ?>
                                         <img src="<?= BASE_URL . htmlspecialchars($item['main_image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
@@ -348,10 +346,10 @@ $vendor_profile_id_js = $vendor_profile['id'];
                                     <?php endif; ?>
                                     <div class="portfolio-item-overlay">
                                         <?php if (!empty($item['video_url'])): ?>
-                                            <a href="<?= BASE_URL . htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-light-overlay"><i class="fas fa-video"></i> Watch Video</a>
+                                            <a href="<?= htmlspecialchars($item['video_url']) ?>" target="_blank" class="btn btn-sm btn-light-overlay"><i class="fas fa-video"></i> Watch Video</a>
                                         <?php endif; ?>
                                         <?php if (!empty($item['client_testimonial'])): ?>
-                                            <p class="testimonial-overlay">"<?= htmlspecialchars(substr($item['client_testimonial'], 0, 100)) ?><?= (strlen($item['client_testimonial']) > 100) ? '...' : '' ?>"</p>
+                                            <p class="testimonial-overlay">"<?= htmlspecialchars(substr($item['client_testimonial'] ?? '', 0, 100)) ?><?= (strlen($item['client_testimonial'] ?? '') > 100 ? '...' : '') ?>"</p>
                                         <?php endif; ?>
                                     </div>
                                 </div>
@@ -484,8 +482,9 @@ $vendor_profile_id_js = $vendor_profile['id'];
                         info.jsEvent.preventDefault();
                         const clickedDate = info.event.startStr.slice(0, 10);
                         if (bookNowBtn && info.event.extendedProps.status === 'available') {
-                            bookNowBtn.href = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>&prefill_date=${clickedDate}`;
+                            bookNowBtn.href = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>&service_offering_id=<?= htmlspecialchars($service_offering['id']) ?>&package_id=<?= htmlspecialchars($package['id']) ?>&prefill_date=${clickedDate}`;
                         } else if (bookNowBtn) {
+                            // If event is not available or other conditions, just link to book_vendor without prefill
                             bookNowBtn.href = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>`;
                         }
                     }
