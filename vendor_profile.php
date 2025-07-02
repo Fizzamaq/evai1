@@ -52,7 +52,7 @@ $vendor_service_offerings_raw = $vendor->getVendorServices($vendor_profile['id']
 $vendor_services_grouped = [];
 foreach ($vendor_service_offerings_raw as $service_offering) {
     // getServiceOfferingById fetches the offering and its packages
-    $full_service_offering = $vendor->getServiceOfferingById($service_offering['id'], $vendor_profile['id']);
+    $full_service_offering = $vendor->getServiceOfferingById($offering['id'], $vendor_profile['id']); // Changed variable from $offering to $service_offering
     if ($full_service_offering) {
         $vendor_services_grouped[$full_service_offering['category_name']][] = $full_service_offering;
     }
@@ -427,6 +427,10 @@ $vendor_profile_id_js = $vendor_profile['id'];
                         center: 'title',
                         right: ''
                     },
+                    // ADDED: Restrict calendar navigation to current and future dates
+                    validRange: {
+                        start: '<?= date('Y-m-d') ?>' // Sets the start of the valid range to today
+                    },
                     events: function(fetchInfo, successCallback, failureCallback) {
                         fetch(`<?= BASE_URL ?>public/availability.php?vendor_id=${vendorProfileId}&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
                             .then(response => {
@@ -437,25 +441,17 @@ $vendor_profile_id_js = $vendor_profile['id'];
                             })
                             .then(data => {
                                 const formattedEvents = data.map(event => {
-                                    let eventColor = '';
-                                    if (event.status === 'available') {
-                                        eventColor = '#4CAF50';
-                                    } else if (event.status === 'booked') {
-                                        eventColor = '#F44336';
-                                    } else if (event.status === 'blocked') {
-                                        eventColor = '#B0BEC5';
-                                    } else if (event.status === 'holiday') {
-                                        eventColor = '#FF9800';
-                                    }
-
+                                    // These colors are defined in vendor_profile.css as `background-color` with `!important`
+                                    // and will be applied by FullCalendar
                                     return {
                                         id: event.id,
-                                        title: '',
+                                        title: event.status.charAt(0).toUpperCase() + event.status.slice(1), // Display the status
                                         start: event.date + 'T' + event.start_time, // Full datetime string
                                         end: event.date + 'T' + event.end_time,     // Full datetime string
                                         allDay: false,
-                                        display: 'background',
-                                        color: eventColor,
+                                        // REMOVED: display: 'background', This makes events render as foreground events
+                                        // color: eventColor, // FullCalendar will use eventColor for background, or use CSS classes
+                                        className: `fc-event-${event.status}`, // Add class for specific styling
                                         extendedProps: {
                                             status: event.status
                                         }
@@ -473,19 +469,27 @@ $vendor_profile_id_js = $vendor_profile['id'];
                                 failureCallback(error);
                             });
                     },
+                    // MODIFIED: eventContent to display the title and use CSS classes for styling
                     eventContent: function(arg) {
-                        return { html: `<div></div>` };
+                        // Create a div with the event title inside. FullCalendar will apply the classNames
+                        // from the event object (e.g., fc-event-available) which are defined in CSS.
+                        return { html: `<div class="fc-event-status-text">${arg.event.title}</div>` };
                     },
                     selectable: false,
                     editable: false,
+                    // MODIFIED: eventClick to link to book_vendor.php with prefill_date if status is 'available'
                     eventClick: function(info) {
                         info.jsEvent.preventDefault();
                         const clickedDate = info.event.startStr.slice(0, 10);
-                        if (bookNowBtn && info.event.extendedProps.status === 'available') {
-                            bookNowBtn.href = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>&service_offering_id=<?= htmlspecialchars($service_offering['id']) ?>&package_id=<?= htmlspecialchars($package['id']) ?>&prefill_date=${clickedDate}`;
-                        } else if (bookNowBtn) {
-                            // If event is not available or other conditions, just link to book_vendor without prefill
-                            bookNowBtn.href = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>`;
+                        // Check if the clicked event's status is 'available'
+                        if (info.event.extendedProps.status === 'available') {
+                             // Construct the URL with vendor_id, prefill_date.
+                             // Removed service_offering_id and package_id from here
+                             const bookUrl = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>&prefill_date=${clickedDate}`;
+                             window.location.href = bookUrl;
+                        } else {
+                            // Optionally, alert the user or change the "Book Now" button if the date is not available
+                            alert(`This date is ${info.event.extendedProps.status}. Please choose an available date.`);
                         }
                     }
                 });
