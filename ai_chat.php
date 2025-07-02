@@ -1,4 +1,5 @@
 <?php
+// public/ai_chat.php
 // TEMPORARY: Enable full error reporting for debugging
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -53,6 +54,9 @@ unset($_SESSION['ai_form_data'], $_SESSION['ai_form_errors']);
 $event_types = dbFetchAll("SELECT id, type_name FROM event_types WHERE is_active = TRUE ORDER BY type_name ASC");
 // $all_services = dbFetchAll("SELECT id, service_name FROM vendor_services WHERE is_active = TRUE ORDER BY service_name ASC"); // No longer needed directly
 $vendor_categories = $vendor_class->getAllVendorCategories(); // For grouping services
+
+// Set minimum date for event_date to today
+$min_event_date = date('Y-m-d');
 
 // --- Handle Form Submission ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['get_recommendations'])) {
@@ -175,7 +179,7 @@ include 'header.php';
                 <div class="form-group">
                     <label for="event_date">Event Date <span class="required">*</span></label>
                     <input type="date" id="event_date" name="event_date" required
-                           value="<?= htmlspecialchars($form_data['event_date'] ?? '') ?>">
+                           value="<?= htmlspecialchars($form_data['event_date'] ?? '') ?>" min="<?= $min_event_date ?>">
                 </div>
                 <div class="form-group">
                     <label for="location_string">Event Location <span class="required">*</span></label>
