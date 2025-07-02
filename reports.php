@@ -45,7 +45,7 @@ if (isset($_GET['export']) && !empty($financialData)) {
     exit();
 }
 
-include '../../../includes/admin_header.php'; // Corrected path
+include '../../includes/admin_header.php'; // Corrected path
 ?>
 <!DOCTYPE html>
 <html lang="en">
