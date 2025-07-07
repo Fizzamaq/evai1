@@ -15,12 +15,14 @@ if (!isset($_SESSION['user_id']) || !isset($_GET['id'])) {
 
 $bookingId = (int)$_GET['id'];
 $booking = new Booking($pdo);
+
 // Re-fetch booking details with relevant joins for display
+// FIX: Corrected the JOIN condition for vendor_profiles from vp.user_id to vp.id
 $stmt = $pdo->prepare("
     SELECT b.*, e.title as event_title, vp.business_name
     FROM bookings b
-    JOIN events e ON b.event_id = e.id
-    JOIN vendor_profiles vp ON b.vendor_id = vp.id -- Assuming vendor_id in bookings maps to vendor_profiles.id
+    LEFT JOIN events e ON b.event_id = e.id /* Use LEFT JOIN as event_id can be null now */
+    JOIN vendor_profiles vp ON b.vendor_id = vp.id
     WHERE b.id = ? AND b.user_id = ?
 ");
 $stmt->execute([$bookingId, $_SESSION['user_id']]);
@@ -32,26 +34,62 @@ if (!$bookingDetails) {
     header('Location: ' . BASE_URL . 'public/dashboard.php');
     exit();
 }
+
+// --- Parse Special Instructions for Selected Services and Uploaded Picture URL ---
+$original_instructions = htmlspecialchars($bookingDetails['special_instructions']);
+$selected_services_display = 'N/A';
+$uploaded_picture_url = null;
+$clean_instructions = $original_instructions; // This will hold instructions without the parsed parts
+
+// Pattern to find "Selected Services: ..."
+if (preg_match('/Selected Services:\s*(.*?)(?:\n\n|$)/s', $original_instructions, $matches_services)) {
+    $selected_services_display = htmlspecialchars($matches_services[1]);
+    $clean_instructions = str_replace($matches_services[0], '', $clean_instructions);
+}
+
+// Pattern to find "Uploaded Picture URL: ..."
+if (preg_match('/Uploaded Picture URL:\s*(.*?)(?:\n\n|$)/s', $original_instructions, $matches_picture)) {
+    $uploaded_picture_url = htmlspecialchars(trim($matches_picture[1]));
+    $clean_instructions = str_replace($matches_picture[0], '', $clean_instructions);
+}
+
+// Clean up any double newlines or leading/trailing whitespace left from parsing
+$clean_instructions = trim(preg_replace('/\n\s*\n/', "\n\n", $clean_instructions));
+
 ?>
 <div class="booking-details-container">
     <h1>Booking Details</h1>
-    <?php if (isset($_SESSION['success'])): ?>
+    <?php if (isset($_SESSION['success'])) { ?>
         <div class="alert alert-success"><?= htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?></div>
-    <?php endif; ?>
-    <?php if (isset($_SESSION['error']): ?>
+    <?php } ?>
+    <?php if (isset($_SESSION['error'])) { ?>
         <div class="alert alert-error"><?= htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?></div>
-    <?php endif; ?>
+    <?php } ?>
 
     <p><strong>Booking ID:</strong> <?= htmlspecialchars($bookingDetails['id']) ?></p>
-    <p><strong>Event Title:</strong> <?= htmlspecialchars($bookingDetails['event_title'] ?? 'N/A') ?></p>
     <p><strong>Vendor:</strong> <?= htmlspecialchars($bookingDetails['business_name']) ?></p>
-    <p><strong>Service Date:</strong> <?= date('M j, Y', strtotime($bookingDetails['service_date'])) ?></p>
-    <p><strong>Total Amount:</strong> $<?= number_format($bookingDetails['final_amount'], 2) ?></p>
-    <p><strong>Deposit:</strong> $<?= number_format($bookingDetails['deposit_amount'], 2) ?></p>
-    <p><strong>Status:</strong> <?= htmlspecialchars(ucfirst($bookingDetails['status'])) ?></p>
-    <p><strong>Special Instructions:</strong> <?= nl2br(htmlspecialchars($bookingDetails['special_instructions'])) ?></p>
+    <p><strong>Date:</strong> <?= date('M j, Y', strtotime($bookingDetails['created_at'])) ?> (Booking Created)</p>
+    
+    <div class="booking-section">
+        <h3>Selected Services</h3>
+        <p><?= $selected_services_display ?></p>
+    </div>
 
-    <div class="booking-actions">
+    <?php if (!empty($clean_instructions)): ?>
+    <div class="booking-section">
+        <h3>Special Instructions</h3>
+        <p><?= nl2br($clean_instructions) ?></p>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($uploaded_picture_url)): ?>
+    <div class="booking-section">
+        <h3>Uploaded Picture</h3>
+        <img src="<?= BASE_URL . $uploaded_picture_url ?>" alt="Uploaded Booking Reference" style="max-width: 300px; height: auto; border: 1px solid #ddd; border-radius: 8px; display: block; margin-top: 10px;">
+    </div>
+    <?php endif; ?>
+
+    <div class="booking-actions" style="margin-top: 30px;">
         <?php if ($bookingDetails['status'] === 'completed' && !$bookingDetails['is_reviewed']): ?>
             <a href="<?= BASE_URL ?>public/review.php?booking_id=<?= $bookingId ?>" class="btn btn-primary">Leave Review</a>
         <?php elseif ($bookingDetails['status'] === 'pending_payment'): ?>
