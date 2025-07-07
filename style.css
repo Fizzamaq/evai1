@@ -392,19 +392,19 @@ input[type="radio"] {
     /*align-items: center;*/
     /*justify-content: center;*/
     top: 10px; /* Floating slightly below the top edge */
-   /* width: calc(100% - 100px);  Smaller width for island effect (50px margin each side) */
-    max-width: 800px; /* Max width for the island shape (adjust as needed) */
+    width: calc(100% - 100px); /* Smaller width for island effect (50px margin each side) */
+    max-width: 900px; /* Max width for the island shape (adjust as needed) */
     left: 50%; /* Center horizontally */
     transform: translateX(-50%); /* Adjust for centering */
     filter: sepia(15%); 
     background: rgba(0, 0, 0, 0.30) !important; /* Ensure no residual background color */
     backdrop-filter: blur(8px); /* Blurry effect */
     -webkit-backdrop-filter: blur(8px); /* Safari compatibility */
-    box-shadow: rgba(0, 0, 0, 0.15) !important; /* Ensure no residual shadow */
-    border-radius: 50px; /* High border-radius for pill/oval shape */
+    box-shadow: rgba(0, 0, 0, 0.35) !important; /* Ensure no residual shadow */
+    border-radius: 80px; /* High border-radius for pill/oval shape */
     /*border-width: 5px solid;*/
     /*height: 50px;*/
-    padding: 10px 10px 10px 10px; /* Reduced padding for more compact height (from 0.5rem) */
+    padding: 10px 10px; /* Reduced padding for more compact height (from 0.5rem) */
 
     /* Ensure content inside changes to white */
     color: black; /* Default color for fixed header content */
