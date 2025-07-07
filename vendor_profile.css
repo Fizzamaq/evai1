@@ -434,6 +434,22 @@
     box-sizing: border-box; /* Include padding in width/height calculation */
 }
 
+/* New style for the text inside FullCalendar event cells */
+.fc-event-status-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%; /* Ensure it fills the event block */
+    width: 100%;  /* Ensure it fills the event block */
+    white-space: normal; /* Allow text to wrap if it's too long for the cell */
+    text-overflow: ellipsis; /* Keep ellipsis for overflow */
+    overflow: hidden; /* Keep overflow hidden for cleanliness */
+    text-align: center; /* Ensure text is centered */
+    padding: 2px; /* Small padding to prevent text from touching edges */
+    box-sizing: border-box; /* Include padding in width/height */
+}
+
+
 /* Ensure the events container within the day cell has no extra padding */
 .fc-daygrid-day-events {
     padding: 0 !important;
