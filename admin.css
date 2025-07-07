@@ -1,0 +1,305 @@
+/* assets/css/admin.css */
+
+/* Overall Admin Container */
+.admin-container {
+    max-width: 1400px; /* Slightly wider for admin content */
+    margin: var(--spacing-lg) auto;
+    padding: var(--spacing-md);
+    box-sizing: border-box;
+}
+
+.admin-container h1 {
+    text-align: center;
+    margin-bottom: var(--spacing-lg);
+    color: var(--primary-color);
+    font-size: 2.8em;
+    font-weight: 800;
+}
+
+/* Stats Grid for System Overview */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+}
+
+.stat-card {
+    background: var(--white);
+    padding: var(--spacing-md);
+    border-radius: 15px; /* More rounded */
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1); /* Stronger shadow */
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid var(--border-color); /* Subtle border */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 150px; /* Ensure consistent height */
+}
+
+.stat-card:hover {
+    transform: translateY(-8px); /* More pronounced lift */
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2); /* Even stronger shadow */
+}
+
+.metric-value {
+    font-size: 3.5em; /* Larger, more impactful numbers */
+    font-weight: 900; /* Extra bold */
+    color: var(--secondary-color); /* Use a vibrant color */
+    margin-bottom: var(--spacing-xs);
+    line-height: 1;
+}
+
+.metric-label {
+    color: var(--text-dark); /* Darker label */
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+/* General Admin Section Styling */
+.admin-section {
+    background: var(--white);
+    padding: var(--spacing-lg);
+    border-radius: 15px; /* Consistent rounded corners */
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); /* Consistent shadow */
+    margin-bottom: var(--spacing-xl);
+    border: 1px solid var(--border-color);
+}
+
+.admin-section h2 {
+    font-size: 2.2em;
+    color: var(--text-dark);
+    margin-bottom: var(--spacing-lg);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: var(--spacing-md);
+    text-align: center; /* Center section titles */
+    font-weight: 700;
+}
+
+/* Quick Actions Grid */
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+    justify-content: center; /* Center items if they don't fill the row */
+}
+
+.action-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--spacing-lg);
+    background: var(--background-light);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+    text-decoration: none;
+    color: var(--primary-color); /* Primary color for text */
+    font-size: 1.3em;
+    font-weight: 600;
+    min-height: 180px; /* Ensure consistent height */
+    border: 1px solid var(--light-grey-border);
+}
+
+.action-card i.fas {
+    font-size: 4em; /* Large icons */
+    margin-bottom: var(--spacing-md);
+    color: var(--primary-color); /* Match text color */
+    transition: transform 0.3s ease;
+}
+
+.action-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    background-color: var(--white);
+    color: var(--secondary-color); /* Accent color on hover */
+}
+
+.action-card:hover i.fas {
+    transform: scale(1.1);
+    color: var(--secondary-color); /* Accent color on hover */
+}
+
+/* Recent Activity Log */
+.activity-log {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.activity-item {
+    display: flex;
+    align-items: flex-start; /* Align icon and text at the top */
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--background-light);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--light-grey-border);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.activity-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.activity-icon {
+    flex-shrink: 0;
+    font-size: 1.8em; /* Icon size */
+    color: var(--primary-color);
+    background: rgba(var(--primary-color-rgb, 138, 43, 226), 0.1); /* Light background for icon */
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.activity-content {
+    flex-grow: 1;
+}
+
+.activity-message {
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 5px;
+    line-height: 1.4;
+}
+
+.activity-time {
+    font-size: 0.85em;
+    color: var(--text-subtle);
+}
+
+/* Admin Table styles (for users.php, events.php, vendors.php) */
+.table-responsive {
+    overflow-x: auto; /* Enable horizontal scrolling for tables on small screens */
+    margin-top: var(--spacing-lg);
+    border-radius: 10px; /* Match section card rounding */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05); /* Subtle shadow */
+    border: 1px solid var(--border-color); /* Overall table border */
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: separate; /* Use separate to allow border-radius on cells */
+    border-spacing: 0;
+    font-size: 0.95em;
+    background: var(--white); /* Table background */
+}
+
+.admin-table thead {
+    background-color: var(--background-light);
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 15px 20px;
+    text-align: left;
+    border-bottom: 1px solid var(--light-grey-border); /* Cell borders */
+    color: var(--text-dark);
+}
+
+.admin-table th {
+    font-weight: 700;
+    color: var(--primary-color);
+    text-transform: uppercase;
+    font-size: 0.9em;
+}
+
+.admin-table tbody tr:last-child td {
+    border-bottom: none; /* No border on last row */
+}
+
+.admin-table tbody tr:nth-child(even) {
+    background-color: var(--background-light); /* Zebra striping */
+}
+
+.admin-table tbody tr:hover {
+    background-color: var(--light-bg-hover); /* Hover effect on rows */
+}
+
+.admin-table .btn {
+    padding: 8px 12px;
+    font-size: 0.8em;
+    border-radius: 6px;
+    margin-right: 5px; /* Space between buttons */
+}
+.admin-table .btn:last-child {
+    margin-right: 0;
+}
+
+/* Responsive adjustments for admin dashboard */
+@media (max-width: 992px) {
+    .stats-grid,
+    .action-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .admin-container h1,
+    .admin-section h2 {
+        font-size: 2.2em;
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-grid,
+    .action-grid {
+        grid-template-columns: 1fr; /* Stack columns */
+    }
+    .stat-card,
+    .action-card {
+        min-height: auto; /* Allow height to shrink */
+    }
+    .admin-section {
+        padding: var(--spacing-md);
+    }
+    .admin-container h1,
+    .admin-section h2 {
+        font-size: 2em;
+    }
+    .activity-item {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: var(--spacing-sm);
+    }
+    .activity-icon {
+        margin-bottom: 0;
+    }
+    .admin-table th,
+    .admin-table td {
+        padding: 10px 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .admin-container {
+        padding: var(--spacing-sm);
+    }
+    .admin-container h1,
+    .admin-section h2 {
+        font-size: 1.8em;
+    }
+    .metric-value {
+        font-size: 3em;
+    }
+    .action-card {
+        font-size: 1.1em;
+    }
+    .action-card i.fas {
+        font-size: 3.5em;
+    }
+    .admin-table .btn {
+        display: block; /* Stack buttons vertically */
+        width: 100%;
+        margin-right: 0;
+        margin-bottom: 5px;
+    }
+}
