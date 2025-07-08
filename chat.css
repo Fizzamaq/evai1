@@ -2,7 +2,7 @@
 
 /* Overall chat container for a framed, modern look */
 .chat-container {
-    max-width: 1200px; /* Centered, defined width */
+    max-width: 1400px; /* Increased max-width */
     margin: var(--spacing-lg) auto; /* Top/bottom margin, auto left/right to center */
     padding: var(--spacing-md); /* Overall padding */
     display: grid;
@@ -317,7 +317,6 @@
     background: #ffe6e6;
     transform: none;
 }
-
 
 /* Chat input area */
 .chat-input {
