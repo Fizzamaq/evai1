@@ -53,7 +53,7 @@
                     }
                     ?>
                     <a href="<?= $dashboard_link ?>">Dashboard</a>
-                    <a href="<?= BASE_URL ?>public/index.php">Home</a>
+                    <?php /* Removed Home link for logged-in users as logo handles navigation */ ?>
                     <?php if ($user_type == 1): // Customer specific links ?>
                         <a href="<?= BASE_URL ?>public/events.php">My Events</a>
                         <a href="<?= BASE_URL ?>public/ai_chat.php">AI Assistant</a>
