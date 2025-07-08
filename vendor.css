@@ -42,7 +42,7 @@
 /* New/Updated styles for vendor_portfolio.php */
 
 .portfolio-container {
-    max-width: 900px;
+    max-width: 1400px; /* Increased max-width for a wider interface */
     margin: var(--spacing-lg) auto;
     padding: var(--spacing-md);
     box-sizing: border-box;
@@ -286,6 +286,61 @@
     color: var(--primary-color);
 }
 
+/* NEW: Styling for portfolio actions footer */
+.portfolio-actions-footer {
+    padding: var(--spacing-md);
+    border-top: 1px dashed var(--border-color);
+    display: flex; /* Use flexbox for alignment */
+    justify-content: flex-end; /* Align buttons to the right */
+    gap: var(--spacing-sm); /* Space between buttons */
+    margin-top: auto; /* Push footer to the bottom of the card */
+}
+
+.portfolio-actions-footer .btn {
+    flex-shrink: 0; /* Prevent buttons from shrinking */
+    padding: 10px 20px; /* Adjust padding for better look */
+    font-size: 0.9em; /* Adjust font size */
+    border-radius: 8px; /* More rounded buttons */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Subtle shadow for buttons */
+    transition: all 0.2s ease; /* Smooth transition for hover effects */
+}
+
+/* Enhanced Edit Button (btn-secondary) */
+.portfolio-actions-footer .btn-secondary {
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color)); /* Gradient from primary to accent */
+    color: var(--white); /* White text for contrast */
+    border: none; /* No border for a cleaner look */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15); /* More prominent shadow */
+}
+
+.portfolio-actions-footer .btn-secondary:hover {
+    background: linear-gradient(135deg, var(--accent-color), var(--primary-color)); /* Reverse gradient on hover */
+    transform: translateY(-2px); /* Stronger lift effect */
+    box-shadow: 0 6px 15px rgba(0,0,0,0.25); /* Even more prominent shadow */
+}
+
+/* Enhanced Delete Button (btn-danger) */
+.portfolio-actions-footer .btn-danger {
+    background: linear-gradient(135deg, var(--error-color), #CC0000); /* Gradient from error color to a darker red */
+    color: var(--white); /* White text */
+    border: none; /* No border */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15); /* More prominent shadow */
+}
+
+.portfolio-actions-footer .btn-danger:hover {
+    background: linear-gradient(135deg, #CC0000, var(--error-color)); /* Reverse gradient on hover */
+    transform: translateY(-2px); /* Stronger lift effect */
+    box-shadow: 0 6px 15px rgba(0,0,0,0.25); /* Even more prominent shadow */
+}
+
+
+/* Ensure form within flex item doesn't break layout */
+.portfolio-actions-footer form {
+    display: flex; /* Make form a flex container too */
+    margin: 0; /* Remove default form margin */
+}
+
+
 /* Responsive adjustments for vendor_portfolio */
 @media (max-width: 768px) {
     .portfolio-header {
@@ -304,5 +359,13 @@
     }
     .portfolio-image-wrapper {
         padding-bottom: 56.25%; /* 16:9 aspect ratio for vertical images on mobile */
+    }
+    /* Adjust buttons in footer for small screens */
+    .portfolio-actions-footer {
+        flex-direction: column; /* Stack buttons vertically */
+        align-items: stretch; /* Stretch to full width */
+    }
+    .portfolio-actions-footer .btn {
+        width: 100%; /* Full width when stacked */
     }
 }
