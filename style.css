@@ -56,7 +56,7 @@ body {
 /* General container for content - wide and flexible */
 .container {
     width: 100%; /* Take full width initially */
-    max-width: 1300px; /* Wider max-width for content, to feel more expansive */
+    max-width: 1400px; /* Wider max-width for content, to feel more expansive */
     margin: 0 auto; /* Center the container */
     padding: var(--spacing-md); /* Add horizontal and vertical padding */
     box-sizing: border-box; /* Include padding in width calculation */
