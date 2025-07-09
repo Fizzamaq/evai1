@@ -31,8 +31,11 @@ $stats = [
     'response_rate' => $vendor->getResponseRate($vendor_data['id']) // Display vendor's response rate
 ];
 
+// Fetch recent bookings for the vendor
+$recent_vendor_bookings = $vendor->getRecentVendorBookings($vendor_data['id'], 5);
+
 // Fetch recent activities for the vendor
-$recent_activities = $report_generator->getVendorRecentActivity($vendor_data['id'], 5); // Limit to 5 recent activities
+$recent_activities = $report_generator->getVendorRecentActivity($vendor_data['id'], 10); // Limit to 10 recent activities
 
 ?>
 
@@ -78,7 +81,7 @@ $recent_activities = $report_generator->getVendorRecentActivity($vendor_data['id
         </div>
 
         <div class="dashboard-sections">
-            <div class="section-card upcoming-bookings">
+            <div class="section-card section-card-half">
                 <h2>Upcoming Bookings</h2>
                 <?php $upcomingBookings = $vendor->getUpcomingBookings($vendor_data['id']); ?>
                 <?php if (empty($upcomingBookings)): ?>
@@ -99,7 +102,27 @@ $recent_activities = $report_generator->getVendorRecentActivity($vendor_data['id
                 <?php endif; ?>
             </div>
 
-            <div class="section-card">
+            <div class="section-card section-card-half">
+                <h2>Recent Bookings</h2>
+                <?php if (empty($recent_vendor_bookings)): ?>
+                    <div class="empty-state">No recent bookings.</div>
+                <?php else: ?>
+                    <?php foreach ($recent_vendor_bookings as $booking_item): ?>
+                        <div class="list-item booking-item">
+                            <div>
+                                <div class="list-item-title">For <?= htmlspecialchars($booking_item['event_title']) ?> by <?= htmlspecialchars($booking_item['first_name'] . ' ' . $booking_item['last_name']) ?></div>
+                                <div class="list-item-meta">
+                                    <i class="fas fa-calendar-alt"></i> <?= date('M j, Y', strtotime($booking_item['created_at'])) ?>
+                                    <span class="status-badge status-<?= strtolower($booking_item['status']) ?>"><?= ucfirst(htmlspecialchars($booking_item['status'])) ?></span>
+                                </div>
+                            </div>
+                            <a href="<?= BASE_URL ?>public/booking.php?id=<?= $booking_item['id'] ?>" class="btn btn-sm btn-primary">View Details</a>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+
+            <div class="section-card section-card-full">
                 <h2>Recent Activities</h2>
                 <?php if (!empty($recent_activities)): ?>
                     <div class="activity-log">
@@ -127,8 +150,7 @@ $recent_activities = $report_generator->getVendorRecentActivity($vendor_data['id
                 <?php endif; ?>
             </div>
 
-
-            <div class="section-card calendar-widget">
+            <div class="section-card section-card-full calendar-widget">
                 <h2>Availability Calendar
                     <a href="<?= BASE_URL ?>public/vendor_availability.php" class="btn btn-sm btn-info" style="float:right; margin-left: 10px;">Manage Availability</a>
                 </h2>
@@ -196,6 +218,8 @@ $recent_activities = $report_generator->getVendorRecentActivity($vendor_data['id
                             statusClass = 'fc-event-booked';
                         } else if (arg.event.extendedProps.status === 'blocked') {
                             statusClass = 'fc-event-blocked';
+                        } else if (arg.event.extendedProps.status === 'holiday') {
+                            statusClass = 'fc-event-holiday'; // New class for Holiday
                         }
                         return { html: `<div class="${statusClass}">${arg.event.title}</div>` };
                     },
