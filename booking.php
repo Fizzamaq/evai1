@@ -57,39 +57,55 @@ if (preg_match('/Uploaded Picture URL:\s*(.*?)(?:\n\n|$)/s', $original_instructi
 $clean_instructions = trim(preg_replace('/\n\s*\n/', "\n\n", $clean_instructions));
 
 ?>
-<div class="booking-details-container">
-    <h1>Booking Details</h1>
-    <?php if (isset($_SESSION['success'])) { ?>
-        <div class="alert alert-success"><?= htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?></div>
-    <?php } ?>
-    <?php if (isset($_SESSION['error'])) { ?>
-        <div class="alert alert-error"><?= htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?></div>
-    <?php } ?>
+<head>
+    <link rel="stylesheet" href="../assets/css/booking_details.css"> </head>
+<div class="booking-details-wrapper">
+    <div class="booking-header">
+        <h1>Booking Details</h1>
+        <?php if (isset($_SESSION['success'])) { ?>
+            <div class="alert success"><?= htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?></div>
+        <?php } ?>
+        <?php if (isset($_SESSION['error'])) { ?>
+            <div class="alert error"><?= htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?></div>
+        <?php } ?>
+    </div>
 
-    <p><strong>Booking ID:</strong> <?= htmlspecialchars($bookingDetails['id']) ?></p>
-    <p><strong>Vendor:</strong> <?= htmlspecialchars($bookingDetails['business_name']) ?></p>
-    <p><strong>Date:</strong> <?= date('M j, Y', strtotime($bookingDetails['created_at'])) ?> (Booking Created)</p>
+    <div class="booking-summary-card">
+        <h3>Summary</h3>
+        <p><strong>Booking ID:</strong> <span><?= htmlspecialchars($bookingDetails['id']) ?></span></p>
+        <p><strong>Event:</strong> <span><?= htmlspecialchars($bookingDetails['event_title'] ?? 'N/A') ?></span></p>
+        <p><strong>Vendor:</strong> <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($bookingDetails['vendor_id']) ?>"><?= htmlspecialchars($bookingDetails['business_name']) ?></a></p>
+        <p><strong>Service Date:</strong> <span><?= date('M j, Y', strtotime($bookingDetails['service_date'])) ?></span></p>
+        <?php if (!empty($bookingDetails['service_time'])): ?>
+        <p><strong>Service Time:</strong> <span><?= date('g:i A', strtotime($bookingDetails['service_time'])) ?></span></p>
+        <?php endif; ?>
+        <p><strong>Status:</strong> <span class="status-badge status-<?= strtolower($bookingDetails['status']) ?>"><?= ucfirst(htmlspecialchars($bookingDetails['status'])) ?></span></p>
+        <p class="final-amount"><strong>Total Amount:</strong> <span>PKR <?= number_format($bookingDetails['final_amount'], 2) ?></span></p>
+        <?php if (!empty($bookingDetails['deposit_amount'])): ?>
+        <p><strong>Deposit:</strong> <span>PKR <?= number_format($bookingDetails['deposit_amount'], 2) ?></span></p>
+        <?php endif; ?>
+    </div>
     
-    <div class="booking-section">
+    <div class="booking-section-card">
         <h3>Selected Services</h3>
         <p><?= $selected_services_display ?></p>
     </div>
 
     <?php if (!empty($clean_instructions)): ?>
-    <div class="booking-section">
+    <div class="booking-section-card">
         <h3>Special Instructions</h3>
         <p><?= nl2br($clean_instructions) ?></p>
     </div>
     <?php endif; ?>
 
     <?php if (!empty($uploaded_picture_url)): ?>
-    <div class="booking-section">
+    <div class="booking-section-card">
         <h3>Uploaded Picture</h3>
-        <img src="<?= BASE_URL . $uploaded_picture_url ?>" alt="Uploaded Booking Reference" style="max-width: 300px; height: auto; border: 1px solid #ddd; border-radius: 8px; display: block; margin-top: 10px;">
+        <img src="<?= BASE_URL . $uploaded_picture_url ?>" alt="Uploaded Booking Reference">
     </div>
     <?php endif; ?>
 
-    <div class="booking-actions" style="margin-top: 30px;">
+    <div class="booking-actions">
         <?php if ($bookingDetails['status'] === 'completed' && !$bookingDetails['is_reviewed']): ?>
             <a href="<?= BASE_URL ?>public/review.php?booking_id=<?= $bookingId ?>" class="btn btn-primary">Leave Review</a>
         <?php elseif ($bookingDetails['status'] === 'pending_payment'): ?>
