@@ -100,13 +100,13 @@ class ReportGenerator {
         try {
             // Use positional parameters and pass the limit value multiple times
             $stmt = $this->pdo->prepare("
-                (SELECT 'New User Registered: ' AS type_prefix, CONCAT(first_name, ' ', last_name) AS message_detail, created_at, 'fas fa-user-plus' AS icon_class FROM users ORDER BY created_at DESC LIMIT ?)
+                (SELECT 'New User Registered: ' AS type_prefix, CONCAT(first_name, ' ', last_name) AS message_detail, created_at, 'fas fa-user-plus' AS icon_class, NULL AS related_url FROM users ORDER BY created_at DESC LIMIT ?)
                 UNION ALL
-                (SELECT 'New Event Created: ' AS type_prefix, title AS message_detail, created_at, 'fas fa-calendar-plus' AS icon_class FROM events ORDER BY created_at DESC LIMIT ?)
+                (SELECT 'New Event Created: ' AS type_prefix, title AS message_detail, created_at, 'fas fa-calendar-plus' AS icon_class, CONCAT('public/event.php?id=', id) AS related_url FROM events ORDER BY created_at DESC LIMIT ?)
                 UNION ALL
-                (SELECT 'New Vendor Registered: ' AS type_prefix, business_name AS message_detail, created_at, 'fas fa-store' AS icon_class FROM vendor_profiles ORDER BY created_at DESC LIMIT ?)
+                (SELECT 'New Vendor Registered: ' AS type_prefix, business_name AS message_detail, created_at, 'fas fa-store' AS icon_class, CONCAT('public/vendor_profile.php?id=', id) AS related_url FROM vendor_profiles ORDER BY created_at DESC LIMIT ?)
                 UNION ALL
-                (SELECT 'New Booking: ' AS type_prefix, CONCAT('Booking for event ID ', id) AS message_detail, created_at, 'fas fa-calendar-check' AS icon_class FROM bookings ORDER BY created_at DESC LIMIT ?)
+                (SELECT 'New Booking: ' AS type_prefix, CONCAT('Booking for event ID ', id) AS message_detail, created_at, 'fas fa-calendar-check' AS icon_class, CONCAT('public/booking.php?id=', id) AS related_url FROM bookings ORDER BY created_at DESC LIMIT ?)
                 ORDER BY created_at DESC
                 LIMIT ?
             ");
@@ -118,7 +118,8 @@ class ReportGenerator {
                 $activities[] = [
                     'message' => $row['type_prefix'] . $row['message_detail'],
                     'created_at' => $row['created_at'],
-                    'icon_class' => $row['icon_class']
+                    'icon_class' => $row['icon_class'],
+                    'related_url' => $row['related_url']
                 ];
             }
             return $activities;
@@ -138,7 +139,7 @@ class ReportGenerator {
         try {
             $stmt = $this->pdo->prepare("
                 -- New Event Created
-                (SELECT 'New Event Created: ' AS type_prefix, e.title AS message_detail, e.created_at, 'fas fa-calendar-plus' AS icon_class, NULL AS related_url
+                (SELECT 'New Event Created: ' AS type_prefix, e.title AS message_detail, e.created_at, 'fas fa-calendar-plus' AS icon_class, CONCAT('public/event.php?id=', e.id) AS related_url
                 FROM events e WHERE e.user_id = :user_id1 ORDER BY e.created_at DESC LIMIT :limit1)
                 
                 UNION ALL
@@ -150,21 +151,32 @@ class ReportGenerator {
                 
                 UNION ALL
                 
-                -- Chat Message Sent by user (only if it's the latest message in conversation)
-                (SELECT 'Chat Message: ' AS type_prefix, CONCAT('You sent a message to ', CASE WHEN cc.user_id = :user_id3 THEN vp.business_name ELSE CONCAT(u_other.first_name, ' ', u_other.last_name) END) AS message_detail, cm.created_at, 'fas fa-comment' AS icon_class, CONCAT('public/chat.php?conversation_id=', cc.id) AS related_url
+                -- Chat Activity (summarized to avoid too many entries)
+                (SELECT 'Chat Activity: ' AS type_prefix,
+                        CONCAT(
+                            'Message in chat with ',
+                            CASE
+                                WHEN cc.user_id = :user_id3 THEN vp.business_name
+                                ELSE CONCAT(u_other.first_name, ' ', u_other.last_name)
+                            END
+                        ) AS message_detail,
+                        MAX(cm.created_at) AS created_at, -- Get the latest message time for the conversation
+                        'fas fa-comment' AS icon_class,
+                        CONCAT('public/chat.php?conversation_id=', cc.id) AS related_url
                 FROM chat_messages cm
                 JOIN chat_conversations cc ON cm.conversation_id = cc.id
                 LEFT JOIN users u_other ON (CASE WHEN cc.user_id = :user_id4 THEN cc.vendor_id ELSE cc.user_id END) = u_other.id
                 LEFT JOIN vendor_profiles vp ON u_other.id = vp.user_id
-                WHERE cm.sender_id = :user_id5 AND cm.id = (SELECT MAX(id) FROM chat_messages WHERE conversation_id = cm.conversation_id)
-                ORDER BY cm.created_at DESC LIMIT :limit3)
+                WHERE (cc.user_id = :user_id5 OR cc.vendor_id = :user_id6)
+                GROUP BY cc.id -- Group by conversation to show one entry per conversation
+                ORDER BY MAX(cm.created_at) DESC LIMIT :limit3)
 
                 UNION ALL
 
                 -- AI Recommendation Viewed (or event saved from AI)
                 (SELECT 'AI Plan Saved: ' AS type_prefix, e.title AS message_detail, e.created_at, 'fas fa-robot' AS icon_class, CONCAT('public/event.php?id=', e.id) AS related_url
                 FROM events e
-                WHERE e.user_id = :user_id6 AND e.ai_preferences IS NOT NULL AND e.status != 'deleted'
+                WHERE e.user_id = :user_id7 AND e.ai_preferences IS NOT NULL AND e.status != 'deleted'
                 ORDER BY e.created_at DESC LIMIT :limit4)
 
                 ORDER BY created_at DESC
@@ -178,8 +190,9 @@ class ReportGenerator {
             $stmt->bindParam(':user_id3', $userId, PDO::PARAM_INT);
             $stmt->bindParam(':user_id4', $userId, PDO::PARAM_INT);
             $stmt->bindParam(':user_id5', $userId, PDO::PARAM_INT);
-            $stmt->bindParam(':limit3', $limit, PDO::PARAM_INT);
             $stmt->bindParam(':user_id6', $userId, PDO::PARAM_INT);
+            $stmt->bindParam(':limit3', $limit, PDO::PARAM_INT);
+            $stmt->bindParam(':user_id7', $userId, PDO::PARAM_INT);
             $stmt->bindParam(':limit4', $limit, PDO::PARAM_INT);
             $stmt->bindParam(':final_limit', $limit, PDO::PARAM_INT);
             
@@ -216,20 +229,31 @@ class ReportGenerator {
 
                 UNION ALL
                 
-                -- Chat Message Received by vendor (only if it's the latest message in conversation)
-                (SELECT 'Chat Message: ' AS type_prefix, CONCAT('You received a message from ', CONCAT(u_other.first_name, ' ', u_other.last_name)) AS message_detail, cm.created_at, 'fas fa-comment' AS icon_class, CONCAT('public/vendor_chat.php?conversation_id=', cc.id) AS related_url
+                -- Chat Activity (summarized to avoid too many entries)
+                (SELECT 'Chat Activity: ' AS type_prefix,
+                        CONCAT(
+                            'Message in chat with ',
+                            CASE
+                                WHEN cc.user_id = :vendor_user_id2 THEN vp.business_name
+                                ELSE CONCAT(u_other.first_name, ' ', u_other.last_name)
+                            END
+                        ) AS message_detail,
+                        MAX(cm.created_at) AS created_at, -- Get the latest message time for the conversation
+                        'fas fa-comment' AS icon_class,
+                        CONCAT('public/vendor_chat.php?conversation_id=', cc.id) AS related_url
                 FROM chat_messages cm
                 JOIN chat_conversations cc ON cm.conversation_id = cc.id
-                JOIN users u_other ON (CASE WHEN cc.user_id = :vendor_user_id2 THEN cc.vendor_id ELSE cc.user_id END) = u_other.id
-                WHERE cm.sender_id != :vendor_user_id3 AND (cc.user_id = :vendor_user_id4 OR cc.vendor_id = :vendor_user_id5)
-                AND cm.id = (SELECT MAX(id) FROM chat_messages WHERE conversation_id = cm.conversation_id)
-                ORDER BY cm.created_at DESC LIMIT :limit2)
+                LEFT JOIN users u_other ON (CASE WHEN cc.user_id = :vendor_user_id3 THEN cc.vendor_id ELSE cc.user_id END) = u_other.id
+                LEFT JOIN vendor_profiles vp ON u_other.id = vp.user_id
+                WHERE (cc.user_id = :vendor_user_id4 OR cc.vendor_id = :vendor_user_id5)
+                GROUP BY cc.id -- Group by conversation to show one entry per conversation
+                ORDER BY MAX(cm.created_at) DESC LIMIT :limit2)
 
                 UNION ALL
                 
                 -- New Review Received
-                (SELECT 'New Review: ' AS type_prefix, CONCAT('for your service from ', u.first_name, ' ', u.last_name) AS message_detail, r.created_at, 'fas fa-star' AS icon_class, NULL AS related_url
-                FROM reviews r JOIN users u ON r.reviewer_id = u.id
+                (SELECT 'New Review: ' AS type_prefix, CONCAT('for your service from ', u.first_name, ' ', u.last_name) AS message_detail, r.created_at, 'fas fa-star' AS icon_class, CONCAT('public/vendor_profile.php?id=', vp.id) AS related_url
+                FROM reviews r JOIN users u ON r.reviewer_id = u.id JOIN vendor_profiles vp ON r.reviewed_id = vp.user_id
                 WHERE r.reviewed_id = :vendor_user_id6 ORDER BY r.created_at DESC LIMIT :limit3)
 
                 ORDER BY created_at DESC
