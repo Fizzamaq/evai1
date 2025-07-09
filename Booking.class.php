@@ -113,14 +113,18 @@ class Booking {
         }
     }
 
-    // Add method to get all bookings for a user
+    /**
+     * Get all bookings for a user.
+     * @param int $userId The ID of the user.
+     * @return array An array of booking data.
+     */
     public function getUserBookings($userId) {
         try {
             $stmt = $this->pdo->prepare("
-                SELECT b.*, e.title as event_title, v.business_name
+                SELECT b.*, e.title as event_title, vp.business_name
                 FROM bookings b
-                JOIN events e ON b.event_id = e.id
-                JOIN vendor_profiles v ON b.vendor_id = v.user_id
+                LEFT JOIN events e ON b.event_id = e.id
+                JOIN vendor_profiles vp ON b.vendor_id = vp.id
                 WHERE b.user_id = ?
                 ORDER BY b.created_at DESC
             ");
@@ -132,4 +136,3 @@ class Booking {
         }
     }
 }
-?>
