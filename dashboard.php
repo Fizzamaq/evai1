@@ -43,8 +43,9 @@ if (isset($_SESSION['user_type'])) {
 $event_stats = $event->getUserEventStats($_SESSION['user_id']);
 // Get a limited number of upcoming events for display
 $upcoming_events = $event->getUpcomingEvents($_SESSION['user_id'], 5);
-// Get a limited number of recent bookings for display (assuming getUserBookings exists and can be limited)
-$recent_bookings = $booking->getUserBookings($_SESSION['user_id']);
+// Get a limited number of recent bookings for display (assuming getCustomerBookings exists and can be limited)
+// FIX: Changed from getUserBookings to getCustomerBookings
+$recent_bookings = $booking->getCustomerBookings($_SESSION['user_id']); 
 // Manually limit if the method doesn't support it directly
 $recent_bookings = array_slice($recent_bookings, 0, 5);
 
