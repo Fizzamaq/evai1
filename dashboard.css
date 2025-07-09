@@ -2,11 +2,11 @@
 
 /* --- Customer Dashboard Container --- */
 .customer-dashboard-container {
-    width: 100%;
-    max-width: 1200px; /* Wider for dashboards */
-    margin: 0 auto;
-    padding: var(--spacing-md);
-    box-sizing: border-box;
+    width: 100%; /* Make it take full width initially */
+    max-width: 1400px; /* Wider for dashboards */
+    margin: 0 auto; /* Center the container */
+    padding: 20px; /* Padding on all sides */
+    box-sizing: border-box; /* Include padding in width calculation */
 }
 
 /* --- Dashboard Header (Common to both customer and vendor) --- */
@@ -79,9 +79,20 @@
 /* --- Dashboard Sections (Common to both customer and vendor) --- */
 .dashboard-sections {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, 1fr); /* Default to two columns */
     gap: var(--spacing-lg);
 }
+
+/* Styles for half-width sections */
+.section-card-half {
+    grid-column: span 1; /* Take up one column */
+}
+
+/* Styles for full-width sections */
+.section-card-full {
+    grid-column: 1 / -1; /* Span all columns */
+}
+
 
 .section-card {
     background: var(--white);
@@ -134,6 +145,13 @@
     color: var(--text-subtle);
     flex-basis: 100%;
     margin-top: 5px;
+    display: flex; /* Make meta info a flex container */
+    align-items: center;
+    gap: 8px; /* Gap between icon and text, and status badge */
+}
+
+.list-item-meta i {
+    color: var(--primary-color);
 }
 
 .list-item .btn-link {
@@ -151,9 +169,55 @@
     text-decoration: none;
 }
 
+/* Status Badges - Centralized here for consistency */
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 15px; /* More rounded pill shape */
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    white-space: nowrap; /* Prevent badge text from wrapping */
+    margin-left: auto; /* Push badge to the right in flex container */
+}
+
+.status-planning {
+    background: #ffeaa7; /* Light yellow */
+    color: #fdcb6e; /* Darker yellow */
+}
+
+.status-active {
+    background: #55efc4; /* Light teal */
+    color: #00b894; /* Darker teal */
+}
+
+.status-completed {
+    background: #a29bfe; /* Light purple */
+    color: #6c5ce7; /* Darker purple */
+}
+
+.status-cancelled, .status-payment_failed { /* Combined for similar visual */
+    background: #ff7675; /* Light red */
+    color: #d63031; /* Darker red */
+}
+.status-pending { /* For general 'pending' status like bookings */
+    background: #c7d2e6; /* Light blue-grey */
+    color: #536c92; /* Darker blue-grey */
+}
+.status-refunded {
+    background: #b2ebf2; /* Light cyan */
+    color: #0097a7; /* Dark cyan */
+}
+
+
+.empty-state {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-subtle);
+}
+
 /* --- Vendor Dashboard Specifics --- */
 .vendor-dashboard {
-    max-width: 1200px;
+    max-width: 1400px; /* Wider max-width for vendors too */
     margin: 0 auto;
     padding: var(--spacing-md);
     box-sizing: border-box;
@@ -219,54 +283,6 @@
     color: #424242;
 }
 
-/* Admin Settings Page Styles (from settings.php, moved here for consistency) */
-.settings-container {
-    max-width: 800px;
-    margin: var(--spacing-lg) auto;
-    padding: var(--spacing-md);
-    background: var(--white);
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.08); /* Consistent shadow */
-    border: 1px solid var(--light-grey-border); /* Consistent border */
-}
-
-.setting-item {
-    margin-bottom: var(--spacing-md);
-    padding: var(--spacing-md);
-    background: var(--background-light);
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    border: 1px solid var(--light-grey-border); /* Consistent border */
-}
-
-.setting-key {
-    font-weight: 700;
-    margin-bottom: var(--spacing-xs);
-    color: var(--text-dark);
-    font-size: 1.1em;
-}
-
-.setting-description {
-    color: var(--text-subtle);
-    font-size: 0.9em;
-    margin-bottom: var(--spacing-sm);
-}
-
-.setting-input {
-    width: 100%;
-    padding: 10px;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    font-size: 16px;
-    box-sizing: border-box;
-}
-
-.settings-container .btn-primary {
-    margin-top: var(--spacing-md);
-    width: auto;
-    padding: 12px 30px;
-}
-
 /* NEW: Styles for Activity Log (consistent with admin dashboard) */
 .activity-log {
     border-top: 1px solid #eee; /* Subtle top border */
@@ -310,7 +326,10 @@
 /* --- Responsive Adjustments (Dashboard Specific) --- */
 @media (max-width: 992px) {
     .dashboard-sections {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr; /* Stack all sections vertically on medium screens */
+    }
+    .section-card-half {
+        grid-column: span 1 / auto; /* Reset span for stacking */
     }
 }
 
