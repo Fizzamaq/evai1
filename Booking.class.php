@@ -135,4 +135,24 @@ class Booking {
             return [];
         }
     }
+
+    /**
+     * Get all bookings associated with a specific event ID.
+     * @param int $eventId The ID of the event.
+     * @return array An array of booking data, or empty array if none found.
+     */
+    public function getBookingsByEventId($eventId) {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT b.*
+                FROM bookings b
+                WHERE b.event_id = ?
+            ");
+            $stmt->execute([$eventId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Get bookings by event ID error: " . $e->getMessage());
+            return [];
+        }
+    }
 }
