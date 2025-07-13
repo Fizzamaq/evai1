@@ -9,7 +9,6 @@ class Booking {
 
     public function createBooking($data, $userId) {
         try {
-            // Added screenshot_filename to the INSERT statement
             $stmt = $this->pdo->prepare("
                 INSERT INTO bookings (
                     user_id, event_id, vendor_id, service_id, service_date,
@@ -19,7 +18,7 @@ class Booking {
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
                 )
             ");
-            $stmt->execute([
+            $success = $stmt->execute([
                 $userId,
                 $data['event_id'],
                 $data['vendor_id'],
@@ -28,12 +27,25 @@ class Booking {
                 $data['final_amount'],
                 $data['deposit_amount'],
                 $data['special_instructions'],
-                $data['status'], // Use status from $data (e.g., 'pending_review')
-                $data['screenshot_filename'] // New: Insert screenshot filename
+                $data['status'],
+                $data['screenshot_filename'] // This is the 10th parameter
             ]);
-            return $this->pdo->lastInsertId();
+
+            if ($success) {
+                return $this->pdo->lastInsertId();
+            } else {
+                // Log PDO error information if the execute fails
+                $errorInfo = $stmt->errorInfo();
+                error_log("Booking creation error: PDO Execute Failed. ErrorInfo: " . implode(" | ", $errorInfo) . " | Data: " . print_r($data, true));
+                return false;
+            }
         } catch (PDOException $e) {
-            error_log("Booking creation error: " . $e->getMessage());
+            // Catch and log any PDO exceptions during the process
+            error_log("Booking creation PDO Exception: " . $e->getMessage() . " | SQLSTATE: " . $e->getCode());
+            return false;
+        } catch (Exception $e) {
+            // Catch and log any other general exceptions
+            error_log("Booking creation General Exception: " . $e->getMessage());
             return false;
         }
     }
