@@ -209,7 +209,7 @@
     opacity: 0; /* Hidden by default */
     transition: opacity 0.3s ease; /* Smooth fade in/out */
     text-align: center;
-    z-index: 5; /* Ensure button is on top of image */
+    z-index: 5; /* Ensure it's above the image */
 }
 
 .portfolio-item-card:hover .portfolio-item-overlay {
@@ -260,7 +260,7 @@
     flex-wrap: wrap;
     gap: var(--spacing-sm);
     margin-top: var(--spacing-sm);
-    padding-top: 5px;
+    padding-top: var(--spacing-sm);
     border-top: 1px dashed var(--border-color);
 }
 
@@ -593,10 +593,20 @@
 
 /* Adjust flex ratio for portfolio-carousel-right if it's still a flex item in a layout */
 .portfolio-content-layout .portfolio-carousel-right {
-    flex: 3; /* Allocate more space to the image collage */
+    flex: 2; /* Allocate more space to the image collage */
     max-width: 100%;
     padding-bottom: 0; /* Remove previous aspect ratio padding */
     height: auto; /* Let content define height */
+}
+
+.profile_tabscontainer___0PX7 {
+    position: sticky;
+    padding-top: 30px;
+    top: 59px;
+    width: 100%;
+    grid-template-columns: repeat(4, 1fr);
+    left: auto;
+    padding-left: 0;
 }
 
 
