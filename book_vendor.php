@@ -15,16 +15,17 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$vendor_id_from_url = $_GET['vendor_id'] ?? null; // Renamed to avoid confusion with $vendor_profile['id']
-$prefill_date = $_GET['prefill_date'] ?? null; // Date passed from calendar click on vendor profile
+$vendor_id_from_url = $_GET['vendor_id'] ?? null;
+$prefill_date = $_GET['prefill_date'] ?? null;
 
 $user_obj = new User($pdo);
 $vendor_obj = new Vendor($pdo);
-$event_obj = new Event($pdo);
+$event_obj = new Event($pdo); // Instantiate Event object
 
 // Initialize all variables that will be used in the HTML to avoid 'Undefined variable' warnings
 $vendor_profile = null;
-$vendor_service_offerings_grouped = []; // To hold all services offered by the vendor, grouped by category
+$vendor_service_offerings_grouped = [];
+$event_types = []; // To fetch event types for the new event dropdown
 $success_message = $_SESSION['success_message'] ?? null;
 $error_message = $_SESSION['error_message'] ?? null;
 
@@ -55,22 +56,30 @@ try {
         }
     }
 
+    // Fetch all event types for the "new event" dropdown
+    $stmt = $pdo->query("SELECT id, type_name FROM event_types ORDER BY type_name ASC");
+    $event_types = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (empty($event_types)) {
+        throw new Exception("No event types configured. Please contact support.");
+    }
+
+
 } catch (Exception $e) {
     // If any exception occurs during data fetching/validation, redirect with error
     $_SESSION['error_message'] = $e->getMessage();
     error_log("Booking page load error: " . $e->getMessage()); // Log the error
-    // Decide appropriate redirect URL based on what failed
-    if (isset($vendor_profile) && $vendor_profile) {
-        // If vendor profile was fetched, redirect back to vendor's profile page
+    
+    // Redirect to a relevant page based on the error
+    if (strpos($e->getMessage(), "event types configured") !== false) {
+        header('Location: ' . BASE_URL . 'public/dashboard.php'); // Go to dashboard if no event types
+    } else if (isset($vendor_profile) && $vendor_profile) {
         header('Location: ' . BASE_URL . 'public/vendor_profile.php?id=' . $vendor_profile['id']);
     } else {
-        // If vendor profile wasn't even fetched (e.g., vendor_id was bad), go to general vendors list
         header('Location: ' . BASE_URL . 'public/vendors.php');
     }
     exit();
 }
 
-// Ensure vendor_profile['id'] is used for JS, as availability is linked to vendor_profiles.id
 // This variable is now guaranteed to be a valid integer ID because of the checks above.
 $vendor_profile_id_for_js = (int)$vendor_profile['id'];
 
@@ -370,6 +379,36 @@ include 'header.php';
             <input type="hidden" name="service_date" id="service_date_input" value="<?= htmlspecialchars($prefill_date ?? '') ?>">
 
             <div class="form-group">
+                <label for="new_event_title">New Event Name <span class="required">*</span></label>
+                <input type="text" id="new_event_title" name="new_event_title" class="form-control" required placeholder="e.g., John's Birthday Party">
+            </div>
+
+            <div class="form-group">
+                <label for="new_event_type_id">Event Type <span class="required">*</span></label>
+                <select id="new_event_type_id" name="new_event_type_id" class="form-control" required>
+                    <option value="">-- Select Event Type --</option>
+                    <?php foreach ($event_types as $type): ?>
+                        <option value="<?= htmlspecialchars($type['id']) ?>"><?= htmlspecialchars($type['type_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <!-- Optional: Add guest count and budget for new event if needed -->
+            <div class="form-group">
+                <label for="new_event_guest_count">Approx. Guest Count</label>
+                <input type="number" id="new_event_guest_count" name="new_event_guest_count" class="form-control" min="1" placeholder="e.g., 50">
+            </div>
+            <div class="form-group">
+                <label for="new_event_budget_min">Min. Budget (PKR)</label>
+                <input type="number" id="new_event_budget_min" name="new_event_budget_min" class="form-control" min="0" placeholder="e.g., 10000">
+            </div>
+            <div class="form-group">
+                <label for="new_event_budget_max">Max. Budget (PKR)</label>
+                <input type="number" id="new_event_budget_max" name="new_event_budget_max" class="form-control" min="0" placeholder="e.g., 50000">
+            </div>
+
+
+            <div class="form-group">
                 <label for="display_selected_date">Selected Service Date <span class="required">*</span></label>
                 <!-- Display the selected date to the user, updated by JS -->
                 <input type="text" id="display_selected_date" class="form-control" 
@@ -512,7 +551,7 @@ include 'header.php';
                         // Optional: Alert user if date is not available for booking
                         // You might want to check info.dayEl.querySelector('.fc-event-available')
                         // or fetch availability for this specific date if not already done.
-                        const eventsOnDay = bookingCalendar.getEventManager().getEvents().filter(event => event.startStr.startsWith(info.dateStr));
+                        const eventsOnDay = bookingCalendar.getEvents().filter(event => event.startStr.startsWith(info.dateStr)); // Corrected: Use getEvents() directly
                         const isAvailable = eventsOnDay.some(event => event.extendedProps.status === 'available');
 
                         if (!isAvailable) {
@@ -556,6 +595,8 @@ include 'header.php';
             document.querySelector('form').addEventListener('submit', function(event) {
                 const selectedServices = document.querySelectorAll('input[name="selected_services[]"]:checked');
                 const pictureUploadInput = document.getElementById('picture_upload');
+                const newEventTitleInput = document.getElementById('new_event_title'); // NEW
+                const newEventTypeSelect = document.getElementById('new_event_type_id'); // NEW
 
                 if (selectedServices.length === 0) {
                     alert('Please select at least one service to book.');
@@ -568,6 +609,19 @@ include 'header.php';
                     event.preventDefault();
                     return;
                 }
+
+                // NEW: Validate new event details
+                if (!newEventTitleInput.value.trim()) {
+                    alert('Please enter a name for your new event.');
+                    event.preventDefault();
+                    return;
+                }
+                if (!newEventTypeSelect.value) {
+                    alert('Please select an event type for your new event.');
+                    event.preventDefault();
+                    return;
+                }
+
 
                 if (pictureUploadInput.files.length === 0) {
                     alert('Please upload a screenshot for the booking.');
