@@ -209,7 +209,7 @@
     opacity: 0; /* Hidden by default */
     transition: opacity 0.3s ease; /* Smooth fade in/out */
     text-align: center;
-    z-index: 5; /* Ensure it's above the image */
+    z-index: 5; /* Ensure button is on top of image */
 }
 
 .portfolio-item-card:hover .portfolio-item-overlay {
@@ -260,7 +260,7 @@
     flex-wrap: wrap;
     gap: var(--spacing-sm);
     margin-top: var(--spacing-sm);
-    padding-top: var(--spacing-sm);
+    padding-top: 5px;
     border-top: 1px dashed var(--border-color);
 }
 
@@ -524,6 +524,81 @@
 .holiday-color {
     background-color: #FF9800;
 }
+
+/* NEW COLLAGE STYLES */
+.profile_collageContainer__Bn1a_ {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.profile_collageUpperPane__8NcMm,
+.profile_collageLowerPane__aFs9q {
+    min-width: 100px;
+    box-sizing: border-box;
+    position: relative;
+}
+
+.profile_collageUpperPane__8NcMm {
+    width: 100%;
+    height: 285px;
+    margin-bottom: 5px;
+}
+
+@media (max-width: 1600px) {
+    .profile_collageUpperPane__8NcMm {
+        height: 220px;
+    }
+}
+
+.profile_collageLowerPane__aFs9q {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+    height: 185px;
+}
+
+@media (max-width: 1600px) {
+    .profile_collageLowerPane__aFs9q {
+        height: 150px;
+    }
+}
+
+.profile_collageUpperPane__8NcMm img,
+.profile_collageLowerPane__aFs9q img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.profile_collageUpperPane__8NcMm a:hover img,
+.profile_collageLowerPane__aFs9q a:hover img {
+    transform: scale(1.05);
+}
+
+.profile_collageUpperPane__8NcMm a,
+.profile_collageLowerPane__aFs9q a {
+    display: block;
+    width: 100%;
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+}
+
+/* Adjust flex ratio for portfolio-carousel-right if it's still a flex item in a layout */
+.portfolio-content-layout .portfolio-carousel-right {
+    flex: 3; /* Allocate more space to the image collage */
+    max-width: 100%;
+    padding-bottom: 0; /* Remove previous aspect ratio padding */
+    height: auto; /* Let content define height */
+}
+
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
