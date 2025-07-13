@@ -9,6 +9,11 @@ require_once '../classes/Event.class.php';
 
 include 'header.php';
 
+// TEMPORARY DEBUGGING: Enable full error reporting
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // Ensure vendor ID is provided in the URL
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     $_SESSION['error_message'] = "Invalid vendor ID provided.";
@@ -25,9 +30,19 @@ $event = new Event($pdo);
 // Fetch main vendor profile data including user and user_profile data
 $vendor_profile = $vendor->getVendorProfileById($vendor_id);
 
+// --- DEBUGGING START ---
+// Dump the value of $vendor_profile['id'] directly from PHP
+// This output will appear at the very top of the HTML source.
+// You might need to view page source (Ctrl+U or Cmd+Option+U) to see it clearly.
+echo "<!-- DEBUG: \$vendor_profile['id'] value: ";
+var_dump($vendor_profile['id'] ?? 'NOT SET');
+echo " -->";
+// --- DEBUGGING END ---
+
+
 if (!$vendor_profile) {
     $_SESSION['error_message'] = "Vendor not found.";
-    header('Location: ' . BASE_URL . 'public/index.php');
+    header('Location: ' . BASE_URL . 'public/index.php'); // Changed to index.php for general error
     exit();
 }
 
@@ -52,7 +67,8 @@ $vendor_service_offerings_raw = $vendor->getVendorServices($vendor_profile['id']
 $vendor_services_grouped = [];
 foreach ($vendor_service_offerings_raw as $service_offering) {
     // getServiceOfferingById fetches the offering and its packages
-    $full_service_offering = $vendor->getServiceOfferingById($offering['id'], $vendor_profile['id']); // Changed variable from $offering to $service_offering
+    // Corrected: Pass the actual service_offering_id and vendor_profile_id
+    $full_service_offering = $vendor->getServiceOfferingById($service_offering['id'], $vendor_profile['id']);
     if ($full_service_offering) {
         $vendor_services_grouped[$full_service_offering['category_name']][] = $full_service_offering;
     }
@@ -72,7 +88,9 @@ foreach ($vendor_services_grouped as $category_name => $services_in_category) {
     }
 }
 
-$vendor_profile_id_js = $vendor_profile['id'];
+// Ensure vendor_profile['id'] is used for JS, as availability is linked to vendor_profiles.id
+// Add a fallback to 0 if $vendor_profile['id'] is not set or invalid, though the check above should prevent this.
+$vendor_profile_id_for_js = isset($vendor_profile['id']) ? (int)$vendor_profile['id'] : 0;
 ?>
 
 <!DOCTYPE html>
@@ -113,6 +131,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
             flex-direction: column;
             justify-content: space-between;
             border: 1px solid var(--light-grey-border);
+            cursor: pointer; /* Make the whole card clickable */
         }
         .service-package-card:hover {
             transform: translateY(-3px);
@@ -143,6 +162,7 @@ $vendor_profile_id_js = $vendor_profile['id'];
             gap: 5px;
             margin-top: var(--spacing-sm);
             margin-bottom: var(--spacing-md);
+            overflow: hidden; /* Ensure images don't overflow */
         }
         .service-package-card .package-images img {
             width: 60px;
@@ -150,6 +170,8 @@ $vendor_profile_id_js = $vendor_profile['id'];
             object-fit: cover;
             border-radius: 5px;
             border: 1px solid var(--border-color);
+            max-width: 100%; /* Ensure image doesn't exceed its container */
+            height: auto; /* Maintain aspect ratio */
         }
         .service-package-card .package-images .image-count-overlay {
             width: 60px;
@@ -173,6 +195,153 @@ $vendor_profile_id_js = $vendor_profile['id'];
             width: 100%;
             padding: 10px 15px;
             font-size: 0.9em;
+        }
+
+        /* Lightbox for Service Package Details */
+        .package-details-lightbox-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .package-details-lightbox-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .package-details-lightbox-content {
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
+            width: 90%;
+            max-width: 1000px; /* Adjust max-width as needed */
+            height: 90%;
+            max-height: 700px; /* Adjust max-height as needed */
+            display: flex;
+            overflow: hidden; /* Ensure content stays within bounds */
+            position: relative;
+        }
+        .package-details-lightbox-left {
+            flex: 1;
+            padding: var(--spacing-lg);
+            overflow-y: auto; /* Enable scrolling for text content */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* Push button to bottom */
+        }
+        .package-details-lightbox-right {
+            flex: 1.5; /* Give more space to the image */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #eee; /* Placeholder background */
+            position: relative;
+            overflow: hidden; /* Important for image carousel */
+        }
+        .package-details-lightbox-right img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* Contain image within its area */
+        }
+        .package-details-lightbox-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 2.5em;
+            color: #fff;
+            cursor: pointer;
+            z-index: 10001;
+            background-color: rgba(0, 0, 0, 0.4);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s ease;
+        }
+        .package-details-lightbox-close:hover {
+            background-color: rgba(255, 0, 0, 0.6);
+        }
+        .package-details-lightbox-nav-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 3em;
+            color: #fff;
+            cursor: pointer;
+            z-index: 10001;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            transition: background-color 0.2s ease;
+        }
+        .package-details-lightbox-nav-arrow:hover {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .package-details-lightbox-nav-prev {
+            left: 20px;
+        }
+        .package-details-lightbox-nav-next {
+            right: 20px;
+        }
+        .package-details-lightbox-left h3 {
+            color: var(--primary-color);
+            font-size: 1.8em;
+            margin-top: 0;
+            margin-bottom: var(--spacing-sm);
+        }
+        .package-details-lightbox-left .package-price-large {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: var(--secondary-color);
+            margin-bottom: var(--spacing-md);
+        }
+        .package-details-lightbox-left p {
+            color: var(--text-dark);
+            line-height: 1.6;
+            margin-bottom: var(--spacing-md);
+        }
+        .package-details-lightbox-left .btn {
+            margin-top: auto; /* Push button to bottom */
+            width: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .package-details-lightbox-content {
+                flex-direction: column;
+                height: 95%;
+                max-height: 95%;
+            }
+            .package-details-lightbox-right {
+                height: 50%; /* Image takes 50% height on mobile */
+            }
+            .package-details-lightbox-left {
+                height: 50%; /* Text takes 50% height on mobile */
+                padding: var(--spacing-md);
+            }
+            .package-details-lightbox-close,
+            .package-details-lightbox-nav-arrow {
+                font-size: 2em;
+                width: 35px;
+                height: 35px;
+                top: 10px;
+            }
+            .package-details-lightbox-nav-prev {
+                left: 10px;
+            }
+            .package-details-lightbox-nav-next {
+                right: 10px;
+            }
         }
     </style>
 </head>
@@ -275,7 +444,12 @@ $vendor_profile_id_js = $vendor_profile['id'];
                             <?php if (!empty($service_offering['packages'])): // This condition should always be true due to $vendor_services_grouped_with_packages filtering ?>
                                 <div class="service-packages-grid">
                                     <?php foreach ($service_offering['packages'] as $package): ?>
-                                        <div class="service-package-card">
+                                        <div class="service-package-card" 
+                                             data-package-name="<?= htmlspecialchars($package['package_name']) ?>"
+                                             data-package-description="<?= htmlspecialchars($package['package_description']) ?>"
+                                             data-package-price-min="<?= htmlspecialchars($package['price_min']) ?>"
+                                             data-package-price-max="<?= htmlspecialchars($package['price_max']) ?>"
+                                             data-package-images="<?= htmlspecialchars(json_encode(array_column($package['images'], 'image_url'))) ?>">
                                             <div>
                                                 <h5><?= htmlspecialchars($package['package_name']) ?></h5>
                                                 <p class="package-price">
@@ -315,7 +489,6 @@ $vendor_profile_id_js = $vendor_profile['id'];
         </div>
 
 
-        <?php if (isset($_SESSION['user_id']) && $_SESSION['user_type'] == 1): ?>
         <div class="profile-section availability-section">
             <h2>Availability Overview</h2>
             <div id="public-availability-calendar"></div>
@@ -326,7 +499,6 @@ $vendor_profile_id_js = $vendor_profile['id'];
                 <span class="legend-item"><span class="legend-color holiday-color"></span> Holiday</span>
             </div>
         </div>
-        <?php endif; ?>
 
         <div class="profile-section">
             <h2>Portfolio</h2>
@@ -411,90 +583,205 @@ $vendor_profile_id_js = $vendor_profile['id'];
 
     </div>
 
+    <!-- Package Details Lightbox -->
+    <div class="package-details-lightbox-overlay" id="packageDetailsLightbox">
+        <div class="package-details-lightbox-content">
+            <div class="package-details-lightbox-left">
+                <h3 id="lightboxPackageName"></h3>
+                <p class="package-price-large" id="lightboxPackagePrice"></p>
+                <p id="lightboxPackageDescription"></p>
+                <div class="action-button">
+                    <?php if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 1): ?>
+                        <a href="#" id="lightboxBookButton" class="btn btn-primary">Book This Package</a>
+                    <?php else: ?>
+                        <a href="<?= BASE_URL ?>public/login.php" class="btn btn-primary">Login to Book</a>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="package-details-lightbox-right">
+                <img src="" alt="Package Image" id="lightboxPackageImage">
+                <span class="package-details-lightbox-nav-arrow package-details-lightbox-nav-prev" id="lightboxPackagePrev">&lt;</span>
+                <span class="package-details-lightbox-nav-arrow package-details-lightbox-nav-next" id="lightboxPackageNext">&gt;</span>
+            </div>
+        </div>
+        <span class="package-details-lightbox-close" id="packageDetailsLightboxClose">&times;</span>
+    </div>
+
     <?php include 'footer.php'; ?>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const calendarEl = document.getElementById('public-availability-calendar');
-            const bookNowBtn = document.getElementById('book-now-btn');
-            const vendorProfileId = <?= json_encode($vendor_profile_id_js) ?>;
+            const vendorProfileId = <?= json_encode($vendor_profile_id_for_js) ?>; // Corrected variable name
 
             if (calendarEl) {
-                const calendar = new FullCalendar.Calendar(calendarEl, {
-                    initialView: 'dayGridMonth',
-                    headerToolbar: {
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: ''
-                    },
-                    // ADDED: Restrict calendar navigation to current and future dates
-                    validRange: {
-                        start: '<?= date('Y-m-d') ?>' // Sets the start of the valid range to today
-                    },
-                    events: function(fetchInfo, successCallback, failureCallback) {
-                        fetch(`<?= BASE_URL ?>public/availability.php?vendor_id=${vendorProfileId}&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`HTTP error! status: ${response.status}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
-                                const formattedEvents = data.map(event => {
-                                    // These colors are defined in vendor_profile.css as `background-color` with `!important`
-                                    // and will be applied by FullCalendar
-                                    return {
-                                        id: event.id,
-                                        title: event.status.charAt(0).toUpperCase() + event.status.slice(1), // Display the status
-                                        start: event.date + 'T' + event.start_time, // Full datetime string
-                                        end: event.date + 'T' + event.end_time,     // Full datetime string
-                                        allDay: false,
-                                        // REMOVED: display: 'background', This makes events render as foreground events
-                                        // color: eventColor, // FullCalendar will use eventColor for background, or use CSS classes
-                                        className: `fc-event-${event.status}`, // Add class for specific styling
-                                        extendedProps: {
-                                            status: event.status
-                                        }
-                                    };
+                // Only initialize calendar if vendorProfileId is a valid number
+                if (typeof vendorProfileId === 'number' && vendorProfileId > 0) {
+                    const calendar = new FullCalendar.Calendar(calendarEl, {
+                        initialView: 'dayGridMonth',
+                        headerToolbar: {
+                            left: 'prev,next today',
+                            center: 'title',
+                            right: ''
+                        },
+                        validRange: {
+                            start: '<?= date('Y-m-d') ?>'
+                        },
+                        events: function(fetchInfo, successCallback, failureCallback) {
+                            fetch(`<?= BASE_URL ?>public/availability.php?vendor_id=${vendorProfileId}&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
+                                .then(response => {
+                                    if (!response.ok) {
+                                        // If response is not OK, try to read it as text to debug
+                                        return response.text().then(text => {
+                                            console.error('Error fetching availability: Server response not OK.', response.status, text);
+                                            throw new Error('Server error or invalid JSON response for calendar data.');
+                                        });
+                                    }
+                                    return response.json(); // Attempt to parse as JSON
+                                })
+                                .then(data => {
+                                    successCallback(data);
+                                })
+                                .catch(error => {
+                                    console.error('Error fetching availability:', error);
+                                    const calendarContainer = document.getElementById('public-availability-calendar');
+                                    if (calendarContainer) {
+                                        calendarContainer.innerHTML = '<p class="text-subtle">Failed to load calendar. Please check console for details.</p>';
+                                    }
+                                    failureCallback(error);
                                 });
-                                successCallback(formattedEvents);
-                            })
-                            .catch(error => {
-                                console.error('Error fetching availability:', error);
-                                // Optionally display an error message on the dashboard
-                                const calendarContainer = document.getElementById('public-availability-calendar');
-                                if (calendarContainer) {
-                                    calendarContainer.innerHTML = '<p class="text-subtle">Failed to load calendar. Please try again.</p>';
-                                }
-                                failureCallback(error);
-                            });
-                    },
-                    // MODIFIED: eventContent to display the title and use CSS classes for styling
-                    eventContent: function(arg) {
-                        // Create a div with the event title inside. FullCalendar will apply the classNames
-                        // from the event object (e.g., fc-event-available) which are defined in CSS.
-                        return { html: `<div class="fc-event-status-text">${arg.event.title}</div>` };
-                    },
-                    selectable: false,
-                    editable: false,
-                    // MODIFIED: eventClick to link to book_vendor.php with prefill_date if status is 'available'
-                    eventClick: function(info) {
-                        info.jsEvent.preventDefault();
-                        const clickedDate = info.event.startStr.slice(0, 10);
-                        // Check if the clicked event's status is 'available'
-                        if (info.event.extendedProps.status === 'available') {
-                             // Construct the URL with vendor_id, prefill_date.
-                             // Removed service_offering_id and package_id from here
-                             const bookUrl = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>&prefill_date=${clickedDate}`;
-                             window.location.href = bookUrl;
-                        } else {
-                            // Optionally, alert the user or change the "Book Now" button if the date is not available
-                            alert(`This date is ${info.event.extendedProps.status}. Please choose an available date.`);
+                        },
+                        eventContent: function(arg) {
+                            return { html: `<div class="fc-event-status-text">${arg.event.title}</div>` };
+                        },
+                        selectable: false,
+                        editable: false,
+                        eventClick: function(info) {
+                            info.jsEvent.preventDefault();
+                            const clickedDate = info.event.startStr.slice(0, 10);
+                            if (info.event.extendedProps.status === 'available') {
+                                 const bookUrl = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>&prefill_date=${clickedDate}`;
+                                 window.location.href = bookUrl;
+                            } else {
+                                alert(`This date is ${info.event.extendedProps.status}. Please choose an available date.`);
+                            }
                         }
-                    }
-                });
-                calendar.render();
+                    });
+                    calendar.render();
+                } else {
+                    // If vendorProfileId is invalid, display a message instead of calendar
+                    calendarEl.innerHTML = '<p class="text-subtle">Vendor ID is invalid, cannot display availability calendar.</p>';
+                }
             }
+
+            // --- Package Details Lightbox Logic ---
+            const packageDetailsLightbox = document.getElementById('packageDetailsLightbox');
+            const lightboxPackageName = document.getElementById('lightboxPackageName');
+            const lightboxPackagePrice = document.getElementById('lightboxPackagePrice');
+            const lightboxPackageDescription = document.getElementById('lightboxPackageDescription');
+            const lightboxPackageImage = document.getElementById('lightboxPackageImage');
+            const lightboxPackagePrev = document.getElementById('lightboxPackagePrev');
+            const lightboxPackageNext = document.getElementById('lightboxPackageNext');
+            const lightboxBookButton = document.getElementById('lightboxBookButton'); // This might be null
+            const packageDetailsLightboxClose = document.getElementById('packageDetailsLightboxClose');
+
+            let currentPackageImages = [];
+            let currentPackageImageIndex = 0;
+            let currentBookLink = '';
+
+            document.querySelectorAll('.service-package-card').forEach(card => {
+                card.addEventListener('click', function(e) {
+                    // Prevent opening lightbox if clicking the "Book This Package" button
+                    if (e.target.closest('.action-button')) {
+                        return;
+                    }
+
+                    const packageName = this.dataset.packageName;
+                    const packageDescription = this.dataset.packageDescription;
+                    const priceMin = this.dataset.packagePriceMin;
+                    const priceMax = this.dataset.packagePriceMax;
+                    const imagesJson = this.dataset.packageImages;
+                    
+                    // Safely get the service_offering_id and package_id from the 'Book This Package' link
+                    const bookButtonLinkElement = this.querySelector('.action-button a.btn'); // Get the element
+                    let serviceOfferingId = '';
+                    let packageId = '';
+
+                    if (bookButtonLinkElement) { // Check if the element exists
+                        const urlParams = new URLSearchParams(bookButtonLinkElement.href.split('?')[1]);
+                        serviceOfferingId = urlParams.get('service_offering_id') || '';
+                        packageId = urlParams.get('package_id') || '';
+                    }
+                    
+                    currentPackageImages = imagesJson ? JSON.parse(imagesJson) : [];
+                    currentPackageImageIndex = 0;
+
+                    lightboxPackageName.textContent = packageName;
+                    lightboxPackageDescription.innerHTML = packageDescription.replace(/\n/g, '<br>'); // Preserve newlines
+                    lightboxPackagePrice.textContent = `PKR ${parseFloat(priceMin).toLocaleString()} - PKR ${parseFloat(priceMax).toLocaleString()}`;
+                    
+                    // Set the book button link ONLY if the button element exists
+                    if (lightboxBookButton) { // Check for null here
+                        currentBookLink = `<?= BASE_URL ?>public/book_vendor.php?vendor_id=<?= htmlspecialchars($vendor_profile['id']) ?>&service_offering_id=${serviceOfferingId}&package_id=${packageId}`;
+                        lightboxBookButton.href = currentBookLink;
+                    }
+
+                    showPackageImage(currentPackageImageIndex);
+                    packageDetailsLightbox.classList.add('active');
+                    document.body.style.overflow = 'hidden';
+                });
+            });
+
+            packageDetailsLightboxClose.addEventListener('click', () => {
+                packageDetailsLightbox.classList.remove('active');
+                document.body.style.overflow = '';
+            });
+
+            lightboxPackagePrev.addEventListener('click', () => {
+                currentPackageImageIndex = (currentPackageImageIndex - 1 + currentPackageImages.length) % currentPackageImages.length;
+                showPackageImage(currentPackageImageIndex);
+            });
+
+            lightboxPackageNext.addEventListener('click', () => {
+                currentPackageImageIndex = (currentPackageImageIndex + 1) % currentPackageImages.length;
+                showPackageImage(currentPackageImageIndex);
+            });
+
+            function showPackageImage(index) {
+                if (currentPackageImages.length > 0) {
+                    lightboxPackageImage.src = '<?= BASE_URL ?>' + currentPackageImages[index];
+                    lightboxPackageImage.style.display = 'block';
+                    // Show/hide arrows based on image count
+                    if (currentPackageImages.length > 1) {
+                        lightboxPackagePrev.style.display = 'flex';
+                        lightboxPackageNext.style.display = 'flex';
+                    } else {
+                        lightboxPackagePrev.style.display = 'none';
+                        lightboxPackageNext.style.display = 'none';
+                    }
+                } else {
+                    lightboxPackageImage.src = ''; // Clear image
+                    lightboxPackageImage.style.display = 'none'; // Hide image container
+                    lightboxPackagePrev.style.display = 'none';
+                    lightboxPackageNext.style.display = 'none';
+                }
+            }
+
+            // Close lightbox when clicking outside the content
+            packageDetailsLightbox.addEventListener('click', function(e) {
+                if (e.target === packageDetailsLightbox) {
+                    packageDetailsLightbox.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+
+            // Close with ESC key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && packageDetailsLightbox.classList.contains('active')) {
+                    packageDetailsLightbox.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
         });
     </script>
 </body>
