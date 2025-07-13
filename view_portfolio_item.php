@@ -72,7 +72,7 @@ if ($vendor_profile) {
             color: var(--text-subtle);
             font-size: 1.1em;
         }
-        /* Styles for the main content layout: carousel right, details left */
+        /* Styles for the main content layout: collage right, details left */
         .portfolio-content-layout {
             display: flex;
             flex-direction: column; /* Stack on small screens */
@@ -83,12 +83,12 @@ if ($vendor_profile) {
             .portfolio-content-layout {
                 flex-direction: row; /* Side-by-side on larger screens */
             }
-            /* Adjust flex ratios for left (details) and right (carousel) columns */
+            /* Adjust flex ratios for left (details) and right (collage) columns */
             .portfolio-details-left {
                 flex: 1; /* Takes 1 part of the available space */
                 max-width: 100%; /* Ensures flex items don't overflow */
             }
-            .portfolio-carousel-right {
+            .portfolio-carousel-right { /* Renamed from portfolio-collage-right for consistency, but acts as collage container */
                 flex: 2; /* Takes 2 parts of the available space, making it bigger */
                 max-width: 100%; /* Ensures flex items don't overflow */
             }
@@ -101,7 +101,7 @@ if ($vendor_profile) {
             }
         }
         
-        /* Styles for Swiper Carousel */
+        /* Styles for Swiper Carousel (retained if needed elsewhere, but replaced for main display) */
         .portfolio-carousel-wrapper {
             width: 100%;
             padding-bottom: 75%; /* Set aspect ratio to 4:3 (height is 75% of width) */
@@ -328,6 +328,29 @@ if ($vendor_profile) {
         .lightbox-close:hover {
             background-color: rgba(255, 0, 0, 0.6); /* Red on hover */
         }
+        /* Navigation arrows for lightbox */
+        .lightbox-nav-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 3em;
+            color: #fff;
+            cursor: pointer;
+            z-index: 10001;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            transition: background-color 0.2s ease;
+        }
+        .lightbox-nav-arrow:hover {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .lightbox-nav-prev {
+            left: 20px;
+        }
+        .lightbox-nav-next {
+            right: 20px;
+        }
     </style>
 </head>
 <body>
@@ -416,22 +439,31 @@ if ($vendor_profile) {
                 <?php endif; ?>
             </div>
 
-            <?php if (!empty($item_details['images'])): /* Only render this div if images exist */ ?>
-            <div class="portfolio-carousel-right">
-                <div class="portfolio-carousel-wrapper swiper">
-                    <div class="swiper-wrapper">
-                        <?php foreach ($item_details['images'] as $image): ?>
-                            <div class="swiper-slide">
-                                <a href="<?= BASE_URL . htmlspecialchars($image['image_url']) ?>" class="lightbox-trigger">
-                                    <img src="<?= BASE_URL . htmlspecialchars($image['image_url']) ?>" alt="<?= htmlspecialchars($item_details['title']) ?>">
-                                </a>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <div class="swiper-pagination"></div>
+            <?php if (!empty($item_details['images'])): ?>
+            <div class="portfolio-carousel-right profile_collageContainer__Bn1a_">
+                <div class="profile_collageUpperPane__8NcMm">
+                    <?php if (isset($item_details['images'][0])): ?>
+                        <a href="<?= BASE_URL . htmlspecialchars($item_details['images'][0]['image_url']) ?>" class="lightbox-trigger">
+                            <img src="<?= BASE_URL . htmlspecialchars($item_details['images'][0]['image_url']) ?>" alt="<?= htmlspecialchars($item_details['title']) ?> - Main Image">
+                        </a>
+                    <?php endif; ?>
                 </div>
+                <?php if (count($item_details['images']) > 1): ?>
+                    <div class="profile_collageLowerPane__aFs9q">
+                        <?php for ($i = 1; $i < count($item_details['images']) && $i <= 3; $i++): // Display up to 3 more images for the collage ?>
+                            <a href="<?= BASE_URL . htmlspecialchars($item_details['images'][$i]['image_url']) ?>" class="lightbox-trigger" style="flex: 1; overflow: hidden; height: 100%; display: flex; align-items: center; justify-content: center; margin-right: 5px;">
+                                <img src="<?= BASE_URL . htmlspecialchars($item_details['images'][$i]['image_url']) ?>" alt="<?= htmlspecialchars($item_details['title']) ?> - Image <?= $i + 1 ?>" style="width: 100%; height: 100%; object-fit: cover;">
+                            </a>
+                        <?php endfor; ?>
+                    </div>
+                <?php endif; ?>
             </div>
-            <?php endif; /* END conditional rendering */ ?>
+            <?php else: ?>
+                <div class="portfolio-placeholder" style="height: 400px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--background-light); color: var(--text-subtle); border-radius: 10px;">
+                    <i class="fas fa-image" style="font-size: 4em;"></i>
+                    <span>No Images Available</span>
+                </div>
+            <?php endif; ?>
         </div>
 
         <div class="back-link">
@@ -484,13 +516,15 @@ if ($vendor_profile) {
             <img src="" alt="Enlarged Image" id="lightboxImage">
         </div>
         <span class="lightbox-close" id="lightboxClose">&times;</span>
+        <span class="lightbox-nav-arrow lightbox-nav-prev" id="lightboxPrev">&lt;</span>
+        <span class="lightbox-nav-arrow lightbox-nav-next" id="lightboxNext">&gt;</span>
     </div>
 
     <?php include 'footer.php'; ?>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Swiper Initialization
+            // Swiper Initialization (for other carousels if any, not for main portfolio image collage)
             const swiperWrapper = document.querySelector('.portfolio-carousel-wrapper .swiper-slide');
             if (swiperWrapper) {
                 new Swiper('.portfolio-carousel-wrapper', {
@@ -509,41 +543,81 @@ if ($vendor_profile) {
                 });
             }
 
-            // Lightbox functionality
+            // Lightbox functionality with navigation
             const lightboxOverlay = document.getElementById('lightboxOverlay');
             const lightboxImage = document.getElementById('lightboxImage');
             const lightboxClose = document.getElementById('lightboxClose');
+            const lightboxPrev = document.getElementById('lightboxPrev');
+            const lightboxNext = document.getElementById('lightboxNext');
             const lightboxTriggers = document.querySelectorAll('.lightbox-trigger');
 
+            let currentImageIndex = 0;
+            const images = []; // Array to store all image URLs for navigation
+
+            // Populate the images array from all collage triggers
             lightboxTriggers.forEach(trigger => {
+                images.push(trigger.href);
+            });
+
+            function openLightbox(index) {
+                currentImageIndex = index;
+                lightboxImage.src = images[currentImageIndex];
+                lightboxOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+                updateNavigationButtons();
+            }
+
+            function closeLightbox() {
+                lightboxOverlay.classList.remove('active');
+                document.body.style.overflow = ''; // Restore scrolling
+            }
+
+            function showNextImage() {
+                currentImageIndex = (currentImageIndex + 1) % images.length;
+                lightboxImage.src = images[currentImageIndex];
+                updateNavigationButtons();
+            }
+
+            function showPrevImage() {
+                currentImageIndex = (currentImageIndex - 1 + images.length) % images.length;
+                lightboxImage.src = images[currentImageIndex];
+                updateNavigationButtons();
+            }
+
+            function updateNavigationButtons() {
+                // Hide arrows if there's only one image
+                if (images.length <= 1) {
+                    lightboxPrev.style.display = 'none';
+                    lightboxNext.style.display = 'none';
+                } else {
+                    lightboxPrev.style.display = 'block';
+                    lightboxNext.style.display = 'block';
+                }
+            }
+
+
+            lightboxTriggers.forEach((trigger, index) => {
                 trigger.addEventListener('click', function(e) {
                     e.preventDefault(); // Prevent default link behavior
-                    const imageUrl = this.href; // Get the full image URL from the <a> tag
-                    lightboxImage.src = imageUrl;
-                    lightboxOverlay.classList.add('active'); // Show lightbox
-                    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+                    openLightbox(index);
                 });
             });
 
-            // Close lightbox when clicking close button
-            lightboxClose.addEventListener('click', function() {
-                lightboxOverlay.classList.remove('active');
-                document.body.style.overflow = ''; // Restore scrolling
-            });
+            lightboxClose.addEventListener('click', closeLightbox);
+            lightboxPrev.addEventListener('click', showPrevImage);
+            lightboxNext.addEventListener('click', showNextImage);
 
             // Close lightbox when clicking outside the image (on the overlay)
             lightboxOverlay.addEventListener('click', function(e) {
                 if (e.target === lightboxOverlay) { // Only close if clicked directly on overlay, not the image itself
-                    lightboxOverlay.classList.remove('active');
-                    document.body.style.overflow = '';
+                    closeLightbox();
                 }
             });
 
             // Close lightbox with ESC key
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape' && lightboxOverlay.classList.contains('active')) {
-                    lightboxOverlay.classList.remove('active');
-                    document.body.style.overflow = '';
+                    closeLightbox();
                 }
             });
 
