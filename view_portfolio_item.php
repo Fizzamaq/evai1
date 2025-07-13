@@ -90,7 +90,9 @@ if ($vendor_profile) {
             .portfolio-details-left {
                 flex: 1; /* Takes 1 part of the available space */
                 max-width: 100%; /* Ensures flex items don't overflow */
-                /* No flex-direction: column here, as tab-navigation is sticky, and content sections are outside this flex item */
+                /* Removed display: flex; flex-direction: column; from here
+                   because it is handled by the .tab-content-section style directly
+                   or implicit block flow. */
             }
             .portfolio-carousel-right {
                 flex: 2; /* Takes 2 parts of the available space, making it bigger */
@@ -164,8 +166,15 @@ if ($vendor_profile) {
             border-radius: 8px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.08);
             margin-bottom: var(--spacing-lg); /* Space between sections */
-            /* No margin-top here, as the parent .portfolio-details-left will manage spacing or it flows directly */
+            margin-top: var(--spacing-lg); /* Default margin for sections */
         }
+
+        /* Specific rule for the FIRST tab-content-section directly following the tab-navigation
+           when it's in the two-column layout (portfolio-details-left) */
+        .portfolio-details-left > .tab-content-section:first-child {
+            margin-top: 0; /* Remove top margin for the very first section in the left column */
+        }
+
         .tab-content-section h2 {
             font-size: 1.6em;
             margin-top: 0;
@@ -321,81 +330,23 @@ if ($vendor_profile) {
             <?php endif; ?>
         </div>
 
+        <div class="tab-navigation profile_tabscontainer___0PX7">
+            <button class="tab-button" data-target-id="description-section">Description</button>
+            <button class="tab-button" data-target-id="details-section">Details</button>
+            <?php if (!empty($item_details['services_provided'])): ?>
+                <button class="tab-button" data-target-id="services-provided-section">Services Provided</button>
+            <?php endif; ?>
+            <?php if (!empty($item_details['client_testimonial'])): ?>
+                <button class="tab-button" data-target-id="client-testimonial-section">Reviews</button>
+            <?php endif; ?>
+        </div>
+
         <div class="portfolio-content-layout">
             <div class="portfolio-details-left">
-                <!-- Sticky Tab Navigation -->
-                <div class="tab-navigation profile_tabscontainer___0PX7">
-                    <button class="tab-button" data-target-id="description-section">Description</button>
-                    <button class="tab-button" data-target-id="details-section">Details</button>
-                    <?php if (!empty($item_details['services_provided'])): ?>
-                        <button class="tab-button" data-target-id="services-provided-section">Services Provided</button>
-                    <?php endif; ?>
-                    <?php if (!empty($item_details['client_testimonial'])): ?>
-                        <button class="tab-button" data-target-id="client-testimonial-section">Reviews</button>
-                    <?php endif; ?>
-                </div>
-                
-                <!-- Content sections are now inside this div -->
                 <div id="description-section" class="tab-content-section">
                     <h2>Description</h2>
                     <p><?= nl2br(htmlspecialchars($item_details['description'] ?? 'No description provided.')) ?></p>
                 </div>
-
-                <div id="details-section" class="tab-content-section">
-                    <h2>Details</h2>
-                    <?php if (!empty($item_details['project_charges'])): ?>
-                        <div class="detail-item">
-                            <p><strong>Charges:</strong> PKR <?= number_format($item_details['project_charges'], 2) ?></p>
-                        </div>
-                    <?php endif; ?>
-                    <div class="detail-item">
-                        <p><strong>Event Type:</strong> <?= htmlspecialchars($item_details['event_type_name'] ?? 'N/A') ?></p>
-                    </div>
-                    <?php if (!empty($item_details['project_date'])): ?>
-                        <div class="detail-item">
-                            <p><strong>Project Date:</strong> <?= date('F j, Y', strtotime($item_details['project_date'])) ?></p>
-                        </div>
-                    <?php endif; ?>
-                    <?php if (!empty($item_details['video_url'])): ?>
-                        <div class="detail-item">
-                            <p><strong>Video:</strong> <a href="<?= htmlspecialchars($item_details['video_url']) ?>" target="_blank"><?= htmlspecialchars($item_details['video_url']) ?></a></p>
-                        </div>
-                    <?php endif; ?>
-                    <?php if (!empty($item_details['is_featured'])): ?>
-                        <div class="detail-item">
-                            <p><strong>Status:</strong> Featured Project</p>
-                        </div>
-                    <?php endif; ?>
-
-                    <?php if (!empty($item_details['venue_name'])): ?>
-                        <div class="detail-item">
-                            <p><strong>Venue Name:</strong> <?= htmlspecialchars($item_details['venue_name']) ?></p>
-                        </div>
-                        <?php if (!empty($item_details['venue_address'])): ?>
-                            <div class="detail-item">
-                                <p><strong>Address:</strong> <?= htmlspecialchars($item_details['venue_address']) ?>, <?= htmlspecialchars($item_details['venue_city']) ?>, <?= htmlspecialchars($item_details['venue_state']) ?>, <?= htmlspecialchars($item_details['venue_postal_code']) ?>, <?= htmlspecialchars($item_details['venue_country']) ?></p>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
-                </div>
-
-                <?php if (!empty($item_details['services_provided'])): ?>
-                <div id="services-provided-section" class="tab-content-section">
-                    <h2>Services Provided</h2>
-                    <ul>
-                        <?php foreach ($item_details['services_provided'] as $service): ?>
-                            <li><?= htmlspecialchars($service['service_name']) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-                <?php endif; ?>
-
-                <?php if (!empty($item_details['client_testimonial'])): ?>
-                <div id="client-testimonial-section" class="tab-content-section">
-                    <h2>Reviews</h2>
-                    <p class="client-testimonial-quote">"<?= nl2br(htmlspecialchars($item_details['client_testimonial'])) ?>"</p>
-                </div>
-                <?php endif; ?>
             </div>
 
             <?php if (!empty($item_details['images'])): ?>
@@ -424,6 +375,62 @@ if ($vendor_profile) {
                 </div>
             <?php endif; ?>
         </div>
+
+        <div id="details-section" class="tab-content-section">
+            <h2>Details</h2>
+            <?php if (!empty($item_details['project_charges'])): ?>
+                <div class="detail-item">
+                    <p><strong>Charges:</strong> PKR <?= number_format($item_details['project_charges'], 2) ?></p>
+                </div>
+            <?php endif; ?>
+            <div class="detail-item">
+                <p><strong>Event Type:</strong> <?= htmlspecialchars($item_details['event_type_name'] ?? 'N/A') ?></p>
+            </div>
+            <?php if (!empty($item_details['project_date'])): ?>
+                <div class="detail-item">
+                    <p><strong>Project Date:</strong> <?= date('F j, Y', strtotime($item_details['project_date'])) ?></p>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($item_details['video_url'])): ?>
+                <div class="detail-item">
+                    <p><strong>Video:</strong> <a href="<?= htmlspecialchars($item_details['video_url']) ?>" target="_blank"><?= htmlspecialchars($item_details['video_url']) ?></a></p>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($item_details['is_featured'])): ?>
+                <div class="detail-item">
+                    <p><strong>Status:</strong> Featured Project</p>
+                </div>
+            <?php endif; ?>
+
+            <?php if (!empty($item_details['venue_name'])): ?>
+                <div class="detail-item">
+                    <p><strong>Venue Name:</strong> <?= htmlspecialchars($item_details['venue_name']) ?></p>
+                </div>
+                <?php if (!empty($item_details['venue_address'])): ?>
+                    <div class="detail-item">
+                        <p><strong>Address:</strong> <?= htmlspecialchars($item_details['venue_address']) ?>, <?= htmlspecialchars($item_details['venue_city']) ?>, <?= htmlspecialchars($item_details['venue_state']) ?>, <?= htmlspecialchars($item_details['venue_postal_code']) ?>, <?= htmlspecialchars($item_details['venue_country']) ?></p>
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div>
+
+        <?php if (!empty($item_details['services_provided'])): ?>
+        <div id="services-provided-section" class="tab-content-section">
+            <h2>Services Provided</h2>
+            <ul>
+                <?php foreach ($item_details['services_provided'] as $service): ?>
+                    <li><?= htmlspecialchars($service['service_name']) ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!empty($item_details['client_testimonial'])): ?>
+        <div id="client-testimonial-section" class="tab-content-section">
+            <h2>Reviews</h2>
+            <p class="client-testimonial-quote">"<?= nl2br(htmlspecialchars($item_details['client_testimonial'])) ?>"</p>
+        </div>
+        <?php endif; ?>
 
         <div class="back-link">
             <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_profile['id'] ?? '') ?>" class="btn btn-secondary">Back to <?= htmlspecialchars($vendor_profile['business_name'] ?? 'Vendor') ?>'s Profile</a>
