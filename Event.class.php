@@ -1,133 +1,137 @@
 <?php
+// classes/Event.class.php
 class Event {
-    private $conn;
+    private $pdo;
 
-    public function __construct($pdo) { // Pass PDO to constructor
-        $this->conn = $pdo;
+    public function __construct($pdo) {
+        $this->pdo = $pdo;
     }
 
-    /**
-     * Create a new event
-     */
+    // MODIFIED: createEvent now takes a data array for flexibility
     public function createEvent($data) {
         try {
-            $this->conn->beginTransaction();
+            // Default values for optional fields if not provided in $data
+            $title = $data['title'] ?? 'New Event Booking';
+            $description = $data['description'] ?? 'Event created via booking form.';
+            $event_date = $data['event_date'] ?? date('Y-m-d'); // Default to today if not provided
+            $event_type_id = $data['event_type_id'] ?? 1; // Default to a generic event type if not provided (e.g., 'Other')
+            $guest_count = $data['guest_count'] ?? 0;
+            $budget_min = $data['budget_min'] ?? 0.00;
+            $budget_max = $data['budget_max'] ?? 0.00;
+            $status = $data['status'] ?? 'planning'; // Default status
+            $ai_preferences = $data['ai_preferences'] ?? null;
+            $location_string = $data['location_string'] ?? null;
+            $venue_name = $data['venue_name'] ?? null;
+            $venue_address = $data['venue_address'] ?? null;
+            $venue_city = $data['venue_city'] ?? null;
+            $venue_state = $data['venue_state'] ?? null;
+            $venue_country = $data['venue_country'] ?? null;
+            $venue_postal_code = $data['venue_postal_code'] ?? null;
+            $event_time = $data['event_time'] ?? null;
+            $end_date = $data['end_date'] ?? null;
+            $end_time = $data['end_time'] ?? null;
+            $special_requirements = $data['special_requirements'] ?? null;
+            $venue_location_point_str = $data['venue_location_point_str'] ?? null;
 
-            // Insert into events table
-            $sql = "INSERT INTO events (
-                user_id, event_type_id, title, description, event_date, event_time,
-                end_date, end_time, venue_name, venue_address, venue_city, venue_state,
-                venue_country, venue_postal_code, guest_count, budget_min, budget_max,
-                status, special_requirements, ai_preferences, location_string, venue_location,
-                created_at, updated_at
-            ) VALUES (
-                :user_id, :event_type_id, :title, :description, :event_date, :event_time,
-                :end_date, :end_time, :venue_name, :venue_address, :venue_city, :venue_state,
-                :venue_country, :venue_postal_code, :guest_count, :budget_min, :budget_max,
-                :status, :special_requirements, :ai_preferences, :location_string, ST_GeomFromText(:venue_location_point_str),
-                NOW(), NOW() -- Use NOW() for created_at and updated_at
-            )";
 
-            $stmt = $this->conn->prepare($sql);
+            $stmt = $this->pdo->prepare("
+                INSERT INTO events (
+                    user_id, event_type_id, title, description, event_date, event_time,
+                    end_date, end_time, venue_name, venue_address, venue_city, venue_state,
+                    venue_country, venue_postal_code, guest_count, budget_min, budget_max,
+                    status, special_requirements, ai_preferences, location_string, venue_location,
+                    created_at, updated_at
+                ) VALUES (
+                    :user_id, :event_type_id, :title, :description, :event_date, :event_time,
+                    :end_date, :end_time, :venue_name, :venue_address, :venue_city, :venue_state,
+                    :venue_country, :venue_postal_code, :guest_count, :budget_min, :budget_max,
+                    :status, :special_requirements, :ai_preferences, :location_string, ST_GeomFromText(:venue_location_point_str),
+                    NOW(), NOW()
+                )
+            ");
+            $success = $stmt->execute([
+                ':user_id' => $data['user_id'], // This must be provided in $data
+                ':event_type_id' => $event_type_id,
+                ':title' => $title,
+                ':description' => $description,
+                ':event_date' => $event_date,
+                ':event_time' => $event_time,
+                ':end_date' => $end_date,
+                ':end_time' => $end_time,
+                ':venue_name' => $venue_name,
+                ':venue_address' => $venue_address,
+                ':venue_city' => $venue_city,
+                ':venue_state' => $venue_state,
+                ':venue_country' => $venue_country,
+                ':venue_postal_code' => $venue_postal_code,
+                ':guest_count' => $guest_count,
+                ':budget_min' => $budget_min,
+                ':budget_max' => $budget_max,
+                ':status' => $status,
+                ':special_requirements' => $special_requirements,
+                ':ai_preferences' => $ai_preferences,
+                ':location_string' => $location_string,
+                ':venue_location_point_str' => $venue_location_point_str
+            ]);
 
-            $venue_location_point_str_val = null;
-            // Placeholder for geocoding logic if you implement it
-            // if (!empty($data['location_string'])) {
-            //      $coords = $this->geocodeLocation($data['location_string']);
-            //      if ($coords) {
-            //          $venue_location_point_str_val = "POINT(" . $coords['lat'] . " " . $coords['lng'] . ")";
-            //      }
-            // }
-
-            $execute_params = [
-                ':user_id' => $data['user_id'],
-                ':event_type_id' => $data['event_type_id'], // Corrected key from 'event_type' to 'event_type_id'
-                ':title' => $data['title'],
-                ':description' => $data['description'],
-                ':event_date' => $data['event_date'],
-                ':event_time' => $data['event_time'] ?? null,
-                ':end_date' => $data['end_date'] ?? null,
-                ':end_time' => $data['end_time'] ?? null,
-                ':venue_name' => $data['venue_name'] ?? null,
-                ':venue_address' => $data['venue_address'] ?? null,
-                ':venue_city' => $data['venue_city'] ?? null,
-                ':venue_state' => $data['venue_state'] ?? null,
-                ':venue_country' => $data['venue_country'] ?? null,
-                ':venue_postal_code' => $data['postal_code'] ?? null, // Changed from data['business_postal_code'] to data['postal_code']
-                ':guest_count' => $data['guest_count'],
-                ':budget_min' => $data['budget_min'],
-                ':budget_max' => $data['budget_max'],
-                ':status' => $data['status'],
-                ':special_requirements' => $data['special_requirements'],
-                ':ai_preferences' => $data['ai_preferences'] ?? null,
-                ':location_string' => $data['location_string'] ?? null,
-                ':venue_location_point_str' => $venue_location_point_str_val
-            ];
-
-            $event_insert_success = $stmt->execute($execute_params);
-
-            if (!$event_insert_success) {
-                throw new PDOException("Events table insert failed.");
+            if ($success) {
+                return $this->pdo->lastInsertId();
+            } else {
+                $errorInfo = $stmt->errorInfo();
+                error_log("Event creation error: PDO Execute Failed. ErrorInfo: " . implode(" | ", $errorInfo) . " | Data: " . print_r($data, true));
+                return false;
             }
-
-            $event_id = $this->conn->lastInsertId();
-
-            // Handle services (insert into event_service_requirements)
-            if (!empty($data['services_needed_array'])) {
-                $service_req_sql = "INSERT INTO event_service_requirements
-                                        (event_id, service_id, priority, budget_allocated, specific_requirements, status)
-                                        VALUES (?, ?, ?, ?, ?, ?)";
-                $service_stmt = $this->conn->prepare($service_req_sql);
-
-                foreach ($data['services_needed_array'] as $service) {
-                    $service_execute_params = [
-                        $event_id,
-                        $service['service_id'],
-                        $service['priority'] ?? 'medium',
-                        $service['budget_allocated'] ?? null,
-                        $service['specific_requirements'] ?? null,
-                        $service['status'] ?? 'needed'
-                    ];
-
-                    $service_insert_success = $service_stmt->execute($service_execute_params);
-
-                    if (!$service_insert_success) {
-                        throw new PDOException("Service insert failed for service_id: " . $service['service_id']);
-                    }
-                }
-            }
-
-            $this->conn->commit();
-            return $event_id;
-
         } catch (PDOException $e) {
-            $this->conn->rollBack();
-            error_log("Event creation PDO error: " . $e->getMessage());
+            error_log("Event creation PDO Exception: " . $e->getMessage() . " | SQLSTATE: " . $e->getCode());
             return false;
         } catch (Exception $e) {
-            $this->conn->rollBack();
-            error_log("Event creation general error: " . $e->getMessage());
+            error_log("Event creation General Exception: " . $e->getMessage());
             return false;
         }
     }
 
-    /**
-     * Get all events for a specific user
-     */
-    public function getUserEvents($user_id) {
+    public function updateEvent($eventId, $userId, $title, $description, $event_date, $event_type_id, $guest_count, $budget_min, $budget_max, $ai_preferences = null, $status = 'planning') {
         try {
-            // Join with event_types to get type_name for display
-            $sql = "SELECT e.*, et.type_name
-                    FROM events e
-                    JOIN event_types et ON e.event_type_id = et.id
-                    WHERE e.user_id = :user_id
-                    ORDER BY e.event_date ASC, e.created_at DESC";
-            $stmt = $this->conn->prepare($sql);
-            $stmt->bindParam(':user_id', $user_id);
-            $stmt->execute();
+            $stmt = $this->pdo->prepare("
+                UPDATE events
+                SET title = ?, description = ?, event_date = ?, event_type_id = ?, guest_count = ?, budget_min = ?, budget_max = ?, ai_preferences = ?, status = ?, updated_at = NOW()
+                WHERE id = ? AND user_id = ?
+            ");
+            $stmt->execute([$title, $description, $event_date, $event_type_id, $guest_count, $budget_min, $budget_max, $ai_preferences, $status, $eventId, $userId]);
+            return $stmt->rowCount(); // Returns number of affected rows
+        } catch (PDOException $e) {
+            error_log("Event update error: " . $e->getMessage());
+            return false;
+        }
+    }
 
+    public function getEventById($eventId) {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT e.*, et.type_name
+                FROM events e
+                JOIN event_types et ON e.event_type_id = et.id
+                WHERE e.id = ?
+            ");
+            $stmt->execute([$eventId]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Get event by ID error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getUserEvents($userId) {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT e.*, et.type_name
+                FROM events e
+                JOIN event_types et ON e.event_type_id = et.id
+                WHERE e.user_id = ?
+                ORDER BY e.event_date DESC
+            ");
+            $stmt->execute([$userId]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
-
         } catch (PDOException $e) {
             error_log("Get user events error: " . $e->getMessage());
             return [];
@@ -135,160 +139,45 @@ class Event {
     }
 
     /**
-     * Get a specific event by ID
+     * Deletes an event.
+     * This method now attempts to delete the event from the database.
+     * It also sets the event status to 'deleted' in the events table
+     * and deletes associated bookings due to ON DELETE CASCADE.
+     * @param int $eventId The ID of the event to delete.
+     * @param int $userId The ID of the user attempting to delete the event (for ownership check).
+     * @return bool True on successful deletion, false otherwise.
      */
-    public function getEventById($event_id, $user_id = null) {
+    public function deleteEvent($eventId, $userId) {
         try {
-            // Join with event_types to get type_name
-            $sql = "SELECT e.*, et.type_name
-                    FROM events e
-                    JOIN event_types et ON e.event_type_id = et.id
-                    WHERE e.id = :event_id";
-            if ($user_id) {
-                $sql .= " AND e.user_id = :user_id";
-            }
-
-            $stmt = $this->conn->prepare($sql);
-            $stmt->bindParam(':event_id', $event_id);
-            if ($user_id) {
-                $stmt->bindParam(':user_id', $user_id);
-            }
-            $stmt->execute();
-
-            return $stmt->fetch(PDO::FETCH_ASSOC);
-
-        } catch (PDOException $e) {
-            error_log("Get event by ID error: " . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Update an existing event
-     */
-    public function updateEvent($event_id, $data, $user_id) {
-        try {
-            $this->conn->beginTransaction();
-
-            $sql = "UPDATE events SET
-                title = :title,
-                description = :description,
-                event_type_id = :event_type_id,
-                event_date = :event_date,
-                event_time = :event_time,
-                end_date = :end_date,
-                end_time = :end_time,
-                venue_name = :venue_name,
-                venue_address = :venue_address,
-                venue_city = :venue_city,
-                venue_state = :venue_state,
-                venue_country = :venue_country,
-                venue_postal_code = :venue_postal_code,
-                guest_count = :guest_count,
-                budget_min = :budget_min,
-                budget_max = :budget_max,
-                status = :status,
-                special_requirements = :special_requirements,
-                location_string = :location_string,
-                venue_location = ST_GeomFromText(:venue_location_point_str) -- Update point as well
-                WHERE id = :event_id AND user_id = :user_id";
-
-            $stmt = $this->conn->prepare($sql);
-
-            $venue_location_point_str = null;
-            // Placeholder for geocoding logic if you implement it
-            // if (!empty($data['location_string_from_form'])) {
-            //      $coords = $this->geocodeLocation($data['location_string_from_form']);
-            //      if ($coords) {
-            //          $venue_location_point_str = "POINT(" . $coords['lat'] . " " . $coords['lng'] . ")";
-            //      }
-            // }
-
-            $stmt->execute([
-                ':title' => $data['title'],
-                ':description' => $data['description'],
-                ':event_type_id' => $data['event_type'], // Corrected key to 'event_type'
-                ':event_date' => $data['event_date'],
-                ':event_time' => $data['event_time'] ?? null,
-                ':end_date' => $data['end_date'] ?? null,
-                ':end_time' => $data['end_time'] ?? null,
-                ':venue_name' => $data['venue_name'] ?? null,
-                ':venue_address' => $data['venue_address'] ?? null,
-                ':venue_city' => $data['venue_city'] ?? null,
-                ':venue_state' => $data['venue_state'] ?? null,
-                ':venue_country' => $data['venue_country'] ?? null,
-                ':venue_postal_code' => $data['venue_postal_code'] ?? null,
-                ':guest_count' => $data['guest_count'] ?? null,
-                ':budget_min' => $data['budget_min'] ?? null,
-                ':budget_max' => $data['budget_max'] ?? null,
-                ':status' => $data['status'] ?? 'planning',
-                ':special_requirements' => $data['special_requirements'] ?? null,
-                ':location_string' => $data['location_string_from_form'] ?? null,
-                ':venue_location_point_str' => $venue_location_point_str, // Pass as named parameter
-                ':event_id' => $event_id,
-                ':user_id' => $user_id
-            ]);
-
-            // Update services (delete existing and insert new ones)
-            $this->conn->prepare("DELETE FROM event_service_requirements WHERE event_id = ?")
-                        ->execute([$event_id]);
-
-            if (!empty($data['services_needed_array'])) {
-                $service_req_sql = "INSERT INTO event_service_requirements
-                                        (event_id, service_id, priority)
-                                        VALUES (?, ?, ?)";
-                $service_stmt = $this->conn->prepare($service_req_sql);
-                foreach ($data['services_needed_array'] as $service_id) {
-                    $service_stmt->execute([$event_id, $service_id, 'medium']);
-                }
-            }
-
-            $this->conn->commit();
-            return true;
-
-        } catch (PDOException $e) {
-            $this->conn->rollBack();
-            error_log("Event update error: " . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Delete an event (soft delete by changing status)
-     */
-    public function deleteEvent($event_id, $user_id) {
-        try {
-            // Verify ownership first
-            $checkStmt = $this->conn->prepare("SELECT id FROM events WHERE id = ? AND user_id = ?");
-            $checkStmt->execute([$event_id, $user_id]);
+            // First, verify ownership to prevent unauthorized deletion
+            $checkStmt = $this->pdo->prepare("SELECT id FROM events WHERE id = ? AND user_id = ?");
+            $checkStmt->execute([$eventId, $userId]);
             if (!$checkStmt->fetch()) {
-                error_log("Delete Event Error: User (ID: $user_id) attempted to delete event (ID: $event_id) they do not own.");
+                error_log("Delete Event Error: User (ID: $userId) attempted to delete event (ID: $eventId) they do not own.");
                 return false; // User does not own this event
             }
 
-            // Perform soft delete
-            $sql = "UPDATE events SET status = 'deleted', updated_at = NOW()
-                    WHERE id = :event_id"; // Removed user_id from WHERE clause here as ownership is already checked
-            $stmt = $this->conn->prepare($sql);
-            $stmt->bindParam(':event_id', $event_id);
-            // $stmt->bindParam(':user_id', $user_id); // No longer needed if removed from SQL
-
-            $success = $stmt->execute();
+            // Attempt to delete the event.
+            // Due to ON DELETE CASCADE on bookings.event_id, associated bookings should be deleted automatically.
+            $deleteStmt = $this->pdo->prepare("DELETE FROM events WHERE id = ?");
+            $success = $deleteStmt->execute([$eventId]);
 
             if ($success) {
-                error_log("Event (ID: $event_id) soft-deleted successfully by User (ID: $user_id).");
+                error_log("Event (ID: $eventId) successfully deleted by User (ID: $userId).");
                 return true;
             } else {
-                $errorInfo = $stmt->errorInfo();
-                error_log("Soft Delete Event Error: Failed to execute UPDATE statement for Event ID: $event_id. PDO ErrorInfo: " . implode(" | ", $errorInfo));
+                // Log PDO error information if the execute fails
+                $errorInfo = $deleteStmt->errorInfo();
+                error_log("Delete Event Error: Failed to execute DELETE statement for Event ID: $eventId. PDO ErrorInfo: " . implode(" | ", $errorInfo));
                 return false;
             }
-
         } catch (PDOException $e) {
-            error_log("Soft Delete Event PDO Exception: " . $e->getMessage());
+            // Catch and log any PDO exceptions during the process
+            error_log("Delete Event PDO Exception: " . $e->getMessage());
             return false;
         } catch (Exception $e) {
-            error_log("Soft Delete Event General Exception: " . $e->getMessage());
+            // Catch and log any other general exceptions
+            error_log("Delete Event General Exception: " . $e->getMessage());
             return false;
         }
     }
@@ -343,7 +232,7 @@ class Event {
 
             $sql .= " ORDER BY e.event_date ASC";
 
-            $stmt = $this->conn->prepare($sql);
+            $stmt = $this->pdo->prepare($sql);
             foreach ($params as $param => $value) {
                 $stmt->bindValue($param, $value);
             }
@@ -373,7 +262,7 @@ class Event {
                     ORDER BY e.event_date ASC
                     LIMIT :limit";
 
-            $stmt = $this->conn->prepare($sql);
+            $stmt = $this->pdo->prepare($sql);
             $stmt->bindParam(':user_id', $user_id);
             $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
             $stmt->execute();
@@ -402,7 +291,7 @@ class Event {
                     FROM events
                     WHERE user_id = :user_id AND status != 'deleted'";
 
-            $stmt = $this->conn->prepare($sql);
+            $stmt = $this->pdo->prepare($sql);
             $stmt->bindParam(':user_id', $user_id);
             $stmt->execute();
 
@@ -445,7 +334,7 @@ class Event {
 
             $sql .= " ORDER BY e.event_date ASC";
 
-            $stmt = $this->conn->prepare($sql);
+            $stmt = $this->pdo->prepare($sql);
             foreach ($params as $param => $value) {
                 $stmt->bindValue($param, $value);
             }
@@ -482,13 +371,13 @@ class Event {
             }
 
             // Services needed for duplication (fetch from event_service_requirements)
-            $services_to_duplicate_stmt = $this->conn->prepare("SELECT service_id, priority, budget_allocated, specific_requirements, status FROM event_service_requirements WHERE event_id = ?");
+            $services_to_duplicate_stmt = $this->pdo->prepare("SELECT service_id, priority, budget_allocated, specific_requirements, status FROM event_service_requirements WHERE event_id = ?");
             $services_to_duplicate_stmt->execute([$event_id]);
             $new_event_data['services_needed_array'] = $services_to_duplicate_stmt->fetchAll(PDO::FETCH_ASSOC);
 
             // Need to map old 'event_type_name' back to 'event_type_id' for insertion
             // This is crucial for createEvent if it expects event_type_id
-            $event_type_stmt = $this->conn->prepare("SELECT id FROM event_types WHERE type_name = ?");
+            $event_type_stmt = $this->pdo->prepare("SELECT id FROM event_types WHERE type_name = ?");
             $event_type_stmt->execute([$original_event['type_name']]);
             $new_event_data['event_type_id'] = $event_type_stmt->fetchColumn(); // Corrected key to event_type_id
 
@@ -511,7 +400,7 @@ class Event {
                     FROM events e
                     JOIN event_types et ON e.event_type_id = et.id
                     ORDER BY e.event_date ASC, e.created_at DESC";
-            $stmt = $this->conn->prepare($sql);
+            $stmt = $this->pdo->prepare($sql);
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -528,7 +417,7 @@ class Event {
      */
     public function updateEventStatus($eventId, $newStatus) {
         try {
-            $stmt = $this->conn->prepare("UPDATE events SET status = ?, updated_at = NOW() WHERE id = ?");
+            $stmt = $this->pdo->prepare("UPDATE events SET status = ?, updated_at = NOW() WHERE id = ?");
             return $stmt->execute([$newStatus, $eventId]);
         } catch (PDOException $e) {
             error_log("Failed to update event status by admin: " . $e->getMessage());
@@ -543,7 +432,7 @@ class Event {
      */
     public function deleteEventSoft($eventId) {
         try {
-            $stmt = $this->conn->prepare("UPDATE events SET status = 'deleted', updated_at = NOW() WHERE id = ?");
+            $stmt = $this->pdo->prepare("UPDATE events SET status = 'deleted', updated_at = NOW() WHERE id = ?");
             return $stmt->execute([$eventId]);
         } catch (PDOException $e) {
             error_log("Failed to soft delete event by admin: " . $e->getMessage());
