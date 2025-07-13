@@ -33,10 +33,10 @@ class Event {
             $venue_location_point_str_val = null;
             // Placeholder for geocoding logic if you implement it
             // if (!empty($data['location_string'])) {
-            //     $coords = $this->geocodeLocation($data['location_string']);
-            //     if ($coords) {
-            //         $venue_location_point_str_val = "POINT(" . $coords['lat'] . " " . $coords['lng'] . ")";
-            //     }
+            //      $coords = $this->geocodeLocation($data['location_string']);
+            //      if ($coords) {
+            //          $venue_location_point_str_val = "POINT(" . $coords['lat'] . " " . $coords['lng'] . ")";
+            //      }
             // }
 
             $execute_params = [
@@ -53,7 +53,7 @@ class Event {
                 ':venue_city' => $data['venue_city'] ?? null,
                 ':venue_state' => $data['venue_state'] ?? null,
                 ':venue_country' => $data['venue_country'] ?? null,
-                ':venue_postal_code' => $data['venue_postal_code'] ?? null,
+                ':venue_postal_code' => $data['postal_code'] ?? null, // Changed from data['business_postal_code'] to data['postal_code']
                 ':guest_count' => $data['guest_count'],
                 ':budget_min' => $data['budget_min'],
                 ':budget_max' => $data['budget_max'],
@@ -75,8 +75,8 @@ class Event {
             // Handle services (insert into event_service_requirements)
             if (!empty($data['services_needed_array'])) {
                 $service_req_sql = "INSERT INTO event_service_requirements
-                                    (event_id, service_id, priority, budget_allocated, specific_requirements, status)
-                                    VALUES (?, ?, ?, ?, ?, ?)";
+                                        (event_id, service_id, priority, budget_allocated, specific_requirements, status)
+                                        VALUES (?, ?, ?, ?, ?, ?)";
                 $service_stmt = $this->conn->prepare($service_req_sql);
 
                 foreach ($data['services_needed_array'] as $service) {
@@ -198,10 +198,10 @@ class Event {
             $venue_location_point_str = null;
             // Placeholder for geocoding logic if you implement it
             // if (!empty($data['location_string_from_form'])) {
-            //     $coords = $this->geocodeLocation($data['location_string_from_form']);
-            //     if ($coords) {
-            //         $venue_location_point_str = "POINT(" . $coords['lat'] . " " . $coords['lng'] . ")";
-            //     }
+            //      $coords = $this->geocodeLocation($data['location_string_from_form']);
+            //      if ($coords) {
+            //          $venue_location_point_str = "POINT(" . $coords['lat'] . " " . $coords['lng'] . ")";
+            //      }
             // }
 
             $stmt->execute([
@@ -231,12 +231,12 @@ class Event {
 
             // Update services (delete existing and insert new ones)
             $this->conn->prepare("DELETE FROM event_service_requirements WHERE event_id = ?")
-                       ->execute([$event_id]);
+                        ->execute([$event_id]);
 
             if (!empty($data['services_needed_array'])) {
                 $service_req_sql = "INSERT INTO event_service_requirements
-                                    (event_id, service_id, priority)
-                                    VALUES (?, ?, ?)";
+                                        (event_id, service_id, priority)
+                                        VALUES (?, ?, ?)";
                 $service_stmt = $this->conn->prepare($service_req_sql);
                 foreach ($data['services_needed_array'] as $service_id) {
                     $service_stmt->execute([$event_id, $service_id, 'medium']);
@@ -258,16 +258,37 @@ class Event {
      */
     public function deleteEvent($event_id, $user_id) {
         try {
+            // Verify ownership first
+            $checkStmt = $this->conn->prepare("SELECT id FROM events WHERE id = ? AND user_id = ?");
+            $checkStmt->execute([$event_id, $user_id]);
+            if (!$checkStmt->fetch()) {
+                error_log("Delete Event Error: User (ID: $user_id) attempted to delete event (ID: $event_id) they do not own.");
+                return false; // User does not own this event
+            }
+
+            // Perform soft delete
             $sql = "UPDATE events SET status = 'deleted', updated_at = NOW()
-                    WHERE id = :event_id AND user_id = :user_id";
+                    WHERE id = :event_id"; // Removed user_id from WHERE clause here as ownership is already checked
             $stmt = $this->conn->prepare($sql);
             $stmt->bindParam(':event_id', $event_id);
-            $stmt->bindParam(':user_id', $user_id);
+            // $stmt->bindParam(':user_id', $user_id); // No longer needed if removed from SQL
 
-            return $stmt->execute();
+            $success = $stmt->execute();
+
+            if ($success) {
+                error_log("Event (ID: $event_id) soft-deleted successfully by User (ID: $user_id).");
+                return true;
+            } else {
+                $errorInfo = $stmt->errorInfo();
+                error_log("Soft Delete Event Error: Failed to execute UPDATE statement for Event ID: $event_id. PDO ErrorInfo: " . implode(" | ", $errorInfo));
+                return false;
+            }
 
         } catch (PDOException $e) {
-            error_log("Event deletion error: " . $e->getMessage());
+            error_log("Soft Delete Event PDO Exception: " . $e->getMessage());
+            return false;
+        } catch (Exception $e) {
+            error_log("Soft Delete Event General Exception: " . $e->getMessage());
             return false;
         }
     }
@@ -510,7 +531,7 @@ class Event {
             $stmt = $this->conn->prepare("UPDATE events SET status = ?, updated_at = NOW() WHERE id = ?");
             return $stmt->execute([$newStatus, $eventId]);
         } catch (PDOException $e) {
-            error_log("Error updating event status by admin: " . $e->getMessage());
+            error_log("Failed to update event status by admin: " . $e->getMessage());
             throw new Exception("Failed to update event status.");
         }
     }
@@ -525,7 +546,7 @@ class Event {
             $stmt = $this->conn->prepare("UPDATE events SET status = 'deleted', updated_at = NOW() WHERE id = ?");
             return $stmt->execute([$eventId]);
         } catch (PDOException $e) {
-            error_log("Error soft deleting event by admin: " . $e->getMessage());
+            error_log("Failed to soft delete event by admin: " . $e->getMessage());
             throw new Exception("Failed to soft delete event.");
         }
     }
