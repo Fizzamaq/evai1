@@ -16,7 +16,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $vendor_id_from_url = $_GET['vendor_id'] ?? null;
-$prefill_date = $_GET['prefill_date'] ?? null;
+$prefill_date = $_GET['prefill_date'] ?? null; // Date passed from calendar click on vendor profile
 
 $user_obj = new User($pdo);
 $vendor_obj = new Vendor($pdo);
@@ -373,7 +373,7 @@ include 'header.php';
         <?php endif; ?>
 
         <form action="<?= BASE_URL ?>public/process_booking.php" method="POST" enctype="multipart/form-data">
-            <input type="hidden" name="vendor_id" value="<?= htmlspecialchars($vendor_profile['user_id']) ?>">
+            <input type="hidden" name="vendor_id" value="<?= htmlspecialchars($vendor_profile['id']) ?>"> <!-- CORRECTED: Use vendor_profile['id'] -->
             
             <!-- Hidden input for service_date, will be populated by JS from calendar selection -->
             <input type="hidden" name="service_date" id="service_date_input" value="<?= htmlspecialchars($prefill_date ?? '') ?>">
@@ -436,7 +436,7 @@ include 'header.php';
                     <?php foreach ($vendor_service_offerings_grouped as $category_name => $service_offerings_in_category): ?>
                         <h4 style="margin-top: var(--spacing-md); color: var(--text-dark);"><?= htmlspecialchars($category_name) ?></h4>
                         <div class="services-selection-grid">
-                            <?php foreach ($service_offerings_in_category as $offering): ?>
+                            <?php foreach ($offering): ?>
                                 <div class="service-item-checkbox">
                                     <input type="checkbox" id="service_<?= htmlspecialchars($offering['service_id']) ?>" 
                                            name="selected_services[]" value="<?= htmlspecialchars($offering['service_id']) ?>" 
