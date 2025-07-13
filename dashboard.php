@@ -1,4 +1,9 @@
 <?php
+// TEMPORARY: Enable full error reporting for debugging.
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // Start session and include necessary files for database connection and classes
 session_start();
 require_once '../includes/config.php';
@@ -44,8 +49,7 @@ $event_stats = $event->getUserEventStats($_SESSION['user_id']);
 // Get a limited number of upcoming events for display
 $upcoming_events = $event->getUpcomingEvents($_SESSION['user_id'], 5);
 // Get a limited number of recent bookings for display (assuming getCustomerBookings exists and can be limited)
-// FIX: Changed from getUserBookings to getCustomerBookings
-$recent_bookings = $booking->getCustomerBookings($_SESSION['user_id']); 
+$recent_bookings = $booking->getUserBookings($_SESSION['user_id']);
 // Manually limit if the method doesn't support it directly
 $recent_bookings = array_slice($recent_bookings, 0, 5);
 
@@ -244,6 +248,14 @@ $recent_activities = $report_generator->getUserRecentActivity($_SESSION['user_id
             </div>
         </div>
 
+        <?php if (isset($success_message)): ?>
+            <div class="alert success"><?php echo htmlspecialchars($success_message); ?></div>
+        <?php endif; ?>
+
+        <?php if (isset($error_message)): ?>
+            <div class="alert error"><?php echo htmlspecialchars($error_message); ?></div>
+        <?php endif; ?>
+
         <div class="customer-stats-grid">
             <div class="stat-card">
                 <div class="metric-value"><?= $event_stats['total_events'] ?? 0 ?></div>
@@ -314,8 +326,8 @@ $recent_activities = $report_generator->getUserRecentActivity($_SESSION['user_id
                     <?php foreach ($recent_bookings as $booking_item): ?>
                         <div class="list-item">
                             <div>
-                                <div class="list-item-title">Booking for <?= htmlspecialchars($booking_item['event_title']) ?></div>
-                                <div class="list-item-meta"><?= htmlspecialchars($booking_item['business_name']) ?> | Status: <?= ucfirst(htmlspecialchars($booking_item['status'])) ?></div>
+                                <div class="list-item-title">Booking for <?= htmlspecialchars($booking_item['event_title'] ?? 'N/A') ?></div>
+                                <div class="list-item-meta"><?= htmlspecialchars($booking_item['business_name'] ?? 'N/A') ?> | Date: <?= date('F j, Y', strtotime($booking_item['service_date'])) ?> | Status: <?= ucfirst(htmlspecialchars($booking_item['status'])) ?></div>
                             </div>
                             <a href="<?= BASE_URL ?>public/booking.php?id=<?= $booking_item['id'] ?>" class="btn-link">View</a>
                         </div>
