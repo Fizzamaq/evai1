@@ -601,7 +601,7 @@
 
 /* Adjust to remove empty space right under sticky tabs */
 .portfolio-content-layout {
-    margin-top: 0; /* Remove the top margin */
+    margin-top: var(--spacing-md); /* Add some space between tabs and this section */
     /* Keep other properties: display: flex; flex-direction: column; gap: var(--spacing-lg); margin-bottom: var(--spacing-lg); */
 }
 
@@ -627,15 +627,17 @@
     .profile-avatar {
         margin: 0;
     }
-    /* Adjust for larger screens where portfolio-details-left and portfolio-carousel-right are side-by-side */
-    .portfolio-details-left .tab-content-section { /* Target all sections within left column */
-        margin-top: var(--spacing-lg); /* Add margin between sections */
+    /* Style for the LEFT column content (Description tab) */
+    .portfolio-details-left > .tab-content-section {
+        margin-top: 0; /* Ensure no top margin for the content in the left column */
+        margin-bottom: var(--spacing-lg); /* Add space below it */
     }
-    .portfolio-details-left .tab-content-section:first-of-type {
-        margin-top: 0; /* Ensure the very first section has no top margin */
+    /* Style for FULL-WIDTH sections below the two-column layout */
+    .tab-content-section:not(.portfolio-details-left > .tab-content-section) { /* Target sections NOT inside portfolio-details-left */
+        max-width: 100%; /* Ensure they are full width */
+        margin: var(--spacing-lg) auto; /* Center them and provide vertical spacing */
+        box-sizing: border-box; /* Include padding/border in width */
     }
-}
-
 @media (max-width: 768px) {
     .profile-header-section {
         flex-direction: column;
