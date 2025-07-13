@@ -3,10 +3,10 @@ session_start();
 require_once '../includes/config.php';
 require_once '../classes/Vendor.class.php'; // Might not be directly needed here, but kept for safety
 require_once '../classes/Booking.class.php';
-// REMOVED: require_once '../classes/PaymentProcessor.class.php'; // Not needed for screenshot payment
 require_once '../classes/Chat.class.php'; // Needed to potentially start a chat
 require_once '../classes/Notification.class.php'; // Include Notification class
 require_once '../classes/UploadHandler.class.php'; // Include UploadHandler for screenshot
+require_once '../classes/Event.class.php'; // Include Event class for creating new event
 
 // TEMPORARY DEBUGGING: Enable full error reporting
 ini_set('display_errors', 1);
@@ -26,93 +26,129 @@ try {
 
     // Instantiate classes here, after basic session check
     $bookingSystem = new Booking($pdo);
-    // REMOVED: $paymentProcessor = new PaymentProcessor($pdo); // Not needed for screenshot payment
     $chat = new Chat($pdo);
     $notification = new Notification($pdo);
-    $uploadHandler = new UploadHandler($pdo); // Instantiate UploadHandler
+    $uploadHandler = new UploadHandler($pdo);
+    $event_obj = new Event($pdo); // Instantiate Event object
 
-    $event_id = $_POST['event_id'] ?? null;
     $vendor_id = $_POST['vendor_id'] ?? null;
     $service_ids = $_POST['selected_services'] ?? []; // Array of selected service IDs
     $service_date = $_POST['service_date'] ?? null;
-    // REMOVED: $final_amount = $_POST['final_amount'] ?? null; // Not sent from form, and not used for payment processing
-    // REMOVED: $deposit_amount = $_POST['deposit_amount'] ?? null; // Not sent from form, and not used for payment processing
     $special_instructions = $_POST['instructions'] ?? '';
+
+    // NEW EVENT DETAILS from book_vendor.php
+    $new_event_title = $_POST['new_event_title'] ?? null;
+    $new_event_type_id = $_POST['new_event_type_id'] ?? null;
+    $new_event_guest_count = $_POST['new_event_guest_count'] ?? null;
+    $new_event_budget_min = $_POST['new_event_budget_min'] ?? null;
+    $new_event_budget_max = $_POST['new_event_budget_max'] ?? null;
 
     // --- DEBUGGING INPUTS ---
     error_log("PROCESS_BOOKING: Received POST data: " . print_r($_POST, true));
     error_log("PROCESS_BOOKING: Received FILES data: " . print_r($_FILES, true));
     // --- END DEBUGGING INPUTS ---
 
-    // For screenshot payment, final_amount and deposit_amount are not processed here.
-    // They might be stored in the booking data, but not used for payment gateway interaction.
-    // Ensure your booking form captures these if they are needed for the DB.
-    // For now, removing dummy values as they are not used for payment processing.
-
-    // Basic validation
-    if (empty($event_id) || empty($vendor_id) || empty($service_ids) || empty($service_date)) {
-        throw new Exception("Missing required booking information (Event ID, Vendor ID, Services, Date).");
+    // Basic validation for mandatory fields
+    if (empty($vendor_id) || !is_numeric($vendor_id)) {
+        throw new Exception("Missing or invalid Vendor ID.");
     }
     if (!is_array($service_ids) || count($service_ids) === 0) {
         throw new Exception("No services selected for booking.");
     }
+    if (empty($service_date)) { // Date is mandatory
+        throw new Exception("Missing desired service date.");
+    }
+    if (empty($new_event_title)) {
+        throw new Exception("Missing new event title.");
+    }
+    if (empty($new_event_type_id) || !is_numeric($new_event_type_id)) {
+        throw new Exception("Missing or invalid new event type.");
+    }
+
+    // --- Create New Event Record FIRST ---
+    $event_data_for_creation = [
+        'user_id' => $_SESSION['user_id'],
+        'title' => $new_event_title,
+        'description' => 'Event created via direct booking form.', // Default description
+        'event_date' => $service_date, // Use selected service date as event date
+        'event_type_id' => (int)$new_event_type_id,
+        'guest_count' => (int)$new_event_guest_count,
+        'budget_min' => (float)$new_event_budget_min,
+        'budget_max' => (float)$new_event_budget_max,
+        'status' => 'active', // Set initial status for newly created event
+        'ai_preferences' => null, // Not AI-generated if created this way
+        'location_string' => null, // Not capturing location here
+        'venue_name' => null // Not capturing venue here
+    ];
+
+    $event_id = $event_obj->createEvent($event_data_for_creation); // Use the createEvent method from Event.class.php
+
+    if (!$event_id) {
+        throw new Exception("Failed to create new event record for booking. Check Event.class.php logs.");
+    }
+    error_log("PROCESS_BOOKING: New event created with ID: " . $event_id);
+
 
     // --- Handle Screenshot Upload ---
     $screenshot_filename = null;
     if (isset($_FILES['picture_upload']) && $_FILES['picture_upload']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = '../assets/uploads/bookings/'; // Define your upload directory
         if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0777, true); // Create directory if it doesn't exist
+            mkdir($upload_dir, 0775, true); // Create directory if it doesn't exist, 0775 permissions
         }
         $screenshot_filename = $uploadHandler->uploadFile($_FILES['picture_upload'], $upload_dir);
         if (!$screenshot_filename) {
-            throw new Exception("Failed to upload screenshot: " . ($_SESSION['upload_error'] ?? 'Unknown error'));
+            // uploadFile sets $_SESSION['upload_error'] on failure
+            throw new Exception("Failed to upload screenshot: " . ($_SESSION['upload_error'] ?? 'Unknown upload error.'));
         }
         error_log("PROCESS_BOOKING: Screenshot uploaded: " . $screenshot_filename);
+    } else if (isset($_FILES['picture_upload']) && $_FILES['picture_upload']['error'] !== UPLOAD_ERR_NO_FILE) {
+        // If a file was attempted but failed for reasons other than "no file"
+        throw new Exception("Screenshot upload error (Code: " . $_FILES['picture_upload']['error'] . ").");
     } else {
-        // Screenshot is mandatory, so if not uploaded or error, throw exception
+        // If no file was uploaded AND it's required
         throw new Exception("Payment screenshot is required. Please upload one.");
     }
 
-    // Create booking with initial status 'pending_review' or 'awaiting_payment_confirmation'
-    // Note: service_id in bookings table seems to be singular, but selected_services is an array.
-    // You might need to create multiple booking entries or store service_ids as JSON/comma-separated.
-    // For now, I'll use the first service_id, but this needs review based on your DB design.
-    $primary_service_id = $service_ids[0]; // Assuming one booking per primary service, or you need to loop
-    
-    // You need to ensure final_amount and deposit_amount are passed if your DB requires them.
-    // Assuming they are either calculated later or not strictly required at this initial booking stage for screenshot payment.
-    // For now, setting them to 0 or null if they are not coming from the form.
-    $final_amount = $_POST['final_amount'] ?? 0; // Ensure this is captured from the form if needed
-    $deposit_amount = $_POST['deposit_amount'] ?? 0; // Ensure this is captured from the form if needed
+    // DUMMY VALUES FOR AMOUNTS (as they are not coming from the form)
+    // You MUST implement logic to calculate these based on selected services/packages.
+    // Setting to 0.00 for now, assuming DB allows 0 or is nullable.
+    $final_amount = 0.00; 
+    $deposit_amount = 0.00;
 
+    // Create booking data array
     $booking_data = [
-        'event_id' => $event_id,
-        'vendor_id' => $vendor_id,
-        'service_id' => $primary_service_id, // Using first selected service
-        'service_date' => $service_date,
-        'final_amount' => $final_amount, // Will be 0 if not sent from form
-        'deposit_amount' => $deposit_amount, // Will be 0 if not sent from form
+        'user_id' => $_SESSION['user_id'], // Ensure user_id is passed
+        'event_id' => (int)$event_id, // Use the NEWLY CREATED event_id
+        'vendor_id' => (int)$vendor_id, // Cast to int
+        'service_id' => (int)$service_ids[0], // Using first selected service, cast to int
+        'service_date' => $service_date, // Should be 'YYYY-MM-DD' format
+        'final_amount' => (float)$final_amount, // Cast to float
+        'deposit_amount' => (float)$deposit_amount, // Cast to float
         'special_instructions' => $special_instructions,
-        'status' => 'pending_review', // Set initial status for screenshot payment
-        'screenshot_filename' => $screenshot_filename // Pass screenshot filename
+        'status' => 'pending_review', // Initial status for screenshot payment
+        'screenshot_filename' => $screenshot_filename // Filename from upload
     ];
+
+    // --- DEBUGGING booking_data before createBooking ---
+    error_log("PROCESS_BOOKING: Data sent to createBooking: " . print_r($booking_data, true));
+    // --- END DEBUGGING ---
 
     $newBookingId = $bookingSystem->createBooking($booking_data, $_SESSION['user_id']);
 
     if (!$newBookingId) {
-        throw new Exception("Failed to create booking in database. BookingSystem->createBooking returned false.");
+        throw new Exception("Failed to create booking in database. BookingSystem->createBooking returned false. Check PHP error log for PDO details.");
     }
     error_log("PROCESS_BOOKING: Booking created with ID: " . $newBookingId);
 
     // Create chat conversation for this booking
-    $conversation_id = $chat->startConversation($event_id, $_SESSION['user_id'], $vendor_id);
+    $conversation_id = $chat->startConversation((int)$event_id, $_SESSION['user_id'], (int)$vendor_id);
     if ($conversation_id) {
         $bookingSystem->updateBookingChatConversationId($newBookingId, $conversation_id);
         error_log("PROCESS_BOOKING: Chat conversation started with ID: " . $conversation_id);
     } else {
         error_log("PROCESS_BOOKING: Failed to create chat conversation for booking ID: $newBookingId");
-        if ($notification) { // Check if notification object is available before using
+        if ($notification) {
             $notification->createNotification(
                 $_SESSION['user_id'],
                 "Warning: Could not start chat for your booking (ID: {$newBookingId}). Please contact support if you need to chat with the vendor.",
@@ -122,29 +158,27 @@ try {
         }
     }
 
-    // REMOVED ALL STRIPE PAYMENT INTENT CREATION/UPDATE LOGIC
-    // Since payment is via screenshot, no payment intent is created here.
-
     $pdo->commit(); // Commit transaction if all successful so far
+    error_log("PROCESS_BOOKING: Database transaction committed.");
 
     $_SESSION['success_message'] = "Booking submitted for review! Your booking (ID: {$newBookingId}) is awaiting vendor confirmation.";
-    if ($notification) { // Check if notification object is available before using
+    if ($notification) {
         $notification->createNotification(
             $_SESSION['user_id'],
             "Your booking (ID: {$newBookingId}) has been submitted for review. Please await vendor confirmation.",
             'booking',
             $newBookingId
         );
-        // Also notify the vendor
+        // Also notify the vendor (assuming vendor_id is their user_id)
         $notification->createNotification(
-            $vendor_id, // Vendor's user_id
+            (int)$vendor_id, // Vendor's user_id
             "New booking (ID: {$newBookingId}) received! Please review and confirm.",
             'booking',
             $newBookingId
         );
     }
     
-    // Redirect to a booking confirmation/status page, NOT Stripe confirmation
+    // Redirect to a booking confirmation/status page
     header('Location: ' . BASE_URL . 'public/booking_confirmation.php?booking_id=' . $newBookingId);
     exit();
 
@@ -155,7 +189,7 @@ try {
     }
     $_SESSION['error_message'] = $e->getMessage();
     error_log("PROCESS_BOOKING: Booking processing error for user " . ($_SESSION['user_id'] ?? 'N/A') . ": " . $e->getMessage());
-    if ($notification) { // Check if notification object is available before using
+    if ($notification) {
         $notification->createNotification(
             $_SESSION['user_id'],
             "Booking Failed: " . $e->getMessage(),
