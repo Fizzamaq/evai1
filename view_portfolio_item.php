@@ -52,7 +52,7 @@ if ($vendor_profile) {
         /* This style block is for specific overrides or new rules unique to this page */
         /* General container for the whole portfolio item view */
         .portfolio-detail-container {
-            max-width: 1100px; /* Adjusted to make the carousel and details bigger */
+            max-width: auto; /* Adjusted to make the carousel and details bigger */
             margin: var(--spacing-lg) auto;
             padding: var(--spacing-md);
             background: var(--white);
@@ -118,8 +118,8 @@ if ($vendor_profile) {
 
             /* Sticky properties */
             position: sticky;
-            padding-top: 30px; /* Space from top of screen */
-            top: 59px; /* Adjust based on header height */
+            padding-top: 0px; /* Space from top of screen */
+            top: 140px; /* Adjust based on header height */
             width: 100%;
             left: 0; /* Align to left edge of its container */
             right: 0; /* Align to right edge of its container */
