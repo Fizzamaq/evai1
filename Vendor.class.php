@@ -295,6 +295,74 @@ class Vendor {
         }
     }
 
+    /**
+     * Get the total revenue generated for a specific vendor from completed bookings.
+     * @param int $vendorId The ID of the vendor profile.
+     * @return float Total revenue or 0.00 if no completed bookings.
+     */
+    public function getTotalRevenue($vendorId) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT SUM(final_amount) AS total_revenue
+                FROM bookings b
+                WHERE b.vendor_id = ? AND b.status = 'completed'
+            ");
+            $stmt->execute([$vendorId]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (float)($result['total_revenue'] ?? 0.00);
+        } catch (PDOException $e) {
+            error_log("Error getting total revenue for vendor {$vendorId}: " . $e->getMessage());
+            return 0.00;
+        }
+    }
+
+    /**
+     * Get the count of active service offerings for a specific vendor.
+     * @param int $vendorId The ID of the vendor profile.
+     * @return int Count of active service offerings.
+     */
+    public function getActiveServiceOfferingsCount($vendorId) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT COUNT(*) AS active_count
+                FROM vendor_service_offerings
+                WHERE vendor_id = ? AND is_active = TRUE
+            ");
+            $stmt->execute([$vendorId]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return (int)($result['active_count'] ?? 0);
+        } catch (PDOException $e) {
+            error_log("Error getting active service offerings count for vendor {$vendorId}: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Get a list of recent service offerings for a vendor, including their prices.
+     * @param int $vendorId The ID of the vendor profile.
+     * @param int $limit The maximum number of offerings to retrieve.
+     * @return array An array of service offerings.
+     */
+    public function getRecentServiceOfferings($vendorId, $limit = 5) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT vso.id, vs.service_name, vso.price_range_min, vso.price_range_max, vso.created_at
+                FROM vendor_service_offerings vso
+                JOIN vendor_services vs ON vso.service_id = vs.id
+                WHERE vso.vendor_id = ? AND vso.is_active = TRUE
+                ORDER BY vso.created_at DESC
+                LIMIT ?
+            ");
+            $stmt->bindParam(1, $vendorId, PDO::PARAM_INT);
+            $stmt->bindParam(2, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting recent service offerings for vendor {$vendorId}: " . $e->getMessage());
+            return [];
+        }
+    }
+
     // NEW METHOD: Get a single service offering by its ID
     // Now also fetches associated packages and their images
     public function getServiceOfferingById($service_offering_id, $vendor_id) {
@@ -478,23 +546,18 @@ class Vendor {
             $image_data = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($image_data) {
-                $stmt_delete_db = $this->conn->prepare("DELETE FROM service_package_images WHERE id = ? AND service_package_id = ?");
-                $success = $stmt_delete_db->execute([$image_id, $service_package_id]);
+                require_once __DIR__ . '/UploadHandler.class.php';
+                $uploader = new UploadHandler();
+                $relative_path_from_web_root = str_replace(BASE_URL, '', $image_data['image_url']);
+                $physical_path = realpath(__DIR__ . '/../../') . '/' . $relative_path_from_web_root;
 
-                if ($success) {
-                    require_once __DIR__ . '/UploadHandler.class.php';
-                    $uploader = new UploadHandler();
-                    $relative_path_from_web_root = str_replace(BASE_URL, '', $image_data['image_url']);
-                    $physical_path = realpath(__DIR__ . '/../../') . '/' . $relative_path_from_web_root;
-
-                    if (file_exists($physical_path)) {
-                        $uploader->deleteFile(basename($physical_path), dirname($relative_path_from_web_root) . '/');
-                    } else {
-                        error_log("File not found for deletion (service package image): " . $physical_path);
-                    }
+                if (file_exists($physical_path)) {
+                    $uploader->deleteFile(basename($physical_path), dirname($relative_path_from_web_root) . '/');
+                } else {
+                    error_log("File not found for deletion (service package image): " . $physical_path);
                 }
                 $this->conn->commit();
-                return $success;
+                return true;
             }
             $this->conn->rollBack();
             return false;
