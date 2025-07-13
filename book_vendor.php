@@ -15,9 +15,8 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$vendor_id = $_GET['vendor_id'] ?? null;
-// Removed $prefill_date as it's no longer used in the form input
-// $prefill_date = $_GET['prefill_date'] ?? null;
+$vendor_id_from_url = $_GET['vendor_id'] ?? null; // Renamed to avoid confusion with $vendor_profile['id']
+$prefill_date = $_GET['prefill_date'] ?? null; // Date passed from calendar click on vendor profile
 
 $user_obj = new User($pdo);
 $vendor_obj = new Vendor($pdo);
@@ -33,20 +32,20 @@ $error_message = $_SESSION['error_message'] ?? null;
 unset($_SESSION['success_message'], $_SESSION['error_message']);
 
 try {
-    // 1. Validate incoming Vendor ID and fetch data
-    if (empty($vendor_id)) {
-        throw new Exception("Booking request incomplete. Missing vendor ID.");
+    // 1. Validate incoming Vendor ID from URL and fetch data
+    if (empty($vendor_id_from_url) || !is_numeric($vendor_id_from_url)) {
+        throw new Exception("Booking request incomplete. Missing or invalid vendor ID in URL.");
     }
 
-    // Fetch vendor profile
-    $vendor_profile = $vendor_obj->getVendorProfileById($vendor_id);
+    // Fetch vendor profile using the validated and cast ID
+    $vendor_profile = $vendor_obj->getVendorProfileById((int)$vendor_id_from_url);
 
     if (!$vendor_profile) {
         throw new Exception("Invalid vendor ID provided. Vendor not found.");
     }
 
     // Fetch all service offerings for this vendor, grouped by category
-    $all_vendor_offerings_raw = $vendor_obj->getVendorServices($vendor_profile['id']); // This gets basic offerings
+    $all_vendor_offerings_raw = $vendor_obj->getVendorServices($vendor_profile['id']); 
     
     // Now, retrieve full details (including packages) for each offering
     foreach ($all_vendor_offerings_raw as $offering) {
@@ -56,16 +55,10 @@ try {
         }
     }
 
-    // User events are no longer fetched for the form, but will be needed in process_booking_new.php
-    // $user_events = $event_obj->getUserEvents($_SESSION['user_id']);
-    // if (empty($user_events)) {
-    //     // This check is now moved to process_booking_new.php
-    //     // throw new Exception("You must have at least one event planned to make a booking. Please create an event first.");
-    // }
-
 } catch (Exception $e) {
     // If any exception occurs during data fetching/validation, redirect with error
     $_SESSION['error_message'] = $e->getMessage();
+    error_log("Booking page load error: " . $e->getMessage()); // Log the error
     // Decide appropriate redirect URL based on what failed
     if (isset($vendor_profile) && $vendor_profile) {
         // If vendor profile was fetched, redirect back to vendor's profile page
@@ -76,6 +69,10 @@ try {
     }
     exit();
 }
+
+// Ensure vendor_profile['id'] is used for JS, as availability is linked to vendor_profiles.id
+// This variable is now guaranteed to be a valid integer ID because of the checks above.
+$vendor_profile_id_for_js = (int)$vendor_profile['id'];
 
 // If we reach this point, all data is valid and variables are set.
 include 'header.php';
@@ -88,7 +85,10 @@ include 'header.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Book <?= htmlspecialchars($vendor_profile['business_name']) ?> - EventCraftAI</title>
     <link rel="stylesheet" href="../assets/css/style.css">
-    <link rel="stylesheet" href="../assets/css/dashboard.css"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/dashboard.css"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script> <!-- Include FullCalendar -->
     <style>
         .booking-form-container {
             max-width: 700px;
@@ -275,6 +275,64 @@ include 'header.php';
             font-size: 0.75em;
         }
 
+        /* Calendar specific styles for book_vendor.php */
+        .booking-calendar-section {
+            margin-top: var(--spacing-lg);
+            padding: var(--spacing-md);
+            background: var(--background-light);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .booking-calendar-section h3 {
+            font-size: 1.5em;
+            color: var(--text-dark);
+            margin-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: var(--spacing-sm);
+        }
+        #booking-fullcalendar {
+            max-width: 100%; /* Ensure calendar is responsive */
+            margin: 0 auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        /* Reusing FullCalendar event styles from vendor_profile.css */
+        .fc-event-available { background-color: #4CAF50 !important; color: #fff !important; }
+        .fc-event-booked { background-color: #F44336 !important; color: #fff !important; }
+        .fc-event-blocked { background-color: #B0BEC5 !important; color: #fff !important; }
+        .fc-event-holiday { background-color: #FF9800 !important; color: #fff !important; }
+        .fc-event-status-text { /* Ensure text is visible in events */
+            white-space: normal;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 1px;
+            line-height: 1.2;
+        }
+        .fc .fc-button-primary:not(:disabled).fc-button-active {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .fc .fc-button-primary:not(:disabled).fc-button-active:hover {
+            background-color: var(--primary-hover-color);
+            border-color: var(--primary-hover-color);
+        }
+        .fc .fc-button {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-dark);
+        }
+        .fc .fc-button:hover {
+            background-color: #e9e9e9;
+        }
+        /* Style for selected date in calendar */
+        .fc-daygrid-day.selected-date {
+            background-color: var(--secondary-color-light) !important; /* Light highlight */
+            border: 2px solid var(--secondary-color) !important; /* Stronger border */
+            box-shadow: 0 0 5px rgba(var(--secondary-color-rgb), 0.5);
+        }
+
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .booking-form-container {
@@ -305,11 +363,31 @@ include 'header.php';
             <div class="alert error"><?= htmlspecialchars($error_message) ?></div>
         <?php endif; ?>
 
-        <form action="<?= BASE_URL ?>public/process_booking_new.php" method="POST" enctype="multipart/form-data">
+        <form action="<?= BASE_URL ?>public/process_booking.php" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="vendor_id" value="<?= htmlspecialchars($vendor_profile['user_id']) ?>">
+            
+            <!-- Hidden input for service_date, will be populated by JS from calendar selection -->
+            <input type="hidden" name="service_date" id="service_date_input" value="<?= htmlspecialchars($prefill_date ?? '') ?>">
 
-            <?php /* Removed "Select Your Event" field */ ?>
-            <?php /* Removed "Desired Service Date" field */ ?>
+            <div class="form-group">
+                <label for="display_selected_date">Selected Service Date <span class="required">*</span></label>
+                <!-- Display the selected date to the user, updated by JS -->
+                <input type="text" id="display_selected_date" class="form-control" 
+                       value="<?= htmlspecialchars($prefill_date ? date('F j, Y', strtotime($prefill_date)) : 'No date selected') ?>" readonly>
+                <small class="text-muted">Click on an available date in the calendar below to select it.</small>
+            </div>
+
+            <div class="booking-calendar-section">
+                <h3>Select a Date from Availability</h3>
+                <div id="booking-fullcalendar"></div>
+                <div class="calendar-legend" style="margin-top: var(--spacing-md);">
+                    <span class="legend-item"><span class="legend-color available-color"></span> Available</span>
+                    <span class="legend-item"><span class="legend-color booked-color"></span> Booked</span>
+                    <span class="legend-item"><span class="legend-color blocked-color"></span> Blocked</span>
+                    <span class="legend-item"><span class="legend-color holiday-color"></span> Holiday</span>
+                </div>
+            </div>
+
 
             <div class="form-group">
                 <h3>Select Services <span class="required">*</span></h3>
@@ -353,7 +431,7 @@ include 'header.php';
             </div>
 
             <div class="form-group">
-                <label for="picture_upload">Upload a screenshot <span class="required">*</span></h3></label>
+                <label for="picture_upload">Upload a screenshot <span class="required">*</span></label>
                 <input type="file" id="picture_upload" name="picture_upload" accept="image/*">
                 <small class="text-muted">Minimum 2,000 of advance is mandatory</small>
             </div>
@@ -369,12 +447,130 @@ include 'header.php';
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Basic client-side validation
+            const serviceDateInput = document.getElementById('service_date_input');
+            const displaySelectedDate = document.getElementById('display_selected_date');
+            const bookingCalendarEl = document.getElementById('booking-fullcalendar');
+            const vendorId = <?= json_encode($vendor_profile_id_for_js) ?>; // Use the validated ID
+
+            let selectedDateCell = null; // To keep track of the visually selected date cell
+
+            // Initialize FullCalendar on the booking page
+            if (bookingCalendarEl && typeof vendorId === 'number' && vendorId > 0) {
+                const bookingCalendar = new FullCalendar.Calendar(bookingCalendarEl, {
+                    initialView: 'dayGridMonth',
+                    initialDate: serviceDateInput.value || new Date(), // Use prefill date or current date
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: ''
+                    },
+                    validRange: {
+                        start: '<?= date('Y-m-d') ?>' // Only allow selecting today and future dates
+                    },
+                    events: function(fetchInfo, successCallback, failureCallback) {
+                        fetch(`<?= BASE_URL ?>public/availability.php?vendor_id=${vendorId}&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
+                            .then(response => {
+                                if (!response.ok) {
+                                    return response.text().then(text => {
+                                        console.error('Error fetching availability for booking calendar:', response.status, text);
+                                        throw new Error('Server error or invalid JSON response for calendar data.');
+                                    });
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                successCallback(data);
+                            })
+                            .catch(error => {
+                                console.error('Error fetching availability for booking calendar:', error);
+                                bookingCalendarEl.innerHTML = '<p class="text-subtle">Failed to load calendar. Please check console for details.</p>';
+                                failureCallback(error);
+                            });
+                    },
+                    eventContent: function(arg) {
+                        // Display event title/status in the calendar cells
+                        return { html: `<div class="fc-event-status-text">${arg.event.title}</div>` };
+                    },
+                    dateClick: function(info) {
+                        // Clear previous selection highlight
+                        if (selectedDateCell) {
+                            selectedDateCell.classList.remove('selected-date');
+                        }
+
+                        // Highlight the newly clicked date cell
+                        info.dayEl.classList.add('selected-date');
+                        selectedDateCell = info.dayEl;
+
+                        // Update the hidden input field and visible display
+                        serviceDateInput.value = info.dateStr;
+                        displaySelectedDate.value = info.date.toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        });
+
+                        // Optional: Alert user if date is not available for booking
+                        // You might want to check info.dayEl.querySelector('.fc-event-available')
+                        // or fetch availability for this specific date if not already done.
+                        const eventsOnDay = bookingCalendar.getEventManager().getEvents().filter(event => event.startStr.startsWith(info.dateStr));
+                        const isAvailable = eventsOnDay.some(event => event.extendedProps.status === 'available');
+
+                        if (!isAvailable) {
+                            alert('This date is not marked as available by the vendor. Please choose an available date.');
+                            // Optionally clear the selection if not available
+                            serviceDateInput.value = '';
+                            displaySelectedDate.value = 'No date selected';
+                            info.dayEl.classList.remove('selected-date');
+                            selectedDateCell = null;
+                        }
+                    },
+                    // Ensure events are clickable for details, but dateClick handles selection
+                    eventClick: function(info) {
+                        info.jsEvent.preventDefault(); // Prevent default behavior
+                        // If you want clicking an event to also select the date, call dateClick logic here
+                        // For now, it will just trigger the dateClick if the event covers the whole day.
+                        // Or you can add specific logic for event details here.
+                    }
+                });
+                bookingCalendar.render();
+
+                // If a prefill_date exists, try to highlight it on calendar load
+                if (serviceDateInput.value) {
+                    const prefillDate = serviceDateInput.value;
+                    // FullCalendar's getDateElement is not for day cells directly.
+                    // We need to find the day cell element based on its data-date attribute.
+                    const prefillDateEl = bookingCalendarEl.querySelector(`.fc-daygrid-day[data-date="${prefillDate}"]`);
+                    
+                    if (prefillDateEl) {
+                        prefillDateEl.classList.add('selected-date');
+                        selectedDateCell = prefillDateEl;
+                    }
+                }
+
+            } else {
+                bookingCalendarEl.innerHTML = '<p class="text-subtle">Vendor ID is invalid, cannot display availability calendar for booking.</p>';
+            }
+
+
+            // Basic client-side validation for form submission
             document.querySelector('form').addEventListener('submit', function(event) {
                 const selectedServices = document.querySelectorAll('input[name="selected_services[]"]:checked');
+                const pictureUploadInput = document.getElementById('picture_upload');
 
                 if (selectedServices.length === 0) {
                     alert('Please select at least one service to book.');
+                    event.preventDefault();
+                    return;
+                }
+
+                if (!serviceDateInput.value) { // Check if the hidden date input has a value
+                    alert('Please select a desired service date from the calendar.');
+                    event.preventDefault();
+                    return;
+                }
+
+                if (pictureUploadInput.files.length === 0) {
+                    alert('Please upload a screenshot for the booking.');
                     event.preventDefault();
                     return;
                 }
