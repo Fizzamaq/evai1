@@ -9,13 +9,14 @@ class Booking {
 
     public function createBooking($data, $userId) {
         try {
+            // Added screenshot_filename to the INSERT statement
             $stmt = $this->pdo->prepare("
                 INSERT INTO bookings (
                     user_id, event_id, vendor_id, service_id, service_date,
                     final_amount, deposit_amount, special_instructions,
-                    status, created_at, updated_at
+                    status, screenshot_proof, created_at, updated_at
                 ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW(), NOW()
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
                 )
             ");
             $stmt->execute([
@@ -26,7 +27,9 @@ class Booking {
                 $data['service_date'],
                 $data['final_amount'],
                 $data['deposit_amount'],
-                $data['special_instructions']
+                $data['special_instructions'],
+                $data['status'], // Use status from $data (e.g., 'pending_review')
+                $data['screenshot_filename'] // New: Insert screenshot filename
             ]);
             return $this->pdo->lastInsertId();
         } catch (PDOException $e) {
@@ -62,13 +65,18 @@ class Booking {
         }
     }
 
-    public function updateBookingStatus($bookingId, $status, $stripePaymentId = null) {
+    // MODIFIED: updateBookingStatus to also update screenshot_proof if provided
+    public function updateBookingStatus($bookingId, $status, $stripePaymentId = null, $screenshotProof = null) {
         try {
             $sql = "UPDATE bookings SET status = ?, updated_at = NOW()";
             $params = [$status];
             if ($stripePaymentId) {
                 $sql .= ", stripe_payment_id = ?";
                 $params[] = $stripePaymentId;
+            }
+            if ($screenshotProof) { // New: Update screenshot proof
+                $sql .= ", screenshot_proof = ?";
+                $params[] = $screenshotProof;
             }
             $sql .= " WHERE id = ?";
             $params[] = $bookingId;
@@ -99,6 +107,7 @@ class Booking {
 
     /**
      * Updates the stripe_payment_id for a given booking.
+     * This method might become obsolete if Stripe is not used.
      * @param int $bookingId The ID of the booking to update.
      * @param string $stripePaymentId The Stripe Payment Intent ID.
      * @return bool True on success, false on failure.
@@ -120,6 +129,7 @@ class Booking {
      */
     public function getUserBookings($userId) {
         try {
+            // Added screenshot_proof to the SELECT statement
             $stmt = $this->pdo->prepare("
                 SELECT b.*, e.title as event_title, vp.business_name
                 FROM bookings b
