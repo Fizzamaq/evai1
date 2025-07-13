@@ -599,18 +599,43 @@
     height: auto; /* Let content define height */
 }
 
+/* Adjust to remove empty space right under sticky tabs */
+.portfolio-content-layout {
+    margin-top: 0; /* Remove the top margin */
+    /* Keep other properties: display: flex; flex-direction: column; gap: var(--spacing-lg); margin-bottom: var(--spacing-lg); */
+}
+
+/* Specific tabs container styling */
 .profile_tabscontainer___0PX7 {
     position: sticky;
     padding-top: 30px;
     top: 59px;
     width: 100%;
-    grid-template-columns: repeat(4, 1fr);
-    left: auto;
+    /* Removed grid-template-columns as it's a flex container */
+    left: 0; /* Explicitly set left to 0 */
+    right: 0; /* Explicitly set right to 0 */
     padding-left: 0;
+    box-sizing: border-box; /* Ensure padding is included in width calculation */
 }
 
 
 /* Responsive adjustments */
+@media (min-width: 768px) {
+    .profile-info-main {
+        text-align: left;
+    }
+    .profile-avatar {
+        margin: 0;
+    }
+    /* Adjust for larger screens where portfolio-details-left and portfolio-carousel-right are side-by-side */
+    .portfolio-details-left .tab-content-section { /* Target all sections within left column */
+        margin-top: var(--spacing-lg); /* Add margin between sections */
+    }
+    .portfolio-details-left .tab-content-section:first-of-type {
+        margin-top: 0; /* Ensure the very first section has no top margin */
+    }
+}
+
 @media (max-width: 768px) {
     .profile-header-section {
         flex-direction: column;
