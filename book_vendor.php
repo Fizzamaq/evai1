@@ -239,18 +239,14 @@ include 'header.php';
             border-color: var(--primary-color);
         }
 
-        .service-item-checkbox input[type="checkbox"]:checked + label::after {
-            opacity: 1;
-        }
-
         /* Optional: Highlight the entire item when checked */
         .service-item-checkbox input[type="checkbox"]:checked ~ .service-details-content {
-            background-color: var(--primary-color-rgb, 138, 43, 226, 0.05); /* Lighter shade of primary color */
+            background-color: rgba(var(--primary-color-rgb, 138, 43, 226), 0.05); /* Lighter shade of primary color */
             border-color: var(--primary-color); /* Highlight border */
             box-shadow: 0 4px 10px rgba(var(--primary-color-rgb, 138, 43, 226), 0.1); /* Subtle shadow */
         }
         .service-item-checkbox input[type="checkbox"]:checked {
-            background-color: var(--primary-color-rgb, 138, 43, 226, 0.05); /* Lighter shade of primary color */
+            background-color: rgba(var(--primary-color-rgb, 138, 43, 226), 0.05); /* Lighter shade of primary color */
             border-color: var(--primary-color); /* Highlight border */
         }
         .service-item-checkbox.is-checked { /* Class added by JS for fallback/consistency */
@@ -436,13 +432,13 @@ include 'header.php';
                     <?php foreach ($vendor_service_offerings_grouped as $category_name => $service_offerings_in_category): ?>
                         <h4 style="margin-top: var(--spacing-md); color: var(--text-dark);"><?= htmlspecialchars($category_name) ?></h4>
                         <div class="services-selection-grid">
-                            <?php foreach ($offering): ?>
+                            <?php foreach ($service_offerings_in_category as $offering): ?>
                                 <div class="service-item-checkbox">
-                                    <input type="checkbox" id="service_<?= htmlspecialchars($offering['service_id']) ?>" 
-                                           name="selected_services[]" value="<?= htmlspecialchars($offering['service_id']) ?>" 
-                                           data-offering-id="<?= htmlspecialchars($offering['id']) ?>" 
+                                    <input type="checkbox" id="service_offering_<?= htmlspecialchars($offering['id']) ?>"
+                                           name="selected_services[]" value="<?= htmlspecialchars($offering['id']) ?>"
+                                           data-offering-id="<?= htmlspecialchars($offering['id']) ?>"
                                            data-service-name="<?= htmlspecialchars($offering['service_name']) ?>">
-                                    <label for="service_<?= htmlspecialchars($offering['service_id']) ?>">
+                                    <label for="service_offering_<?= htmlspecialchars($offering['id']) ?>">
                                         <span class="service-name-text"><?= htmlspecialchars($offering['service_name']) ?></span>
                                         <span class="price-range">
                                             <?php if ($offering['price_range_min'] !== null || $offering['price_range_max'] !== null): ?>
