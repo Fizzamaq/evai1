@@ -6,7 +6,8 @@ require_once '../classes/Vendor.class.php';
 require_once '../classes/UploadHandler.class.php';
 
 $vendor_obj = new Vendor($pdo);
-$uploader = new UploadHandler();
+// CORRECTED: Instantiate UploadHandler with $pdo
+$uploader = new UploadHandler($pdo);
 
 // Ensure vendor is logged in and has access
 // This method handles redirection if not authenticated or not a complete vendor profile
@@ -79,6 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Handle deletion of existing images
                 if (!empty($images_to_delete_ids)) {
                     foreach ($images_to_delete_ids as $image_id) {
+                        // The deletePortfolioImage method now handles its own transaction or rollback point
                         $vendor_obj->deletePortfolioImage($image_id, $portfolio_item_id, $vendor_id);
                     }
                 }
@@ -95,8 +97,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 'error' => $_FILES['portfolio_images_new']['error'][$key],
                                 'size' => $_FILES['portfolio_images_new']['size'][$key]
                             ];
-                            $uploaded_filename = $uploader->handleUpload($file, 'vendors/portfolio/'); // Specific subfolder
-                            $uploaded_image_urls[] = 'assets/uploads/vendors/portfolio/' . $uploaded_filename;
+                            // CORRECTED: Changed handleUpload to uploadFile and provided full target path
+                            $uploaded_filename = $uploader->uploadFile($file, '../assets/uploads/vendors/portfolio/'); 
+                            if ($uploaded_filename) {
+                                $uploaded_image_urls[] = 'assets/uploads/vendors/portfolio/' . $uploaded_filename;
+                            } else {
+                                // If uploadFile returns false, it already set an error in $_SESSION['upload_error']
+                                throw new Exception("Failed to upload new portfolio image: " . ($_SESSION['upload_error'] ?? 'Unknown upload error.'));
+                            }
                         } else if ($_FILES['portfolio_images_new']['error'][$key] !== UPLOAD_ERR_NO_FILE) {
                             throw new Exception("File upload error for image " . htmlspecialchars($name) . ": " . $_FILES['portfolio_images_new']['error'][$key]);
                         }
@@ -145,8 +153,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 'error' => $_FILES['portfolio_images']['error'][$key],
                                 'size' => $_FILES['portfolio_images']['size'][$key]
                             ];
-                            $uploaded_filename = $uploader->handleUpload($file, 'vendors/portfolio/'); // Specific subfolder
-                            $uploaded_image_urls[] = 'assets/uploads/vendors/portfolio/' . $uploaded_filename;
+                            // CORRECTED: Changed handleUpload to uploadFile and provided full target path
+                            $uploaded_filename = $uploader->uploadFile($file, '../assets/uploads/vendors/portfolio/'); 
+                            if ($uploaded_filename) {
+                                $uploaded_image_urls[] = 'assets/uploads/vendors/portfolio/' . $uploaded_filename;
+                            } else {
+                                // If uploadFile returns false, it already set an error in $_SESSION['upload_error']
+                                throw new Exception("Failed to upload new portfolio image: " . ($_SESSION['upload_error'] ?? 'Unknown upload error.'));
+                            }
                         } else if ($_FILES['portfolio_images']['error'][$key] !== UPLOAD_ERR_NO_FILE) {
                             throw new Exception("File upload error for image " . htmlspecialchars($name) . ": " . $_FILES['portfolio_images']['error'][$key]);
                         }
