@@ -18,7 +18,8 @@ $is_vendor = (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2); // 
 
 try {
     $user = new User($pdo); // Pass PDO
-    $uploader = new UploadHandler(); // Instantiate UploadHandler
+    // CORRECTED: Pass PDO to UploadHandler constructor, as it uses it for logging
+    $uploader = new UploadHandler($pdo); 
     $vendor_obj = new Vendor($pdo); // Instantiate Vendor object for vendor-specific actions
 
     // Fetch current vendor data if user is a vendor
@@ -48,8 +49,14 @@ try {
 
         // Handle profile picture upload
         if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK) {
-            $uploaded_filename = $uploader->handleUpload($_FILES['profile_image'], 'users/');
-            $user->updateProfileImage($userId, $uploaded_filename);
+            // CORRECTED: Changed handleUpload to uploadFile and provided full target path
+            $uploaded_filename = $uploader->uploadFile($_FILES['profile_image'], '../assets/uploads/users/');
+            if ($uploaded_filename) {
+                $user->updateProfileImage($userId, $uploaded_filename);
+            } else {
+                 // If uploadFile returns false, it already set an error in $_SESSION['upload_error']
+                 throw new Exception("Failed to upload profile image: " . ($_SESSION['upload_error'] ?? 'Unknown upload error.'));
+            }
         } else if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] !== UPLOAD_ERR_NO_FILE) {
             throw new Exception("File upload error for profile image: " . $_FILES['profile_image']['error']);
         }
