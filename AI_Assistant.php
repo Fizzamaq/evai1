@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/config.php'; // Ensure config is loaded for $pdo
+// Corrected path to config.php relative to this file's expected location in /classes/
+require_once __DIR__ . '/../includes/config.php'; 
 
 class AI_Assistant {
     private $apiKey;
@@ -40,7 +41,7 @@ class AI_Assistant {
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HTTPHEADER => [
-                    'Content-Type' => 'application/json', // Corrected syntax here from ':' to '=>'
+                    'Content-Type' => 'application/json',
                     'Authorization: Bearer ' . $this->apiKey
                 ],
                 CURLOPT_POST => true,
@@ -537,7 +538,7 @@ class AI_Assistant {
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HTTPHEADER => [
-                    'Content-Type' => 'application/json', // Corrected syntax here from ':' to '=>'
+                    'Content-Type' => 'application/json',
                     'Authorization: Bearer ' . $this->apiKey
                 ],
                 CURLOPT_POST => true,
