@@ -40,7 +40,7 @@ class AI_Assistant {
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
+                    'Content-Type' => 'application/json', // Corrected syntax here from ':' to '=>'
                     'Authorization: Bearer ' . $this->apiKey
                 ],
                 CURLOPT_POST => true,
@@ -214,8 +214,7 @@ class AI_Assistant {
                     vp.id, vp.business_name, vp.website, vp.rating, vp.total_reviews, 
                     vp.business_address, vp.business_city, vp.business_state, vp.business_country,
                     vp.service_radius,
-                    ST_X(vp.business_location) AS business_lng, 
-                    ST_Y(vp.business_location) AS business_lat,
+                    ST_X(vp.business_location) AS business_lat, ST_Y(vp.business_location) AS business_lng,
                     GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR '; ') AS offered_services_names,
                     AVG(vso.price_range_min) AS avg_min_price,
                     AVG(vso.price_range_max) AS avg_max_price,
@@ -347,6 +346,153 @@ class AI_Assistant {
         }
     }
 
+    /**
+     * NEW: Get personalized vendor recommendations based on user's recent activity.
+     * This method leverages viewed vendors and possibly recent searches to inform recommendations.
+     * @param int $userId The ID of the current user.
+     * @param int $limit The maximum number of recommendations to return.
+     * @return array An array of recommended vendor data.
+     */
+    public function getPersonalizedVendorRecommendations($userId, $limit = 5) {
+        try {
+            $viewedVendorProfiles = $this->dbFetchAll("
+                SELECT DISTINCT vpv.vendor_profile_id, vp.business_city,
+                                GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS viewed_services
+                FROM user_vendor_views vpv
+                JOIN vendor_profiles vp ON vpv.vendor_profile_id = vp.id
+                LEFT JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
+                LEFT JOIN vendor_services vs ON vso.service_id = vs.id
+                WHERE vpv.user_id = ?
+                GROUP BY vpv.vendor_profile_id
+                ORDER BY vpv.viewed_at DESC
+                LIMIT 5
+            ", [$userId]);
+
+            $recentSearchTerms = $this->dbFetchAll("
+                SELECT message_content
+                FROM ai_chat_messages
+                WHERE session_id IN (SELECT id FROM ai_chat_sessions WHERE user_id = ? ORDER BY updated_at DESC LIMIT 3)
+                AND message_type = 'user'
+                ORDER BY created_at DESC
+            ", [$userId]);
+
+            $keywords = [];
+            $preferredLocations = [];
+            $preferredServiceIds = [];
+
+            // Extract keywords from recent searches
+            foreach ($recentSearchTerms as $term) {
+                $content = strtolower($term['message_content']);
+                // Simple keyword extraction (can be improved with NLU)
+                if (strpos($content, 'vendor') !== false || strpos($content, 'suggest') !== false || strpos($content, 'find') !== false) {
+                    // This message might contain search criteria
+                    $words = explode(' ', $content);
+                    foreach ($words as $word) {
+                        $word = trim($word, ".,!?\"'");
+                        if (strlen($word) > 2 && !in_array($word, ['vendor', 'suggest', 'find', 'for', 'a', 'an', 'the', 'in', 'and', 'or', 'my', 'i', 'me', 'want', 'need', 'how', 'much'])) {
+                            $keywords[] = $word;
+                        }
+                    }
+                }
+            }
+
+            // Extract preferred locations and services from viewed vendors
+            foreach ($viewedVendorProfiles as $vendorView) {
+                if (!empty($vendorView['business_city'])) {
+                    $preferredLocations[] = $vendorView['business_city'];
+                }
+                if (!empty($vendorView['viewed_services'])) {
+                    $services = explode(', ', $vendorView['viewed_services']);
+                    foreach ($services as $serviceName) {
+                        $serviceId = $this->dbFetch("SELECT id FROM vendor_services WHERE service_name = ?", [$serviceName]);
+                        if ($serviceId) {
+                            $preferredServiceIds[] = $serviceId['id'];
+                        }
+                    }
+                }
+            }
+            
+            $combinedSearchQuery = implode(' ', array_unique($keywords));
+            $combinedLocations = implode(', ', array_unique($preferredLocations));
+            $combinedServiceIds = array_unique($preferredServiceIds);
+
+            // Fallback: if no specific activity, get highly-rated vendors
+            if (empty($combinedSearchQuery) && empty($combinedLocations) && empty($combinedServiceIds)) {
+                return $this->dbFetchAll("
+                    SELECT vp.id, vp.business_name, vp.business_city, vp.rating, vp.total_reviews, up.profile_image,
+                           GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS offered_services_names
+                    FROM vendor_profiles vp
+                    JOIN users u ON vp.user_id = u.id
+                    LEFT JOIN user_profiles up ON u.id = up.user_id
+                    LEFT JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
+                    LEFT JOIN vendor_services vs ON vso.service_id = vs.id
+                    WHERE vp.verified = TRUE
+                    GROUP BY vp.id
+                    ORDER BY vp.rating DESC, vp.total_reviews DESC
+                    LIMIT ?
+                ", [$limit]);
+            }
+
+            // Build dynamic query for personalized recommendations
+            $query = "
+                SELECT 
+                    vp.id, vp.business_name, vp.website, vp.rating, vp.total_reviews, 
+                    vp.business_address, vp.business_city, vp.business_state, vp.business_country,
+                    vp.service_radius,
+                    up.profile_image, -- Fetch profile image from user_profiles
+                    GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR '; ') AS offered_services_names
+                FROM vendor_profiles vp
+                LEFT JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
+                LEFT JOIN vendor_services vs ON vso.service_id = vs.id
+                JOIN users u ON vp.user_id = u.id
+                LEFT JOIN user_profiles up ON u.id = up.user_id 
+                WHERE vp.verified = TRUE
+            ";
+            
+            $params = [];
+            $conditions = [];
+
+            if (!empty($combinedSearchQuery)) {
+                $conditions[] = "(vp.business_name LIKE ? OR vp.business_address LIKE ? OR vs.service_name LIKE ?)";
+                $likeParam = '%' . $combinedSearchQuery . '%';
+                $params = array_merge($params, [$likeParam, $likeParam, $likeParam]);
+            }
+
+            if (!empty($combinedLocations)) {
+                $locationPlaceholders = implode(',', array_fill(0, count(array_unique($preferredLocations)), '?'));
+                $conditions[] = "vp.business_city IN ({$locationPlaceholders})";
+                $params = array_merge($params, array_unique($preferredLocations));
+            }
+
+            if (!empty($combinedServiceIds)) {
+                $serviceIdPlaceholders = implode(',', array_fill(0, count($combinedServiceIds), '?'));
+                $conditions[] = "vso.service_id IN ({$serviceIdPlaceholders})";
+                $params = array_merge($params, $combinedServiceIds);
+            }
+
+            if (!empty($conditions)) {
+                $query .= " AND " . implode(" AND ", $conditions);
+            }
+
+            $query .= " GROUP BY vp.id
+                         ORDER BY vp.rating DESC, vp.total_reviews DESC
+                         LIMIT ?";
+            $params[] = $limit;
+            
+            $vendors = $this->dbFetchAll($query, $params);
+
+            // Refine scoring if needed based on detailed match, but current scoring already uses rating.
+            // For now, return direct results, as detailed scoring on "viewed" criteria is complex without more data.
+            return $vendors;
+
+        } catch (PDOException $e) {
+            error_log("Personalized Vendor Recommendation PDO Error: " . $e->getMessage());
+            return [];
+        } catch (Exception $e) {
+            error_log("Personalized Vendor Recommendation General Error: " . $e->getMessage());
+            return [];
+        }
+    }
 
     /**
      * Generates a natural language summary of recommended vendors using OpenAI.
@@ -391,7 +537,7 @@ class AI_Assistant {
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
+                    'Content-Type' => 'application/json', // Corrected syntax here from ':' to '=>'
                     'Authorization: Bearer ' . $this->apiKey
                 ],
                 CURLOPT_POST => true,
