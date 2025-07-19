@@ -768,6 +768,7 @@ class Vendor {
      */
     public function deletePortfolioImage($imageId, $portfolioItemId, $vendorId) {
         try {
+            $this->conn->beginTransaction();
             // First, get the image URL to delete the physical file
             $stmt = $this->conn->prepare("
                 SELECT pi.image_url
@@ -799,13 +800,17 @@ class Vendor {
                         error_log("File not found for deletion (single image): " . $physical_path);
                     }
                 }
+                $this->conn->commit();
                 return $success;
             }
+            $this->conn->rollBack();
             return false; // Image not found or not owned by vendor
         } catch (PDOException $e) {
+            $this->conn->rollBack();
             error_log("Delete portfolio image error: " . $e->getMessage());
             return false;
         } catch (Exception $e) {
+            $this->conn->rollBack();
             error_log("Delete portfolio image general error: " . $e->getMessage());
             return false;
         }
@@ -1313,7 +1318,6 @@ class Vendor {
             $image_data = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($image_data) {
-                // Ensure UploadHandler is available.
                 require_once __DIR__ . '/UploadHandler.class.php';
                 $uploader = new UploadHandler();
 
@@ -1344,5 +1348,237 @@ class Vendor {
             return false;
         }
     }
+
+    /**
+     * Updates a vendor's verification status.
+     * @param int $vendorProfileId The ID of the vendor_profile.
+     * @param bool $status True for verified, false for unverified.
+     * @return bool True on success, false on failure.
+     */
+    public function updateVendorVerificationStatus($vendorProfileId, $status) {
+        try {
+            $stmt = $this->conn->prepare("UPDATE vendor_profiles SET verified = ? WHERE id = ?");
+            return $stmt->execute([$status ? 1 : 0, $vendorProfileId]);
+        } catch (PDOException $e) {
+            error_log("Failed to update vendor verification status for ID {$vendorProfileId}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Deletes a vendor profile. This cascades to delete related records
+     * like portfolio items, service offerings, and availability.
+     * @param int $vendorProfileId The ID of the vendor_profile to delete.
+     * @return bool True on success, false on failure.
+     */
+    public function deleteVendorProfile($vendorProfileId) {
+        try {
+            $this->conn->beginTransaction();
+
+            // Fetch any associated physical files (portfolio images, service offering images, package images)
+            // This is complex and would ideally be handled by a dedicated file cleanup process
+            // or by triggering cascading deletes that call a custom function, which MySQL doesn't natively support.
+            // For simplicity here, we'll assume cascade delete in DB handles records, and client manages files
+            // or rely on deletePortfolioItem/deleteServiceOffering/deleteServicePackage which include file deletion.
+
+            // Delete from vendor_profiles. This should trigger cascade deletes if DB constraints are set up.
+            // It's important that foreign keys on `vendor_id` columns in other tables
+            // (e.g., vendor_portfolios, vendor_service_offerings, vendor_availability)
+            // are set to `ON DELETE CASCADE`. The provided SQL dump confirms this.
+            $stmt = $this->conn->prepare("DELETE FROM vendor_profiles WHERE id = ?");
+            $success = $stmt->execute([$vendorProfileId]);
+
+            if ($success) {
+                $this->conn->commit();
+                return true;
+            } else {
+                $this->conn->rollBack();
+                error_log("Failed to delete vendor profile ID {$vendorProfileId}: " . implode(" | ", $stmt->errorInfo()));
+                return false;
+            }
+        } catch (PDOException $e) {
+            $this->conn->rollBack();
+            error_log("PDOException deleting vendor profile ID {$vendorProfileId}: " . $e->getMessage());
+            return false;
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            error_log("General Exception deleting vendor profile ID {$vendorProfileId}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get booking statistics for a specific vendor.
+     * @param int $vendorId The ID of the vendor profile.
+     * @return array
+     */
+    public function getVendorBookingStats($vendorId) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT
+                    COUNT(*) AS total_bookings,
+                    SUM(CASE WHEN status = 'pending_review' THEN 1 ELSE 0 END) AS pending_bookings,
+                    SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed_bookings,
+                    SUM(CASE WHEN status = 'completed' THEN final_amount ELSE 0 END) AS total_revenue
+                FROM bookings
+                WHERE vendor_id = ?
+            ");
+            $stmt->execute([$vendorId]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting vendor booking stats for vendor {$vendorId}: " . $e->getMessage());
+            return [
+                'total_bookings' => 0,
+                'pending_bookings' => 0,
+                'confirmed_bookings' => 0,
+                'total_revenue' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get upcoming bookings for a vendor.
+     * @param int $vendorId The ID of the vendor profile.
+     * @param int $limit Max number of bookings to return.
+     * @return array
+     */
+    public function getVendorUpcomingBookings($vendorId, $limit = 5) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT b.*, e.title as event_title, u.first_name, u.last_name
+                FROM bookings b
+                LEFT JOIN events e ON b.event_id = e.id
+                LEFT JOIN users u ON b.user_id = u.id
+                WHERE b.vendor_id = ? AND b.service_date >= CURDATE() AND b.status IN ('pending_review', 'confirmed')
+                ORDER BY b.service_date ASC
+                LIMIT ?
+            ");
+            $stmt->bindParam(1, $vendorId, PDO::PARAM_INT);
+            $stmt->bindParam(2, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Add 'client_name' for display convenience
+            foreach ($bookings as &$booking) {
+                $booking['client_name'] = trim($booking['first_name'] . ' ' . $booking['last_name']);
+            }
+            return $bookings;
+        } catch (PDOException $e) {
+            error_log("Error getting vendor upcoming bookings for vendor {$vendorId}: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get recent bookings for a vendor.
+     * @param int $vendorId The ID of the vendor profile.
+     * @param int $limit Max number of bookings to return.
+     * @return array
+     */
+    public function getVendorRecentBookings($vendorId, $limit = 5) {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT b.*, e.title as event_title, u.first_name, u.last_name
+                FROM bookings b
+                LEFT JOIN events e ON b.event_id = e.id
+                LEFT JOIN users u ON b.user_id = u.id
+                WHERE b.vendor_id = ?
+                ORDER BY b.created_at DESC
+                LIMIT ?
+            ");
+            $stmt->bindParam(1, $vendorId, PDO::PARAM_INT);
+            $stmt->bindParam(2, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Add 'client_name' for display convenience
+            foreach ($bookings as &$booking) {
+                $booking['client_name'] = trim($booking['first_name'] . ' ' . $booking['last_name']);
+            }
+            return $bookings;
+        } catch (PDOException $e) {
+            error_log("Error getting vendor recent bookings for vendor {$vendorId}: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Update services offered by a vendor. This method now manages inserting new offerings,
+     * updating existing ones (price/description), and deleting those no longer selected.
+     * It ensures data consistency in `vendor_service_offerings`.
+     *
+     * @param int $vendorProfileId The ID of the vendor's profile.
+     * @param array $newServiceOfferingsData Array of arrays, each containing 'service_id', 'min_price', 'max_price'.
+     * @return bool True on success, false on failure.
+     */
+    public function updateVendorServiceOfferings($vendorProfileId, array $newServiceOfferingsData) {
+        try {
+            $this->conn->beginTransaction();
+
+            // 1. Fetch current service offerings for this vendor
+            $currentOfferings = $this->getVendorServices($vendorProfileId);
+            $currentServiceIds = array_column($currentOfferings, 'service_id');
+            $currentOfferingsMap = [];
+            foreach ($currentOfferings as $offering) {
+                $currentOfferingsMap[$offering['service_id']] = $offering;
+            }
+
+            // 2. Process new/updated offerings
+            $newlySelectedServiceIds = array_column($newServiceOfferingsData, 'service_id');
+
+            foreach ($newServiceOfferingsData as $newOffering) {
+                $serviceId = $newOffering['service_id'];
+                $minPrice = $newOffering['min_price'] ?? null;
+                $maxPrice = $newOffering['max_price'] ?? null;
+                // Description for this overall offering can be added/updated here if it were in the form
+
+                if (in_array($serviceId, $currentServiceIds)) {
+                    // Service exists: Update prices/description for existing entry
+                    $existingOffering = $currentOfferingsMap[$serviceId];
+                    // Only update if changes are detected to minimize writes
+                    if ($existingOffering['price_range_min'] != $minPrice || $existingOffering['price_range_max'] != $maxPrice) {
+                        $stmt = $this->conn->prepare("
+                            UPDATE vendor_service_offerings
+                            SET price_range_min = ?, price_range_max = ?, updated_at = NOW()
+                            WHERE vendor_id = ? AND service_id = ?
+                        ");
+                        $stmt->execute([$minPrice, $maxPrice, $vendorProfileId, $serviceId]);
+                    }
+                } else {
+                    // Service is new: Insert new offering
+                    $stmt = $this->conn->prepare("
+                        INSERT INTO vendor_service_offerings
+                        (vendor_id, service_id, price_range_min, price_range_max, created_at)
+                        VALUES (?, ?, ?, ?, NOW())
+                    ");
+                    $stmt->execute([$vendorProfileId, $serviceId, $minPrice, $maxPrice]);
+                }
+            }
+
+            // 3. Delete offerings no longer selected
+            $servicesToDelete = array_diff($currentServiceIds, $newlySelectedServiceIds);
+            if (!empty($servicesToDelete)) {
+                $placeholders = implode(',', array_fill(0, count($servicesToDelete), '?'));
+                $stmt = $this->conn->prepare("
+                    DELETE FROM vendor_service_offerings
+                    WHERE vendor_id = ? AND service_id IN ($placeholders)
+                ");
+                $stmt->execute(array_merge([$vendorProfileId], $servicesToDelete));
+            }
+
+            $this->conn->commit();
+            return true;
+        } catch (PDOException $e) {
+            $this->conn->rollBack();
+            error_log("Error in updateVendorServiceOfferings: " . $e->getMessage());
+            // Re-throw to allow higher-level error handling
+            throw new Exception("Database error updating vendor service offerings: " . $e->getMessage());
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            error_log("General error in updateVendorServiceOfferings: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
 
 }
