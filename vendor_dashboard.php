@@ -24,18 +24,19 @@ $notification = new Notification($pdo);
 $reportGenerator = new ReportGenerator($pdo);
 
 $user_data = $user->getUserById($_SESSION['user_id']);
-$vendor_profile = $vendor->getVendorProfileByUserId($_SESSION['user_id']); // This method now exists
+// CORRECTED: Changed getVendorProfileByUserId to getVendorByUserId
+$vendor_profile = $vendor->getVendorByUserId($_SESSION['user_id']);
 
 if (!$vendor_profile) {
     $_SESSION['error_message'] = "Please complete your vendor profile to access the dashboard.";
-    header('Location: ' . BASE_URL . 'public/vendor_profile_setup.php'); // Redirect to setup page
+    header('Location: ' . BASE_URL . 'public/edit_profile.php'); // Redirect to edit_profile.php
     exit();
 }
 
 // Fetch dashboard data
 $upcoming_bookings = $booking->getVendorUpcomingBookings($vendor_profile['id'], 5); // Assuming this method exists
 $booking_stats = $booking->getVendorBookingStats($vendor_profile['id']); // Assuming this method exists
-$recent_activities = $reportGenerator->getUserRecentActivity($_SESSION['user_id'], 10); // Limit to 10 recent activities
+$recent_activities = $reportGenerator->getVendorRecentActivity($vendor_profile['id'], 10); // Limit to 10 recent activities
 
 // Retrieve messages from session
 $success_message = $_SESSION['success_message'] ?? null;
@@ -51,8 +52,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
     <title>Vendor Dashboard - EventCraftAI</title>
     <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="stylesheet" href="../assets/css/dashboard.css"> 
-    <link rel="stylesheet" href="../assets/css/vendor.css"> <!-- Assuming vendor.css has relevant styles -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/vendor.css"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -434,14 +434,11 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                     <div class="activity-log">
                         <?php foreach ($recent_activities as $activity): ?>
                         <div class="activity-item">
-                            <div class="activity-icon"><i class="<?= htmlspecialchars($activity['icon_class'] ?? 'fas fa-info-circle') ?>"></i></div> <!-- Added null coalesce for icon_class -->
-                            <div class="activity-content">
-                                <div class="activity-message"><?= htmlspecialchars($activity['type_prefix'] ?? '') . htmlspecialchars($activity['message_detail'] ?? 'No detail.') ?></div> <!-- Added null coalesce -->
-                                <div class="activity-time">
+                            <div class="activity-icon"><i class="<?= htmlspecialchars($activity['icon_class'] ?? 'fas fa-info-circle') ?>"></i></div> <div class="activity-content">
+                                <div class="activity-message"><?= htmlspecialchars($activity['type_prefix'] ?? '') . htmlspecialchars($activity['message_detail'] ?? 'No detail.') ?></div> <div class="activity-time">
                                     <?= date('M j, Y g:i a', strtotime($activity['created_at'] ?? 'now')) ?>
                                     <?php if (isset($activity['related_url']) && !empty($activity['related_url'])): ?>
-                                        <?php if (isset($activity['type']) && $activity['type'] === 'booking' && !empty($activity['related_id'])): ?> <!-- Added isset($activity['type']) check -->
-                                            <a href="#" class="btn-link btn-sm view-booking-details" data-booking-id="<?= htmlspecialchars($activity['related_id']) ?>" style="margin-left: 10px;">View</a>
+                                        <?php if (isset($activity['type']) && $activity['type'] === 'booking' && !empty($activity['related_id'])): ?> <a href="#" class="btn-link btn-sm view-booking-details" data-booking-id="<?= htmlspecialchars($activity['related_id']) ?>" style="margin-left: 10px;">View</a>
                                         <?php else: ?>
                                             <a href="<?= BASE_URL . htmlspecialchars($activity['related_url']) ?>" class="btn-link btn-sm" style="margin-left: 10px;">View</a>
                                         <?php endif; ?>
@@ -473,7 +470,6 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
         </div>
     </div>
 
-    <!-- Booking Details Lightbox -->
     <div class="booking-details-lightbox-overlay" id="bookingDetailsLightbox">
         <div class="booking-details-lightbox-content">
             <span class="booking-details-lightbox-close" id="bookingDetailsLightboxClose">&times;</span>
