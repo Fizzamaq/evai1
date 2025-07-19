@@ -12,6 +12,7 @@ require_once '../classes/Event.class.php';
 require_once '../classes/Booking.class.php';
 require_once '../classes/Notification.class.php'; // Include Notification class
 require_once '../classes/ReportGenerator.class.php'; // Include ReportGenerator for recent activities
+require_once '../classes/AI_Assistant.php'; // Include AI_Assistant class
 
 // Redirect to login page if user is not logged in
 if (!isset($_SESSION['user_id'])) {
@@ -25,6 +26,7 @@ $event = new Event($pdo);
 $booking = new Booking($pdo);
 $notification_obj = new Notification($pdo); // Instantiate Notification class
 $report_generator = new ReportGenerator($pdo); // Instantiate ReportGenerator
+$ai_assistant = new AI_Assistant($pdo); // Instantiate AI_Assistant
 
 // Fetch current user's data
 $user_data = $user->getUserById($_SESSION['user_id']);
@@ -56,6 +58,9 @@ $recent_bookings = array_slice($recent_bookings, 0, 5);
 // Fetch recent activities for the user
 $recent_activities = $report_generator->getUserRecentActivity($_SESSION['user_id'], 5);
 
+// NEW: Fetch personalized vendor recommendations
+$personalized_vendors = $ai_assistant->getPersonalizedVendorRecommendations($_SESSION['user_id'], 3); // Get top 3 personalized recommendations
+
 ?>
 
 <!DOCTYPE html>
@@ -65,8 +70,10 @@ $recent_activities = $report_generator->getUserRecentActivity($_SESSION['user_id
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - EventCraftAI</title>
     <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-
     /* Specific styles for the customer dashboard layout and elements */
 .customer-dashboard-container {
     width: 100%; /* Make it take full width initially */
@@ -149,6 +156,12 @@ $recent_activities = $report_generator->getUserRecentActivity($_SESSION['user_id
     color: #636e72;
     flex-basis: 100%; /* Take full width on wrap */
     margin-top: 5px;
+    display: flex; /* Make meta info a flex container */
+    align-items: center;
+    gap: 8px; /* Gap between icon and text, and status badge */
+}
+.list-item-meta i {
+    color: #667eea;
 }
 .list-item .btn-link {
     margin-top: 10px; /* Space out button when wrapped */
@@ -206,6 +219,91 @@ $recent_activities = $report_generator->getUserRecentActivity($_SESSION['user_id
     align-items: center;
 }
 
+/* NEW: Personalized Vendor Recommendations Section */
+.personalized-vendors-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.vendor-card-item {
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    text-align: left;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+}
+
+.vendor-card-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.18);
+}
+
+.vendor-card-image {
+    width: 100%;
+    height: 180px; /* Fixed height for consistent images */
+    background-size: cover;
+    background-position: center;
+    background-color: var(--border-color); /* Placeholder background */
+    flex-shrink: 0;
+}
+
+.vendor-card-content {
+    padding: var(--spacing-md);
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.vendor-card-content h3 {
+    font-size: 1.3em;
+    margin-top: 0;
+    margin-bottom: var(--spacing-xs);
+    color: var(--primary-color);
+}
+
+.vendor-card-content .vendor-city {
+    font-size: 0.9em;
+    color: var(--text-subtle);
+    margin-bottom: var(--spacing-sm);
+}
+
+.vendor-card-rating {
+    color: var(--warning-color);
+    font-size: 1em;
+    margin-bottom: var(--spacing-md);
+}
+
+.vendor-card-rating i {
+    margin-right: 3px;
+}
+
+.vendor-card-rating span {
+    font-size: 0.8em;
+    color: var(--text-subtle);
+    margin-left: 5px;
+}
+
+.vendor-services {
+    font-size: 0.85em;
+    color: var(--text-dark);
+    line-height: 1.4;
+    margin-bottom: var(--spacing-md);
+}
+
+.vendor-card-item .btn {
+    margin-top: auto; /* Push button to bottom */
+    width: calc(100% - (var(--spacing-md) * 2)); /* Button full width minus padding */
+    align-self: center; /* Center horizontally in column */
+    margin-bottom: var(--spacing-md);
+}
+
 /* Responsive adjustments for smaller screens */
 @media (max-width: 768px) {
     .dashboard-sections {
@@ -223,6 +321,12 @@ $recent_activities = $report_generator->getUserRecentActivity($_SESSION['user_id
     .dashboard-header .btn {
         width: 100%;
         margin-bottom: 10px;
+    }
+    .personalized-vendors-grid {
+        grid-template-columns: 1fr; /* Stack vendor cards */
+    }
+    .vendor-card-image {
+        height: 200px; /* Adjust image height for single column */
     }
 }
 
@@ -274,6 +378,44 @@ $recent_activities = $report_generator->getUserRecentActivity($_SESSION['user_id
                 <div class="metric-label">Avg. Event Budget</div>
             </div>
         </div>
+
+        <?php if (!empty($personalized_vendors)): ?>
+            <div class="section-card">
+                <h2>Recommended Vendors for You</h2>
+                <p class="text-subtle">Based on your recent activity and preferences.</p>
+                <div class="personalized-vendors-grid">
+                    <?php foreach ($personalized_vendors as $vendor_item): ?>
+                        <div class="vendor-card-item">
+                            <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_item['id']) ?>" class="vendor-card-link">
+                                <div class="vendor-card-image" style="background-image: url('<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($vendor_item['profile_image'] ?: 'default-avatar.jpg') ?>')"></div>
+                                <div class="vendor-card-content">
+                                    <h3><?= htmlspecialchars($vendor_item['business_name']) ?></h3>
+                                    <p class="vendor-city"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($vendor_item['business_city']) ?></p>
+                                    <div class="vendor-card-rating">
+                                        <?php
+                                        $rating = round($vendor_item['rating'] * 2) / 2;
+                                        for ($i = 1; $i <= 5; $i++):
+                                            if ($rating >= $i) { echo '<i class="fas fa-star"></i>'; }
+                                            elseif ($rating > ($i - 1) && $rating < $i) { echo '<i class="fas fa-star-half-alt"></i>'; }
+                                            else { echo '<i class="far fa-star"></i>'; }
+                                        endfor;
+                                        ?>
+                                        <span><?= number_format($vendor_item['rating'], 1) ?> (<?= $vendor_item['total_reviews'] ?> Reviews)</span>
+                                    </div>
+                                    <?php if (!empty($vendor_item['offered_services_names'])): ?>
+                                        <p class="vendor-services">Services: <?= htmlspecialchars($vendor_item['offered_services_names']) ?></p>
+                                    <?php endif; ?>
+                                </div>
+                            </a>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php if (empty($personalized_vendors)): ?>
+                    <div class="empty-state">No personalized vendor recommendations at this time. View more vendors or use the AI Assistant to get suggestions!</div>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
 
         <div class="dashboard-sections">
             <div class="section-card">
