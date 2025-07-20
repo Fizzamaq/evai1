@@ -355,6 +355,8 @@ class AI_Assistant {
      * @return array An array of recommended vendor data.
      */
     public function getPersonalizedVendorRecommendations($userId, $limit = 5) {
+        error_log("AI_Assistant: Starting getPersonalizedVendorRecommendations for User ID: " . $userId);
+
         try {
             $viewedVendorProfiles = $this->dbFetchAll("
                 SELECT DISTINCT vpv.vendor_profile_id, vp.business_city,
@@ -368,14 +370,28 @@ class AI_Assistant {
                 ORDER BY vpv.viewed_at DESC
                 LIMIT 5
             ", [$userId]);
+            error_log("AI_Assistant: Fetched viewedVendorProfiles: " . print_r($viewedVendorProfiles, true));
 
-            $recentSearchTerms = $this->dbFetchAll("
-                SELECT message_content
-                FROM ai_chat_messages
-                WHERE session_id IN (SELECT id FROM ai_chat_sessions WHERE user_id = ? ORDER BY updated_at DESC LIMIT 3)
-                AND message_type = 'user'
-                ORDER BY created_at DESC
+            // Step 1: Get recent session IDs - Refactored due to MariaDB LIMIT in subquery issue
+            $recentSessionIds = $this->dbFetchAll("
+                SELECT id FROM ai_chat_sessions WHERE user_id = ? ORDER BY updated_at DESC LIMIT 3
             ", [$userId]);
+            $sessionIds = array_column($recentSessionIds, 'id');
+
+            // Step 2: Fetch recent search terms using the fetched session IDs
+            $recentSearchTerms = [];
+            if (!empty($sessionIds)) {
+                $placeholders = implode(',', array_fill(0, count($sessionIds), '?'));
+                $recentSearchTerms = $this->dbFetchAll("
+                    SELECT message_content
+                    FROM ai_chat_messages
+                    WHERE session_id IN ({$placeholders})
+                    AND message_type = 'user'
+                    ORDER BY created_at DESC
+                ", $sessionIds);
+            }
+            error_log("AI_Assistant: Fetched recentSearchTerms: " . print_r($recentSearchTerms, true));
+
 
             $keywords = [];
             $preferredLocations = [];
@@ -396,6 +412,7 @@ class AI_Assistant {
                     }
                 }
             }
+            error_log("AI_Assistant: Extracted keywords: " . print_r($keywords, true));
 
             // Extract preferred locations and services from viewed vendors
             foreach ($viewedVendorProfiles as $vendorView) {
@@ -412,14 +429,22 @@ class AI_Assistant {
                     }
                 }
             }
+            error_log("AI_Assistant: Extracted preferredLocations: " . print_r($preferredLocations, true));
+            error_log("AI_Assistant: Extracted preferredServiceIds: " . print_r($preferredServiceIds, true));
             
             $combinedSearchQuery = implode(' ', array_unique($keywords));
             $combinedLocations = implode(', ', array_unique($preferredLocations));
             $combinedServiceIds = array_unique($preferredServiceIds);
 
+            error_log("AI_Assistant: Combined Search Query: " . $combinedSearchQuery);
+            error_log("AI_Assistant: Combined Locations: " . $combinedLocations);
+            error_log("AI_Assistant: Combined Service IDs: " . print_r($combinedServiceIds, true));
+
+
             // Fallback: if no specific activity, get highly-rated vendors
             if (empty($combinedSearchQuery) && empty($combinedLocations) && empty($combinedServiceIds)) {
-                return $this->dbFetchAll("
+                error_log("AI_Assistant: No specific activity found, falling back to highly-rated vendors.");
+                $fallbackVendors = $this->dbFetchAll("
                     SELECT vp.id, vp.business_name, vp.business_city, vp.rating, vp.total_reviews, up.profile_image,
                            GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS offered_services_names
                     FROM vendor_profiles vp
@@ -432,6 +457,8 @@ class AI_Assistant {
                     ORDER BY vp.rating DESC, vp.total_reviews DESC
                     LIMIT ?
                 ", [$limit]);
+                error_log("AI_Assistant: Fallback vendors fetched: " . print_r($fallbackVendors, true));
+                return $fallbackVendors;
             }
 
             // Build dynamic query for personalized recommendations
@@ -480,7 +507,11 @@ class AI_Assistant {
                          LIMIT ?";
             $params[] = $limit;
             
+            error_log("AI_Assistant: Final query: " . $query);
+            error_log("AI_Assistant: Final params: " . print_r($params, true));
+
             $vendors = $this->dbFetchAll($query, $params);
+            error_log("AI_Assistant: Final vendors fetched: " . print_r($vendors, true));
 
             // Refine scoring if needed based on detailed match, but current scoring already uses rating.
             // For now, return direct results, as detailed scoring on "viewed" criteria is complex without more data.
@@ -538,7 +569,7 @@ class AI_Assistant {
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HTTPHEADER => [
-                    'Content-Type' => 'application/json',
+                    'Content-Type: application/json',
                     'Authorization: Bearer ' . $this->apiKey
                 ],
                 CURLOPT_POST => true,
