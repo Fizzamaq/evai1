@@ -38,6 +38,9 @@ class Chat {
                 return $existing_conv['id'];
             }
 
+            // Start a transaction specifically for the new conversation creation
+            $this->conn->beginTransaction();
+
             // Create new conversation
             $sql = "INSERT INTO chat_conversations
                 (event_id, user_id, vendor_id, created_at, updated_at)
@@ -57,29 +60,37 @@ class Chat {
 
             if ($result) {
                 $conversation_id = $this->conn->lastInsertId();
+                $this->conn->commit(); // Commit the transaction for the new conversation
                 // --- MODIFIED DEBUG LOG ---
-                $this->debugToFile("startConversation: Successfully created new conversation with ID: " . $conversation_id);
+                $this->debugToFile("startConversation: Successfully created new conversation with ID: " . $conversation_id . " and committed.");
                 // --- END MODIFIED DEBUG LOG ---
                 return $conversation_id;
             } else {
+                $this->conn->rollBack(); // Rollback if insert failed
                 // Log specific PDO error if execution failed
                 $errorInfo = $stmt->errorInfo();
                 // --- MODIFIED ERROR LOG ---
-                $this->debugToFile("Chat.class.php startConversation PDO execute failed. ErrorInfo: " . implode(" ", $errorInfo) . " for params: event_id=" . ($event_id ?? 'NULL') . ", user_id={$user_id}, vendor_id={$vendor_id}");
+                $this->debugToFile("Chat.class.php startConversation PDO execute failed. ErrorInfo: " . implode(" ", $errorInfo) . " for params: event_id=" . ($event_id ?? 'NULL') . ", user_id={$user_id}, vendor_id={$vendor_id} (rolled back).");
                 // --- END MODIFIED ERROR LOG ---
                 return false;
             }
 
         } catch (PDOException $e) {
+            if ($this->conn->inTransaction()) { // Check if a transaction is active before rolling back
+                $this->conn->rollBack();
+            }
             // Log the full PDOException message
             // --- MODIFIED ERROR LOG ---
-            $this->debugToFile("Chat.class.php startConversation PDOException caught: " . $e->getMessage() . " (Code: " . $e->getCode() . ") SQLSTATE: " . ($e->errorInfo[0] ?? 'N/A') . " - Trace: " . $e->getTraceAsString());
+            $this->debugToFile("Chat.class.php startConversation PDOException caught: " . $e->getMessage() . " (Code: " . $e->getCode() . ") SQLSTATE: " . ($e->errorInfo[0] ?? 'N/A') . " - Trace: " . $e->getTraceAsString() . " (rolled back).");
             // --- END MODIFIED ERROR LOG ---
             return false;
         } catch (Exception $e) {
+            if ($this->conn->inTransaction()) { // Check if a transaction is active before rolling back
+                $this->conn->rollBack();
+            }
             // Catch other general exceptions
             // --- MODIFIED ERROR LOG ---
-            $this->debugToFile("Chat.class.php startConversation General Exception caught: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
+            $this->debugToFile("Chat.class.php startConversation General Exception caught: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString() . " (rolled back).");
             // --- END MODIFIED ERROR LOG ---
             return false;
         }
@@ -163,10 +174,34 @@ class Chat {
 
             $message_id = $this->conn->lastInsertId();
 
-            // 2. Update conversation's last message time
-            if (!$this->updateConversationTime($conversation_id)) {
-                // If updateConversationTime returns false, throw an exception to trigger rollback
-                throw new Exception("Failed to update last_message_at for conversation_id: " . $conversation_id);
+            // 2. Update conversation's last message time with exponential backoff retry logic
+            // This retry is here as a fallback for general transient issues even if conversation creation is atomic.
+            $max_retries = 5; // Increased retries for robustness
+            $base_delay_microseconds = 50000; // 50 milliseconds initial delay
+
+            $update_success = false;
+
+            for ($attempt = 1; $attempt <= $max_retries; $attempt++) {
+                $stmt_update_conv = $this->conn->prepare("UPDATE chat_conversations
+                    SET last_message_at = NOW()
+                    WHERE id = ?");
+                $execute_success = $stmt_update_conv->execute([$conversation_id]);
+
+                if ($execute_success && $stmt_update_conv->rowCount() > 0) {
+                    $update_success = true;
+                    break; // Success, exit retry loop
+                } elseif ($attempt < $max_retries) {
+                    // Log retry attempt and wait longer for the next attempt
+                    $current_delay = $base_delay_microseconds * pow(2, $attempt - 1); // Exponential backoff
+                    $this->debugToFile("Chat.class.php sendMessage: Retrying update for conversation_id {$conversation_id} (Attempt {$attempt}). Rows affected: " . $stmt_update_conv->rowCount() . ". Waiting " . ($current_delay / 1000) . "ms.");
+                    usleep($current_delay); // Wait before retrying
+                }
+            }
+
+            // Check final result of the update attempts
+            if (!$update_success) {
+                // If after all retries, the update still failed (affected 0 rows or query error), throw an exception
+                throw new Exception("Failed to update last_message_at for conversation_id: " . $conversation_id . " after {$max_retries} attempts.");
             }
 
             // If both operations succeeded, commit the transaction
@@ -179,34 +214,11 @@ class Chat {
             $this->debugToFile("Chat.class.php sendMessage PDO error (transaction rolled back): " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         } catch (Exception $e) {
-            // Catch other general exceptions (like the one from updateConversationTime failure)
+            // Catch other general exceptions (like the one from the inlined update failure)
             $this->conn->rollBack(); // Rollback the transaction on other errors
             $this->debugToFile("Chat.class.php sendMessage general error (transaction rolled back): " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         }
-    }
-
-    /**
-     * Update conversation last message time.
-     * This method is now designed to be called within a transaction.
-     * @param int $conversation_id
-     * @return bool True on success, false on failure.
-     */
-    private function updateConversationTime($conversation_id) {
-        // No try-catch here, as it's meant to be part of sendMessage's transaction.
-        // PDOExceptions will be caught by the caller's try-catch (sendMessage).
-        $stmt = $this->conn->prepare("UPDATE chat_conversations
-            SET last_message_at = NOW()
-            WHERE id = ?");
-        $result = $stmt->execute([$conversation_id]);
-
-        // If no rows were affected, it means the conversation_id might be invalid or not found.
-        if ($result && $stmt->rowCount() === 0) {
-            $this->debugToFile("Chat.class.php updateConversationTime: No rows updated for conversation_id " . $conversation_id . ". ID might be invalid.");
-            return false; // Explicitly indicate failure if no row found/updated
-        }
-        
-        return $result; // True if executed and affected rows, false if execution failed
     }
 
     /**
@@ -224,7 +236,7 @@ class Chat {
                 LIMIT ? OFFSET ?");
             $stmt->execute([$conversation_id, $limit, $offset]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
+        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
             $this->debugToFile("Chat.class.php getMessages error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         }
