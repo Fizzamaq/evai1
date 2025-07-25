@@ -136,7 +136,7 @@ class Chat {
         } catch (PDOException $e) {
             // --- MODIFIED ERROR LOG ---
             $this->debugToFile("Chat.class.php getConversationByParticipants PDO error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
-            // --- END MODIFIED ERROR LOG ---
+            // --- END MODIFIED DEBUG LOG ---
             return false;
         }
     }
@@ -169,7 +169,8 @@ class Chat {
             ]);
 
             if (!$insert_success) {
-                throw new PDOException("Failed to insert message into chat_messages table. ErrorInfo: " . implode(" ", $stmt_insert->errorInfo()));
+                $errorInfo = $stmt_insert->errorInfo();
+                throw new PDOException("Failed to insert message into chat_messages table. ErrorInfo: " . implode(" ", $errorInfo));
             }
 
             $message_id = $this->conn->lastInsertId();
@@ -222,19 +223,36 @@ class Chat {
     }
 
     /**
-     * Get conversation messages
+     * Get conversation messages.
      * @param int $conversation_id
      * @param int $limit
      * @param int $offset
-     * @return array|false
+     * @param int|null $last_message_id If provided, fetch messages with ID > this value.
+     * @return array|false Messages ordered by oldest first, or false on error.
      */
-    public function getMessages($conversation_id, $limit = 50, $offset = 0) {
+    public function getMessages($conversation_id, $limit = 50, $offset = 0, $last_message_id = null) {
         try {
-            $stmt = $this->conn->prepare("SELECT * FROM chat_messages
-                WHERE conversation_id = ?
-                ORDER BY created_at DESC
-                LIMIT ? OFFSET ?");
-            $stmt->execute([$conversation_id, $limit, $offset]);
+            $sql = "SELECT * FROM chat_messages WHERE conversation_id = ?";
+            $params = [$conversation_id];
+
+            if ($last_message_id !== null) {
+                $sql .= " AND id > ?";
+                $params[] = $last_message_id;
+            }
+
+            $sql .= " ORDER BY created_at ASC, id ASC LIMIT ? OFFSET ?"; // Order oldest first for appending
+
+            $stmt = $this->conn->prepare($sql);
+            // Bind parameters ensuring types are correct for LIMIT/OFFSET
+            $stmt->bindParam(1, $conversation_id, PDO::PARAM_INT);
+            $paramIndex = 2;
+            if ($last_message_id !== null) {
+                $stmt->bindParam($paramIndex++, $last_message_id, PDO::PARAM_INT);
+            }
+            $stmt->bindParam($paramIndex++, $limit, PDO::PARAM_INT);
+            $stmt->bindParam($paramIndex++, $offset, PDO::PARAM_INT);
+            
+            $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
             $this->debugToFile("Chat.class.php getMessages error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
