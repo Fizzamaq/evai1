@@ -58,8 +58,9 @@ $recent_bookings = array_slice($recent_bookings, 0, 5);
 // Fetch recent activities for the user
 $recent_activities = $report_generator->getUserRecentActivity($_SESSION['user_id'], 5);
 
-// NEW: Fetch personalized vendor recommendations
-$personalized_vendors = $ai_assistant->getPersonalizedVendorRecommendations($_SESSION['user_id'], 3); // Get top 3 personalized recommendations
+// REMOVED: Fetching personalized vendor recommendations for dashboard.php
+// This logic is now handled exclusively by index.php for customers.
+$personalized_vendors = []; // Ensure it's empty on this page
 
 ?>
 
@@ -220,89 +221,8 @@ $personalized_vendors = $ai_assistant->getPersonalizedVendorRecommendations($_SE
 }
 
 /* NEW: Personalized Vendor Recommendations Section */
-.personalized-vendors-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-md);
-}
+/* REMOVED FROM THIS PAGE */
 
-.vendor-card-item {
-    background: var(--white);
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    overflow: hidden;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    text-align: left;
-    text-decoration: none;
-    color: inherit;
-    display: flex;
-    flex-direction: column;
-}
-
-.vendor-card-item:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.18);
-}
-
-.vendor-card-image {
-    width: 100%;
-    height: 180px; /* Fixed height for consistent images */
-    background-size: cover;
-    background-position: center;
-    background-color: var(--border-color); /* Placeholder background */
-    flex-shrink: 0;
-}
-
-.vendor-card-content {
-    padding: var(--spacing-md);
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.vendor-card-content h3 {
-    font-size: 1.3em;
-    margin-top: 0;
-    margin-bottom: var(--spacing-xs);
-    color: var(--primary-color);
-}
-
-.vendor-card-content .vendor-city {
-    font-size: 0.9em;
-    color: var(--text-subtle);
-    margin-bottom: var(--spacing-sm);
-}
-
-.vendor-card-rating {
-    color: var(--warning-color);
-    font-size: 1em;
-    margin-bottom: var(--spacing-md);
-}
-
-.vendor-card-rating i {
-    margin-right: 3px;
-}
-
-.vendor-card-rating span {
-    font-size: 0.8em;
-    color: var(--text-subtle);
-    margin-left: 5px;
-}
-
-.vendor-services {
-    font-size: 0.85em;
-    color: var(--text-dark);
-    line-height: 1.4;
-    margin-bottom: var(--spacing-md);
-}
-
-.vendor-card-item .btn {
-    margin-top: auto; /* Push button to bottom */
-    width: calc(100% - (var(--spacing-md) * 2)); /* Button full width minus padding */
-    align-self: center; /* Center horizontally in column */
-    margin-bottom: var(--spacing-md);
-}
 
 /* Responsive adjustments for smaller screens */
 @media (max-width: 768px) {
@@ -322,10 +242,10 @@ $personalized_vendors = $ai_assistant->getPersonalizedVendorRecommendations($_SE
         width: 100%;
         margin-bottom: 10px;
     }
-    .personalized-vendors-grid {
+    .personalized-vendors-grid { /* Keep these styles, but the section itself is removed */
         grid-template-columns: 1fr; /* Stack vendor cards */
     }
-    .vendor-card-image {
+    .vendor-card-image { /* Keep these styles, but the section itself is removed */
         height: 200px; /* Adjust image height for single column */
     }
 }
@@ -379,7 +299,12 @@ $personalized_vendors = $ai_assistant->getPersonalizedVendorRecommendations($_SE
             </div>
         </div>
 
-        <?php if (!empty($personalized_vendors)): ?>
+        <?php /*
+        // The "Recommended Vendors for You" section has been moved to index.php
+        // and is no longer displayed on the customer dashboard.
+        // The previous conditional logic here ensured it was only for customers,
+        // but now the section is entirely removed from this file.
+        if (($_SESSION['user_type'] ?? null) == 1 && !empty($personalized_vendors)): ?>
             <div class="section-card">
                 <h2>Recommended Vendors for You</h2>
                 <p class="text-subtle">Based on your recent activity and preferences.</p>
@@ -414,7 +339,7 @@ $personalized_vendors = $ai_assistant->getPersonalizedVendorRecommendations($_SE
                     <div class="empty-state">No personalized vendor recommendations at this time. View more vendors or use the AI Assistant to get suggestions!</div>
                 <?php endif; ?>
             </div>
-        <?php endif; ?>
+        <?php endif; */ ?>
 
 
         <div class="dashboard-sections">
