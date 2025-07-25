@@ -5,34 +5,20 @@ require_once '../includes/config.php';
 include 'header.php';
 // Include the Vendor class to fetch data
 require_once '../classes/Vendor.class.php';
-
-// REMOVED: The redirection logic for logged-in users.
-// This block previously redirected logged-in users to their dashboards,
-// preventing them from accessing the landing page.
-/*
-if (isset($_SESSION['user_id'])) {
-    $redirect_url = BASE_URL . 'public/dashboard.php'; // Default for customer
-    if (isset($_SESSION['user_type'])) {
-        if ($_SESSION['user_type'] == 2) { // Vendor
-            $redirect_url = BASE_URL . 'public/vendor_dashboard.php';
-        } elseif ($_SESSION['user_type'] == 3) { // Admin
-            $redirect_url = BASE_URL . 'admin/dashboard.php';
-        }
-    }
-    header("Location: " . $redirect_url);
-    exit();
-}
-*/
+require_once '../classes/AI_Assistant.php'; // Include AI_Assistant class
 
 // Instantiate Vendor class to fetch data
 $vendor = new Vendor($pdo);
+$ai_assistant = new AI_Assistant($pdo); // Instantiate AI_Assistant
 
 // Fetch all vendor categories
 $vendor_categories = $vendor->getAllVendorCategories();
 
-// Optional: Fetch featured vendors for a general "Featured" section if still desired,
-// otherwise this section can be removed and replaced by category-specific ones.
-// $featured_vendors = $vendor->getFeaturedVendorsForHomepage(8);
+$personalized_vendors = [];
+// Only fetch personalized vendors if a user is logged in AND is a customer (user_type = 1)
+if (isset($_SESSION['user_id']) && ($_SESSION['user_type'] ?? null) == 1) {
+    $personalized_vendors = $ai_assistant->getPersonalizedVendorRecommendations($_SESSION['user_id'], 3); // Get top 3 personalized recommendations
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -46,6 +32,92 @@ $vendor_categories = $vendor->getAllVendorCategories();
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    <style>
+        /* Styles from dashboard.css for personalized vendors */
+        .personalized-vendors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-md);
+        }
+
+        .vendor-card-item {
+            background: var(--white);
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            text-align: left;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .vendor-card-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.18);
+        }
+
+        .vendor-card-image {
+            width: 100%;
+            height: 180px; /* Fixed height for consistent images */
+            background-size: cover;
+            background-position: center;
+            background-color: var(--border-color); /* Placeholder background */
+            flex-shrink: 0;
+        }
+
+        .vendor-card-content {
+            padding: var(--spacing-md);
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .vendor-card-content h3 {
+            font-size: 1.3em;
+            margin-top: 0;
+            margin-bottom: var(--spacing-xs);
+            color: var(--primary-color);
+        }
+
+        .vendor-card-content .vendor-city {
+            font-size: 0.9em;
+            color: var(--text-subtle);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .vendor-card-rating {
+            color: var(--warning-color);
+            font-size: 1em;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .vendor-card-rating i {
+            margin-right: 3px;
+        }
+
+        .vendor-card-rating span {
+            font-size: 0.8em;
+            color: var(--text-subtle);
+            margin-left: 5px;
+        }
+
+        .vendor-services {
+            font-size: 0.85em;
+            color: var(--text-dark);
+            line-height: 1.4;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .vendor-card-item .btn {
+            margin-top: auto; /* Push button to bottom */
+            width: calc(100% - (var(--spacing-md) * 2)); /* Button full width minus padding */
+            align-self: center; /* Center horizontally in column */
+            margin-bottom: var(--spacing-md);
+        }
+    </style>
 </head>
 <body>
     <section class="hero" id="hero-section">
@@ -63,7 +135,46 @@ $vendor_categories = $vendor->getAllVendorCategories();
                 <a href="login.php" class="btn btn-secondary btn-large">Login</a>
             </div>
         </div>
+    </section>
+
+    <?php if (isset($_SESSION['user_id']) && ($_SESSION['user_type'] ?? null) == 1 && !empty($personalized_vendors)): ?>
+        <section class="section personalized-vendors-section">
+            <div class="container">
+                <h2 class="section-title">Recommended Vendors for You</h2>
+                <p class="subtitle">Based on your recent activity and preferences.</p>
+                <div class="personalized-vendors-grid">
+                    <?php foreach ($personalized_vendors as $vendor_item): ?>
+                        <div class="vendor-card-item">
+                            <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_item['id']) ?>" class="vendor-card-link">
+                                <div class="vendor-card-image" style="background-image: url('<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($vendor_item['profile_image'] ?: 'default-avatar.jpg') ?>')"></div>
+                                <div class="vendor-card-content">
+                                    <h3><?= htmlspecialchars($vendor_item['business_name']) ?></h3>
+                                    <p class="vendor-city"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($vendor_item['business_city']) ?></p>
+                                    <div class="vendor-card-rating">
+                                        <?php
+                                        $rating = round($vendor_item['rating'] * 2) / 2;
+                                        for ($i = 1; $i <= 5; $i++):
+                                            if ($rating >= $i) { echo '<i class="fas fa-star"></i>'; }
+                                            elseif ($rating > ($i - 1) && $rating < $i) { echo '<i class="fas fa-star-half-alt"></i>'; }
+                                            else { echo '<i class="far fa-star"></i>'; }
+                                        endfor;
+                                        ?>
+                                        <span><?= number_format($vendor_item['rating'], 1) ?> (<?= $vendor_item['total_reviews'] ?> Reviews)</span>
+                                    </div>
+                                    <?php if (!empty($vendor_item['offered_services_names'])): ?>
+                                        <p class="vendor-services">Services: <?= htmlspecialchars($vendor_item['offered_services_names']) ?></p>
+                                    <?php endif; ?>
+                                </div>
+                            </a>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php if (empty($personalized_vendors)): ?>
+                    <div class="empty-state">No personalized vendor recommendations at this time. View more vendors or use the AI Assistant to get suggestions!</div>
+                <?php endif; ?>
+            </div>
         </section>
+    <?php endif; ?>
 
     <section class="section categories-section">
         <h2 class="section-title">Explore Categories</h2> <div class="swiper categories-swiper swiper-container-fade-overlay"> <div class="swiper-wrapper">
@@ -104,7 +215,7 @@ $vendor_categories = $vendor->getAllVendorCategories();
                                             <div class="vendor-card-image" style="background-image: url('<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($vendor_item['profile_image'] ?: 'default-avatar.jpg') /* CORRECTED PATH */ ?>')"></div>
                                             <div class="vendor-card-content">
                                                 <h3><?= htmlspecialchars($vendor_item['business_name']) ?></h3>
-                                                <p><?= htmlspecialchars($vendor_item['business_city']) ?></p>
+                                                <p><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($vendor_item['business_city']) ?></p>
                                                 <div class="vendor-card-rating">
                                                     <?php
                                                     $rating = round($vendor_item['rating'] * 2) / 2; // Round to nearest 0.5
@@ -118,7 +229,7 @@ $vendor_categories = $vendor->getAllVendorCategories();
                                                         }
                                                     endfor;
                                                     ?>
-                                                    (<?= htmlspecialchars($vendor_item['total_reviews']) ?> Reviews)
+                                                    <span>(<?= htmlspecialchars($vendor_item['total_reviews']) ?> Reviews)</span>
                                                 </div>
                                                 <?php if (!empty($vendor_item['offered_services'])): ?>
                                                     <p class="vendor-card-services">Services: <?= htmlspecialchars($vendor_item['offered_services']) ?></p>
