@@ -1,4 +1,5 @@
 <?php
+// classes/AI_Assistant.php
 // Corrected path to config.php relative to this file's expected location in /classes/
 require_once __DIR__ . '/../includes/config.php'; 
 
