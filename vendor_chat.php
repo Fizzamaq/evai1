@@ -30,11 +30,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Check user authentication and vendor access for POST requests
     if (!isset($_SESSION['user_id'])) {
+        error_log("Vendor Chat POST: User not authenticated.");
         echo json_encode(['success' => false, 'error' => 'User not authenticated. Please log in.', 'redirect' => BASE_URL . 'public/login.php']);
         exit();
     }
     // Ensure user is a verified vendor for POST actions
-    // Note: verifyVendorAccess() might redirect and exit if not a vendor.
     $vendor->verifyVendorAccess(); 
 
     // Handle specific POST actions
@@ -56,34 +56,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Get conversation_id. For vendors, it should usually be present from URL.
         $conversation_id = $_GET['conversation_id'] ?? null; 
 
-        // --- NEW: Check for vendor-to-vendor chat attempt ---
+        // --- NEW: Check for vendor-to-vendor chat attempt (not supported) ---
         $sender_user_type = $_SESSION['user_type'] ?? null;
         $recipient_user_type = null;
 
-        if ($conversation_id) { // If an existing conversation, participant types should already be valid
-            // No direct check needed here if $conversation_id is already valid and existing.
-            // This check only applies to initiating *new* conversations between vendors.
-        } elseif ($vendor_id_for_creation = $_POST['vendor_id_for_chat'] ?? null) {
-            $recipient_user_data = $user->getUserById($vendor_id_for_creation);
+        if (!$conversation_id && ($client_user_id_for_chat = $_POST['client_user_id_for_chat'] ?? null)) {
+            $recipient_user_data = $user->getUserById($client_user_id_for_chat);
             if ($recipient_user_data) {
                 $recipient_user_type = $recipient_user_data['user_type_id'];
             }
-        }
-        
-        // If both sender and recipient are vendors (user_type_id = 2) for a *new* conversation attempt
-        if ($sender_user_type == 2 && $recipient_user_type == 2 && !$conversation_id) {
-            echo json_encode(['success' => false, 'error' => 'Vendor-to-vendor chat is not supported by the current system design.']);
-            exit();
+
+            // Attempt to start conversation
+            $created_conversation_id = $chat->startConversation(null, (int)$client_user_id_for_chat, $_SESSION['user_id']); // vendor_id is current user
+            if (!$created_conversation_id) {
+                error_log("Failed to start new conversation for vendor " . ($_SESSION['user_id'] ?? 'N/A') . " and client " . ($client_user_id_for_chat ?? 'N/A'));
+                echo json_encode(['success' => false, 'error' => 'Failed to create new conversation.']);
+                exit();
+            }
+            $conversation_id = $created_conversation_id;
+        } elseif (!$conversation_id) {
+             error_log("Missing conversation ID or client_user_id for new conversation creation for vendor " . $_SESSION['user_id']);
+             echo json_encode(['success' => false, 'error' => 'A conversation or client must be identified to send a message.']);
+             exit();
         }
         // --- END NEW CHECK ---
 
-        // Vendors should always be responding within an existing conversation.
+        // If conversation_id is now available, send message
         if ($conversation_id) {
             $message_sent = $chat->sendMessage($conversation_id, $_SESSION['user_id'], $message); // Sender is the vendor's user_id
             if ($message_sent) {
-                echo json_encode(['success' => true, 'message' => 'Message sent.']);
+                echo json_encode(['success' => true, 'message' => 'Message sent.', 'message_id' => $message_sent]); // Return message_id
                 exit();
             } else {
+                error_log("Vendor Chat POST: Failed to save message to database for conversation " . $conversation_id);
                 echo json_encode(['success' => false, 'error' => 'Failed to save message to database.']);
                 exit();
             }
@@ -91,23 +96,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             error_log("Failed to send message: No conversation ID provided for vendor response.");
             echo json_encode(['success' => false, 'error' => 'Failed to send message. Conversation not identified.']);
             exit();
-        }
-    } elseif (isset($_POST['delete_chat'])) { // ADDED: Handle chat deletion request
+    }
+    } elseif (isset($_POST['delete_chat'])) { // Handle chat deletion request
         $conversation_id_to_delete = $_POST['conversation_id'];
         // Basic validation: ensure conversation_id is numeric and user is part of it.
         if (!empty($conversation_id_to_delete) && is_numeric($conversation_id_to_delete)) {
             if ($chat->markConversationAsArchived((int)$conversation_id_to_delete, $_SESSION['user_id'])) {
                 echo json_encode(['success' => true, 'message' => 'Chat archived successfully.', 'redirect' => BASE_URL . 'public/vendor_chat.php']);
             } else {
+                error_log("Vendor Chat POST: Failed to archive chat {$conversation_id_to_delete} for user " . $_SESSION['user_id']);
                 echo json_encode(['success' => false, 'error' => 'Failed to archive chat.']);
             }
         } else {
+            error_log("Vendor Chat POST: Invalid conversation ID for deletion: " . ($conversation_id_to_delete ?? 'NULL'));
             echo json_encode(['success' => false, 'error' => 'Invalid conversation ID for deletion.']);
         }
         exit();
     }
     else {
         // If other POST actions were sent to this file, handle or error out
+        error_log("Vendor Chat POST: Invalid POST action received.");
         echo json_encode(['success' => false, 'error' => 'Invalid POST action.']);
         exit();
     }
@@ -121,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Check user authentication and vendor access for GET requests
 if (!isset($_SESSION['user_id'])) {
     if ($is_ajax_request) { // For AJAX polling GET, output minimal content
-        echo '<div class="chat-messages" id="messages-container"></div>'; // Minimal output
+        echo json_encode(['success' => false, 'error' => 'User not authenticated for AJAX.']); // Return JSON for AJAX
         exit();
     } else { // For full page load GET, redirect to login
         header('Location: ' . BASE_URL . 'public/login.php');
@@ -139,94 +147,12 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
     // Fetch vendor user data needed for chat interface for GET requests
     $user_data = $user->getUserById($_SESSION['user_id']);
 
-    // --- Handle AJAX GET Requests (for polling messages or partial content loads) ---
-    if ($is_ajax_request) {
-        $current_conversation = null;
-        $messages = [];
-
-        if ($conversation_id) {
-            try {
-                $stmt = $pdo->prepare("
-                    SELECT cc.*,
-                           e.title as event_title,
-                           CASE
-                             WHEN cc.vendor_id = ? THEN CONCAT(u.first_name, ' ', u.last_name)
-                             ELSE vp.business_name
-                           END as other_party_name,
-                           CASE
-                             WHEN cc.vendor_id = ? THEN up_user.profile_image
-                             ELSE up_vendor.profile_image
-                           END as other_party_image
-                    FROM chat_conversations cc
-                    LEFT JOIN events e ON cc.event_id = e.id
-                    LEFT JOIN users u ON cc.user_id = u.id
-                    LEFT JOIN user_profiles up_user ON u.id = up_user.user_id
-                    LEFT JOIN users u2 ON cc.vendor_id = u2.id
-                    LEFT JOIN vendor_profiles vp ON u2.id = vp.user_id
-                    LEFT JOIN user_profiles up_vendor ON u2.id = up_vendor.user_id
-                    WHERE cc.id = ?
-                    AND (cc.vendor_id = ? OR cc.user_id = ?)
-                ");
-                $params = [ // 5 parameters for 5 placeholders
-                    $_SESSION['user_id'], // for first CASE
-                    $_SESSION['user_id'], // for second CASE
-                    $conversation_id,
-                    $_SESSION['user_id'], // for first OR
-                    $_SESSION['user_id']  // for second OR
-                ];
-                $stmt->execute($params);
-                $current_conversation = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                if ($current_conversation) {
-                    $other_party = [
-                        'id' => (int)(($current_conversation['vendor_id'] == $_SESSION['user_id']) ? $current_conversation['user_id'] : $current_conversation['vendor_id']),
-                        'name' => htmlspecialchars((string)($current_conversation['other_party_name'] ?? 'Unknown User')),
-                        'image' => htmlspecialchars((string)($current_conversation['other_party_image'] ?? ''))
-                    ];
-
-                    $messages = $chat->getMessages($conversation_id, 100);
-                    $messages = array_reverse($messages); // Show oldest first
-
-                    // Output only the messages container (partial HTML)
-                    echo '<div class="chat-messages" id="messages-container">';
-                    if (empty($messages)):
-                        echo '<div class="empty-state">No messages yet</div>';
-                    else:
-                        foreach ($messages as $message):
-                            $message_content_display = nl2br(htmlspecialchars((string)($message['message_content'] ?? '')));
-                            $message_time_display = !empty($message['created_at']) ? date('g:i a', strtotime((string)$message['created_at'])) : 'N/A';
-                            ?>
-                            <div class="message <?php echo ($message['sender_id'] == $_SESSION['user_id']) ? 'message-outgoing' : 'message-incoming'; ?>" data-id="<?= htmlspecialchars((string)($message['id'])) ?>">
-                                <div class="message-content"><?php echo $message_content_display; ?></div>
-                                <span class="message-time">
-                                    <?php echo $message_time_display; ?>
-                                </span>
-                            </div>
-                            <?php
-                        endforeach;
-                    endif;
-                    echo '</div>'; // Close messages-container
-                    exit(); // Crucial: Exit after AJAX GET response
-                }
-            } catch (PDOException $e) {
-                error_log("Get conversation details for AJAX error (vendor_chat.php): " . $e->getMessage());
-                echo '<div class="chat-messages" id="messages-container"></div>'; // Send empty container on error
-                exit();
-            }
-        }
-        echo '<div class="chat-messages" id="messages-container"></div>'; // For AJAX GET requests with no conversation_id
-        exit(); // Crucial: Exit for all AJAX GET requests
-    }
-
-    // --- START: Full HTML Page Rendering for non-AJAX GET requests (default page load) ---
-    include 'header.php'; // Include header only for full page loads
-
     $current_conversation = null;
-    $messages = [];
+    $messages = []; // Initialize empty. Will be populated below if conversation_id exists.
     $other_party = null;
 
     if ($conversation_id) {
-        $chat->markMessagesAsRead($conversation_id, $_SESSION['user_id']); // Mark as read on full page load
+        $chat->markMessagesAsRead($conversation_id, $_SESSION['user_id']); // Mark as read on full page load or AJAX refresh
 
         try {
             $stmt = $pdo->prepare("
@@ -242,9 +168,9 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                            END as other_party_image
                     FROM chat_conversations cc
                     LEFT JOIN events e ON cc.event_id = e.id
-                    LEFT JOIN users u ON cc.user_id = u.id
-                    LEFT JOIN vendor_profiles vp ON u.id = vp.user_id
+                    LEFT JOIN users u ON cc.user_id = u.id -- This is the client user (cc.user_id)
                     LEFT JOIN user_profiles up_user ON u.id = up_user.user_id
+                    -- For the vendor details (cc.vendor_id)
                     LEFT JOIN users u2 ON cc.vendor_id = u2.id
                     LEFT JOIN vendor_profiles vp ON u2.id = vp.user_id
                     LEFT JOIN user_profiles up_vendor ON u2.id = up_vendor.user_id
@@ -252,28 +178,54 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                     AND (cc.vendor_id = ? OR cc.user_id = ?)
                 ");
                 $params = [ // 5 parameters for 5 placeholders
-                    $_SESSION['user_id'], // for first CASE
-                    $_SESSION['user_id'], // for second CASE
+                    $_SESSION['user_id'], // for first CASE (is current user the vendor?)
+                    $_SESSION['user_id'], // for second CASE (is current user the vendor?)
                     $conversation_id,
-                    $_SESSION['user_id'], // for first OR
-                    $_SESSION['user_id']  // for second OR
+                    $_SESSION['user_id'], // for first OR (is current user the vendor?)
+                    $_SESSION['user_id']  // for second OR (is current user the client?)
                 ];
                 $stmt->execute($params);
                 $current_conversation = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($current_conversation) {
+                // Determine the 'other party' (the client in this vendor chat)
+                $other_party_user_id = ($current_conversation['vendor_id'] == $_SESSION['user_id']) ? $current_conversation['user_id'] : $current_conversation['vendor_id'];
+
+                // Ensure the 'other_party_name' and 'other_party_image' logic is correct
                 $other_party = [
-                    'id' => (int)(($current_conversation['vendor_id'] == $_SESSION['user_id']) ? $current_conversation['user_id'] : $current_conversation['vendor_id']),
+                    'id' => (int)$other_party_user_id,
                     'name' => htmlspecialchars((string)($current_conversation['other_party_name'] ?? 'Unknown User')),
                     'image' => htmlspecialchars((string)($current_conversation['other_party_image'] ?? ''))
                 ];
-                $messages = $chat->getMessages($conversation_id, 100);
-                $messages = array_reverse($messages); // Display oldest messages first
+                
+                // If it's an AJAX request (polling), return JSON
+                if ($is_ajax_request) { 
+                    $last_message_id_for_polling = $_GET['last_message_id'] ?? null; 
+                    $messages = $chat->getMessages($conversation_id, 100, 0, $last_message_id_for_polling);
+                    echo json_encode([
+                        'success' => true,
+                        'messages' => array_values($messages) // Ensure it's a simple array
+                    ]);
+                    exit(); // Crucial: Exit after AJAX GET JSON response
+                } else { // Initial page load
+                    // Fetch all messages for initial rendering (oldest first by default from getMessages)
+                    $messages = $chat->getMessages($conversation_id, 100); 
+                }
+
+            } else {
+                // If conversation not found or not accessible to this user
+                error_log("Vendor Chat GET: Conversation ID {$conversation_id} not found or not accessible to user {$_SESSION['user_id']}.");
+                $conversation_id = null; // Clear conversation_id to show "select chat" view
             }
         } catch (PDOException $e) {
             error_log("Get conversation details error (vendor_chat.php): " . $e->getMessage());
-            $_SESSION['error_message'] = "Could not load conversation details. Please try again.";
+            if ($is_ajax_request) {
+                echo json_encode(['success' => false, 'error' => 'Failed to load conversation details for polling.']);
+            } else {
+                $_SESSION['error_message'] = "Could not load conversation details. Please try again.";
+            }
             $current_conversation = null;
+            $conversation_id = null; // Clear conversation_id on error
         }
     }
     
@@ -292,6 +244,8 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
 ?>
 
     <link rel="stylesheet" href="<?= ASSETS_PATH ?>css/chat.css">
+
+    <?php include 'header.php'; // Includes the main site header, which itself pulls in style.css and potentially page-specific CSS ?>
 
     <div class="chat-container">
         <div class="conversations-sidebar">
@@ -351,12 +305,13 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                     </div>
                 </div>
                 <div class="chat-messages" id="messages-container">
-                    <?php if (empty($messages) && empty($conversation_id)): /* For new chats before first message */ ?>
-                        <div class="empty-state">Start your conversation!</div>
-                    <?php elseif (empty($messages) && $conversation_id): /* For existing chats with no messages */?>
+                    <?php 
+                    // Initial message loading for the main page view
+                    // $messages is already populated with all messages for the selected conversation (oldest first).
+                    if (empty($messages)): ?>
                         <div class="empty-state">No messages yet. Say hello!</div>
-                    <?php else: ?>
-                        <?php foreach ($messages as $message):
+                    <?php else: 
+                        foreach ($messages as $message):
                             $message_content_display = nl2br(htmlspecialchars((string)($message['message_content'] ?? '')));
                             $message_time_display = !empty($message['created_at']) ? date('g:i a', strtotime((string)$message['created_at'])) : 'N/A';
                             ?>
@@ -414,6 +369,27 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
             if (container) container.scrollTop = container.scrollHeight;
         }
 
+        // Helper function to create a message element
+        function createMessageElement(messageData, isOutgoing) {
+            const tempMsg = document.createElement('div');
+            tempMsg.className = 'message ' + (isOutgoing ? 'message-outgoing' : 'message-incoming');
+            tempMsg.dataset.id = messageData.id; // Set data-id for polling
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = messageData.message_content.replace(/\n/g, '<br>'); // Preserve newlines
+            
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'message-time';
+            // Format time: get 12-hour format with AM/PM
+            const messageDate = new Date(messageData.created_at);
+            timeSpan.textContent = messageDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+            tempMsg.appendChild(contentDiv);
+            tempMsg.appendChild(timeSpan);
+            return tempMsg;
+        }
+
         // Elements for error display
         const chatErrorContainer = document.getElementById('chat-error-container');
         const chatErrorMessage = document.getElementById('chat-error-message');
@@ -421,8 +397,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
         const chatDismissButton = document.getElementById('chat-dismiss-error');
         const messageInput = document.getElementById('message-input');
         const messageForm = document.querySelector('.message-form');
-        // MODIFIED: Select all delete buttons in the sidebar
-        const deleteChatButtons = document.querySelectorAll('.delete-chat-icon'); // Corrected selector 
+        const deleteChatButtons = document.querySelectorAll('.delete-chat-icon'); 
 
         let lastFailedMessage = ''; // Store the last message that failed to send
 
@@ -456,7 +431,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
             lastFailedMessage = ''; // Clear stored message
         });
 
-        // MODIFIED: Attach event listener to all delete buttons in the sidebar
+        // Attach event listener to all delete buttons in the sidebar
         deleteChatButtons.forEach(button => {
             button.addEventListener('click', function(e) {
                 e.stopPropagation(); // Prevent the conversation item's click event from firing
@@ -530,26 +505,22 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                         messageInput.value = '';
                         lastFailedMessage = ''; // Clear stored message on success
 
+                        // If a redirect is explicitly sent, follow it. (e.g., for initial chat creation)
                         if (data.redirect_to_conversation) {
                             window.location.href = data.redirect_to_conversation;
                             return;
                         }
-                        // Add message to display
+                        // Add message to display instantly (optimistic update)
                         const messagesContainer = document.getElementById('messages-container');
                         if (messagesContainer) {
-                            const tempMsg = document.createElement('div');
-                            tempMsg.className = 'message message-outgoing';
-                            const contentDiv = document.createElement('div');
-                            contentDiv.className = 'message-content';
-                            contentDiv.textContent = message; // Use textContent for safety
-                            
-                            const timeSpan = document.createElement('span');
-                            timeSpan.className = 'message-time';
-                            timeSpan.textContent = 'Just now'; // Temporary client-side timestamp
-
-                            tempMsg.appendChild(contentDiv);
-                            tempMsg.appendChild(timeSpan);
-                            messagesContainer.appendChild(tempMsg);
+                            // Create a temporary message object for optimistic display
+                            const optimisticMessage = {
+                                id: data.message_id || Date.now(), // Use real ID if returned, else timestamp
+                                message_content: message,
+                                created_at: new Date().toISOString(), // Use current time for optimistic display
+                                sender_id: <?php echo json_encode($_SESSION['user_id']); ?>
+                            };
+                            messagesContainer.appendChild(createMessageElement(optimisticMessage, true));
                             scrollToBottom();
                         }
                     } else {
@@ -569,36 +540,37 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
             const conversationId = '<?php echo htmlspecialchars((string)($conversation_id ?? '')); ?>';
             if (conversationId) {
                 const messagesContainer = document.getElementById('messages-container');
-                const currentLastMessage = messagesContainer ? messagesContainer.lastElementChild : null;
-                const lastMessageId = currentLastMessage ? parseInt(currentLastMessage.dataset.id) : 0;
+                // Capture the current scroll position before refetching to maintain it
+                const shouldScrollToBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop <= messagesContainer.clientHeight + 1; // Tolerance for "at bottom"
+                const currentLastMessage = messagesContainer.lastElementChild;
+                const lastMessageId = currentLastMessage ? parseInt(currentLastMessage.dataset.id) : 0; // Get ID of last message
 
-                fetch(`<?= BASE_URL ?>public/vendor_chat.php?conversation_id=${conversationId}&ajax=1`)
+                fetch(`<?= BASE_URL ?>public/vendor_chat.php?conversation_id=${conversationId}&ajax=1&last_message_id=${lastMessageId}`) // Pass last_message_id
                     .then(response => {
                         if (!response.ok) {
-                            return response.text().then(text => {
-                                console.error('Polling HTTP Error:', response.status, response.statusText, text);
-                                throw new Error('Polling network response was not ok: ' + response.statusText + ' - ' + text);
+                            return response.json().then(json => { // Expect JSON on error now
+                                console.error('Polling HTTP Error:', response.status, response.statusText, json.error || 'Unknown error.');
+                                throw new Error('Polling network response was not ok: ' + (json.error || 'Unknown error.'));
                             });
                         }
-                        return response.text(); // Expect HTML for polling
+                        return response.json(); // Expect JSON data
                     })
-                    .then(html => {
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(html, 'text/html');
-                        const allFetchedMessages = doc.querySelectorAll('#messages-container .message');
+                    .then(data => {
+                        if (data.success && data.messages) {
+                            let addedNew = false;
+                            data.messages.forEach(fetchedMsg => {
+                                // Only append if the message is actually new (ID > lastMessageId)
+                                // This check is crucial if backend returns all messages or a range that includes old ones.
+                                // getMessages in Chat.class.php should already handle this by filtering `id > ?`.
+                                if (parseInt(fetchedMsg.id) > lastMessageId) {
+                                    messagesContainer.appendChild(createMessageElement(fetchedMsg, fetchedMsg.sender_id == <?php echo json_encode($_SESSION['user_id']); ?>));
+                                    addedNew = true;
+                                }
+                            });
 
-                        let addedNew = false;
-                        allFetchedMessages.forEach(fetchedMsg => {
-                            const fetchedMsgId = parseInt(fetchedMsg.dataset.id);
-                            // Only append new messages
-                            if (fetchedMsgId > lastMessageId) {
-                                messagesContainer.appendChild(fetchedMsg.cloneNode(true));
-                                addedNew = true;
+                            if (addedNew && shouldScrollToBottom) {
+                                scrollToBottom();
                             }
-                        });
-
-                        if (addedNew) {
-                            scrollToBottom();
                         }
                     })
                     .catch(error => console.error('Error polling for messages:', error));
