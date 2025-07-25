@@ -27,6 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Check user authentication for POST requests
     if (!isset($_SESSION['user_id'])) {
+        error_log("Chat POST: User not authenticated.");
         echo json_encode(['success' => false, 'error' => 'User not authenticated. Please log in.', 'redirect' => BASE_URL . 'public/login.php']);
         exit();
     }
@@ -60,15 +61,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $vendor_id_for_creation = $_POST['vendor_id_for_chat'] ?? null;
+        $is_new_conversation = false;
 
         // Logic to find/create conversation if vendor_id is passed without conversation_id
         if (!$conversation_id && $vendor_id_for_creation) {
-            $conversation_id = $chat->startConversation($event_id_for_creation, $_SESSION['user_id'], $vendor_id_for_creation);
-            if (!$conversation_id) {
+            $created_conversation_id = $chat->startConversation($event_id_for_creation, $_SESSION['user_id'], $vendor_id_for_creation);
+            if (!$created_conversation_id) {
                 error_log("Failed to start new conversation for user " . ($_SESSION['user_id'] ?? 'N/A') . " and vendor " . ($vendor_id_for_creation ?? 'N/A'));
                 echo json_encode(['success' => false, 'error' => 'Failed to create new conversation.']);
                 exit();
             }
+            $conversation_id = $created_conversation_id;
+            $is_new_conversation = true;
         } elseif (!$conversation_id) { // If no conversation_id and no vendor_id for new creation
              error_log("Missing conversation ID or vendor_id for new conversation creation for user " . $_SESSION['user_id']);
              echo json_encode(['success' => false, 'error' => 'A conversation or vendor must be identified to send a message.']);
@@ -78,20 +82,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // If conversation_id is now available (either pre-existing or just created), send message
         if ($conversation_id) {
-            $message_sent = $chat->sendMessage($conversation_id, $_SESSION['user_id'], $message);
+            $message_sent = false;
+            $max_send_retries = 3;
+            $send_retry_delay_microseconds = 100000; // 100 milliseconds
+
+            for ($attempt = 1; $attempt <= $max_send_retries; $attempt++) {
+                try {
+                    $message_sent = $chat->sendMessage($conversation_id, $_SESSION['user_id'], $message);
+                    if ($message_sent) {
+                        break; // Message sent successfully, exit retry loop
+                    }
+                } catch (Exception $e) {
+                    error_log("Chat POST: Message send attempt {$attempt} failed for conversation {$conversation_id}: " . $e->getMessage());
+                    // Don't re-throw immediately, allow retry
+                }
+
+                if (!$message_sent && $attempt < $max_send_retries) {
+                    usleep($send_retry_delay_microseconds * pow(2, $attempt - 1)); // Exponential backoff
+                }
+            }
+
+
             if ($message_sent) {
-                if (!empty($_POST['vendor_id_for_chat']) && empty($_GET['conversation_id'])) { // New conversation created via POST
+                if ($is_new_conversation) { // New conversation created via POST
                      echo json_encode(['success' => true, 'redirect_to_conversation' => BASE_URL . 'public/chat.php?conversation_id=' . $conversation_id]);
                 } else { // Message sent to existing conversation
                      echo json_encode(['success' => true, 'message' => 'Message sent.']);
                 }
                 exit();
             } else {
-                echo json_encode(['success' => false, 'error' => 'Failed to save message to database.']);
+                error_log("Chat POST: Failed to send message after {$max_send_retries} attempts for conversation {$conversation_id}.");
+                echo json_encode(['success' => false, 'error' => 'Failed to save message to database after multiple attempts.']);
                 exit();
             }
         } else {
             // This condition should ideally not be reached if the above logic is sound
+            error_log("Chat POST: Conversation not identified after processing for user " . $_SESSION['user_id']);
             echo json_encode(['success' => false, 'error' => 'Conversation not identified after processing.']);
             exit();
         }
@@ -100,17 +126,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Basic validation: ensure conversation_id is numeric and user is part of it.
         if (!empty($conversation_id_to_delete) && is_numeric($conversation_id_to_delete)) {
             if ($chat->markConversationAsArchived((int)$conversation_id_to_delete, $_SESSION['user_id'])) {
-                echo json_encode(['success' => true, 'message' => 'Chat archived successfully.', 'redirect' => BASE_URL . 'public/chat.php']);
+                echo json_encode(['success' => true, 'message' => 'Chat deleted successfully.', 'redirect' => BASE_URL . 'public/chat.php']);
             } else {
+                error_log("Chat POST: Failed to archive chat {$conversation_id_to_delete} for user " . $_SESSION['user_id']);
                 echo json_encode(['success' => false, 'error' => 'Failed to archive chat.']);
             }
         } else {
+            error_log("Chat POST: Invalid conversation ID for deletion: " . ($conversation_id_to_delete ?? 'NULL'));
             echo json_encode(['success' => false, 'error' => 'Invalid conversation ID for deletion.']);
         }
         exit();
     }
     else {
         // If other POST actions were sent to this file, handle or error out
+        error_log("Chat POST: Invalid POST action received.");
         echo json_encode(['success' => false, 'error' => 'Invalid POST action.']);
         exit();
     }
