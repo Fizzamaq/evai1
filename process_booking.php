@@ -1,10 +1,10 @@
 <?php
 session_start();
 require_once '../includes/config.php';
-require_once '../classes/Vendor.class.php'; // Might not be directly needed here, but kept for safety
+require_once '../classes/Vendor.class.php';
 require_once '../classes/Booking.class.php';
-require_once '../classes/Chat.class.php'; // Needed to potentially start a chat
-require_once '../classes/Notification.class.php'; // Include Notification class
+require_once '../classes/Chat.class.php';
+require_once '../classes/Notification.class.php';
 require_once '../classes/UploadHandler.class.php'; // Include UploadHandler for screenshot
 require_once '../classes/Event.class.php'; // Include Event class for creating new event
 
@@ -29,10 +29,11 @@ try {
     $chat = new Chat($pdo);
     $notification = new Notification($pdo);
     $uploadHandler = new UploadHandler($pdo);
-    $event_obj = new Event($pdo); // Instantiate Event object
+    $event_obj = new Event($pdo);
+    $vendor_obj = new Vendor($pdo);
 
-    $vendor_id = $_POST['vendor_id'] ?? null;
-    $service_ids = $_POST['selected_services'] ?? []; // Array of selected service IDs
+    $vendor_id = $_POST['vendor_id'] ?? null; // This is vendor_profiles.id
+    $selected_service_offerings_ids = $_POST['selected_services'] ?? []; // Array of selected service_offering_ids
     $service_date = $_POST['service_date'] ?? null;
     $special_instructions = $_POST['instructions'] ?? '';
 
@@ -52,7 +53,7 @@ try {
     if (empty($vendor_id) || !is_numeric($vendor_id)) {
         throw new Exception("Missing or invalid Vendor ID.");
     }
-    if (!is_array($service_ids) || count($service_ids) === 0) {
+    if (!is_array($selected_service_offerings_ids) || count($selected_service_offerings_ids) === 0) {
         throw new Exception("No services selected for booking.");
     }
     if (empty($service_date)) { // Date is mandatory
@@ -65,26 +66,36 @@ try {
         throw new Exception("Missing or invalid new event type.");
     }
 
+    // --- IMPORTANT FIX: Get the actual service_id from the selected service_offering_id ---
+    // The `bookings` table's `service_id` references `vendor_services.id`.
+    // The form submits `vendor_service_offerings.id`. We need to convert this.
+    $actual_service_id = $vendor_obj->getServiceIdByOfferingId((int)$selected_service_offerings_ids[0]);
+    if (!$actual_service_id) {
+        throw new Exception("Invalid selected service offering. Could not find corresponding service ID.");
+    }
+    error_log("PROCESS_BOOKING: Converted service_offering_id " . $selected_service_offerings_ids[0] . " to actual service_id: " . $actual_service_id);
+
+
     // --- Create New Event Record FIRST ---
     $event_data_for_creation = [
         'user_id' => $_SESSION['user_id'],
         'title' => $new_event_title,
-        'description' => 'Event created via direct booking form.', // Default description
+        'description' => 'Event created via direct booking form for vendor services.', // Specific description
         'event_date' => $service_date, // Use selected service date as event date
         'event_type_id' => (int)$new_event_type_id,
-        'guest_count' => (int)$new_event_guest_count,
-        'budget_min' => (float)$new_event_budget_min,
-        'budget_max' => (float)$new_event_budget_max,
+        'guest_count' => !empty($new_event_guest_count) ? (int)$new_event_guest_count : null, // Handle null/empty
+        'budget_min' => !empty($new_event_budget_min) ? (float)$new_event_budget_min : null, // Handle null/empty
+        'budget_max' => !empty($new_event_budget_max) ? (float)$new_event_budget_max : null, // Handle null/empty
         'status' => 'active', // Set initial status for newly created event
         'ai_preferences' => null, // Not AI-generated if created this way
-        'location_string' => null, // Not capturing location here
-        'venue_name' => null // Not capturing venue here
+        'location_string' => null, // Not capturing location here, unless form had it
+        'venue_name' => null // Not capturing venue here, unless form had it
     ];
 
     $event_id = $event_obj->createEvent($event_data_for_creation); // Use the createEvent method from Event.class.php
 
     if (!$event_id) {
-        throw new Exception("Failed to create new event record for booking. Check Event.class.php logs.");
+        throw new Exception("Failed to create new event record for booking. Check Event.class.php logs for details.");
     }
     error_log("PROCESS_BOOKING: New event created with ID: " . $event_id);
 
@@ -93,8 +104,11 @@ try {
     $screenshot_filename = null;
     if (isset($_FILES['picture_upload']) && $_FILES['picture_upload']['error'] === UPLOAD_ERR_OK) {
         $upload_dir = '../assets/uploads/bookings/'; // Define your upload directory
+        // Ensure directory exists and is writable
         if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0775, true); // Create directory if it doesn't exist, 0775 permissions
+            if (!mkdir($upload_dir, 0775, true)) { // Create directory if it doesn't exist, 0775 permissions
+                throw new Exception("Upload directory not found or not writable: " . $upload_dir);
+            }
         }
         $screenshot_filename = $uploadHandler->uploadFile($_FILES['picture_upload'], $upload_dir);
         if (!$screenshot_filename) {
@@ -116,18 +130,35 @@ try {
     $final_amount = 0.00; 
     $deposit_amount = 0.00;
 
+    // Append selected services and uploaded picture URL to special instructions for logging
+    $selected_service_names = [];
+    foreach ($selected_service_offerings_ids as $offering_id) {
+        $offering_details = $vendor_obj->getServiceOfferingById($offering_id, $vendor_id); // Fetch full offering details to get service name
+        if ($offering_details) {
+            $selected_service_names[] = $offering_details['service_name'];
+        }
+    }
+    $special_instructions_for_db = $special_instructions;
+    if (!empty($selected_service_names)) {
+        $special_instructions_for_db .= "\n\nSelected Services: " . implode(', ', $selected_service_names);
+    }
+    if ($screenshot_filename) {
+        $special_instructions_for_db .= "\n\nUploaded Picture URL: assets/uploads/bookings/" . $screenshot_filename;
+    }
+
+
     // Create booking data array
     $booking_data = [
-        'user_id' => $_SESSION['user_id'], // Ensure user_id is passed
+        'user_id' => $_SESSION['user_id'],
         'event_id' => (int)$event_id, // Use the NEWLY CREATED event_id
-        'vendor_id' => (int)$vendor_id, // Cast to int
-        'service_id' => (int)$service_ids[0], // Using first selected service, cast to int
-        'service_date' => $service_date, // Should be 'YYYY-MM-DD' format
-        'final_amount' => (float)$final_amount, // Cast to float
-        'deposit_amount' => (float)$deposit_amount, // Cast to float
-        'special_instructions' => $special_instructions,
-        'status' => 'pending_review', // Initial status for screenshot payment
-        'screenshot_filename' => $screenshot_filename // Filename from upload
+        'vendor_id' => (int)$vendor_id,
+        'service_id' => (int)$actual_service_id, // Use the CORRECTED actual service ID here
+        'service_date' => $service_date,
+        'final_amount' => (float)$final_amount,
+        'deposit_amount' => (float)$deposit_amount,
+        'special_instructions' => $special_instructions_for_db, // Use the updated instructions string
+        'status' => 'pending_review',
+        'screenshot_filename' => $screenshot_filename
     ];
 
     // --- DEBUGGING booking_data before createBooking ---
@@ -142,8 +173,10 @@ try {
     error_log("PROCESS_BOOKING: Booking created with ID: " . $newBookingId);
 
     // Create chat conversation for this booking
+    // Note: If chat->startConversation has its own transaction, it will cause an error due to nesting.
+    // Ensure chat methods do NOT manage their own transactions if called within an existing one.
     $conversation_id = $chat->startConversation((int)$event_id, $_SESSION['user_id'], (int)$vendor_id);
-    if ($conversation_id) {
+    if ($conversation_id) { // Only attempt to update if conversation was successfully created
         $bookingSystem->updateBookingChatConversationId($newBookingId, $conversation_id);
         error_log("PROCESS_BOOKING: Chat conversation started with ID: " . $conversation_id);
     } else {
@@ -169,13 +202,17 @@ try {
             'booking',
             $newBookingId
         );
-        // Also notify the vendor (assuming vendor_id is their user_id)
-        $notification->createNotification(
-            (int)$vendor_id, // Vendor's user_id
-            "New booking (ID: {$newBookingId}) received! Please review and confirm.",
-            'booking',
-            $newBookingId
-        );
+        // Also notify the vendor (assuming vendor_id is their user_id, it's vendor_profiles.id here)
+        // You might need to fetch the vendor's user_id from vendor_profiles table if vendor_id is vendor_profiles.id
+        $vendor_profile_details = $vendor_obj->getVendorProfileById((int)$vendor_id);
+        if ($vendor_profile_details && isset($vendor_profile_details['user_id'])) {
+            $notification->createNotification(
+                (int)$vendor_profile_details['user_id'], // Vendor's user_id
+                "New booking (ID: {$newBookingId}) received! Please review and confirm.",
+                'booking',
+                $newBookingId
+            );
+        }
     }
     
     // Redirect to a booking confirmation/status page
@@ -190,12 +227,16 @@ try {
     $_SESSION['error_message'] = $e->getMessage();
     error_log("PROCESS_BOOKING: Booking processing error for user " . ($_SESSION['user_id'] ?? 'N/A') . ": " . $e->getMessage());
     if ($notification) {
-        $notification->createNotification(
-            $_SESSION['user_id'],
-            "Booking Failed: " . $e->getMessage(),
-            'booking',
-            $newBookingId ?? null // Pass booking ID if available, else null
-        );
+        // Only create notification if $notification object was successfully instantiated
+        // and a user_id exists in session.
+        if (isset($_SESSION['user_id'])) {
+            $notification->createNotification(
+                $_SESSION['user_id'],
+                "Booking Failed: " . $e->getMessage(),
+                'booking',
+                $newBookingId ?? null // Pass booking ID if available, else null
+            );
+        }
     }
     // Redirect back to the previous page or a specific error page
     header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? BASE_URL . 'public/')); // Fallback to homepage
