@@ -363,8 +363,10 @@ class Vendor {
         }
     }
 
-    // NEW METHOD: Get a single service offering by its ID
-    // Now also fetches associated packages and their images
+    /**
+     * NEW METHOD: Get a single service offering by its ID
+     * Now also fetches associated packages and their images
+     */
     public function getServiceOfferingById($service_offering_id, $vendor_id) {
         try {
             $stmt = $this->conn->prepare("
@@ -387,6 +389,24 @@ class Vendor {
             return false;
         }
     }
+    
+    /**
+     * NEW METHOD: Get service_id from service_offering_id
+     * @param int $serviceOfferingId The ID from vendor_service_offerings
+     * @return int|false The service_id from vendor_services, or false if not found
+     */
+    public function getServiceIdByOfferingId(int $serviceOfferingId) {
+        try {
+            $stmt = $this->conn->prepare("SELECT service_id FROM vendor_service_offerings WHERE id = ?");
+            $stmt->execute([$serviceOfferingId]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result['service_id'] ?? false;
+        } catch (PDOException $e) {
+            error_log("Vendor.class.php getServiceIdByOfferingId error: " . $e->getMessage());
+            return false;
+        }
+    }
+
 
     // NEW METHOD: Get all packages for a specific service offering
     public function getPackagesByServiceOfferingId($service_offering_id) {
@@ -1043,7 +1063,7 @@ class Vendor {
             $_SESSION['vendor_id'] = $vendorData['id'];
         } else {
             // User is of type 'vendor' but no vendor_profiles entry exists.
-            // Redirect them to a page where they can complete their vendor profile.
+            // Redirect them to a page where they can complete their their vendor profile.
             $_SESSION['error_message'] = "Your vendor profile is incomplete. Please register your business details to access vendor features.";
             header('Location: ' . BASE_URL . 'public/edit_profile.php');
             exit();
