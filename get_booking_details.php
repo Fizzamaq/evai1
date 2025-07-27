@@ -1,107 +1,116 @@
 <?php
 // api/get_booking_details.php
-session_start();
-require_once '../includes/config.php';
-require_once '../classes/Booking.class.php';
-require_once '../classes/User.class.php'; // To fetch client details
-require_once '../classes/Vendor.class.php'; // To verify vendor ownership of booking
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../classes/Booking.class.php';
+require_once __DIR__ . '/../classes/User.class.php';
+require_once __DIR__ . '/../classes/Vendor.class.php'; // Include Vendor class
+require_once __DIR__ . '/../includes/auth.php'; // For authentication/session checks
 
-header('Content-Type: application/json');
-
-$response = ['success' => false, 'error' => 'An unknown error occurred.'];
-
-// TEMPORARY DEBUGGING: Enable full error reporting for this API endpoint
+// Enable error reporting for debugging
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-try {
-    // 1. Basic Authentication & Authorization: Ensure a vendor is logged in
-    if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] != 2) {
-        error_log("API Error (get_booking_details.php): Unauthorized access. User ID: " . ($_SESSION['user_id'] ?? 'N/A') . ", Type: " . ($_SESSION['user_type'] ?? 'N/A'));
-        throw new Exception("Unauthorized access. Vendor login required.");
-    }
+header('Content-Type: application/json');
 
-    $bookingId = $_GET['booking_id'] ?? null;
-    error_log("API Debug (get_booking_details.php): Received booking_id: " . $bookingId);
-
-    if (empty($bookingId) || !is_numeric($bookingId)) {
-        throw new Exception("Invalid booking ID provided.");
-    }
-
-    $bookingSystem = new Booking($pdo);
-    $user_obj = new User($pdo);
-    $vendor_obj = new Vendor($pdo);
-
-    // 2. Fetch Booking Details
-    $booking_details = $bookingSystem->getBooking((int)$bookingId);
-    error_log("API Debug (get_booking_details.php): Fetched booking_details: " . print_r($booking_details, true));
-
-    if (!$booking_details) {
-        throw new Exception("Booking not found.");
-    }
-
-    // 3. Authorization Check: Ensure this booking belongs to the logged-in vendor
-    $vendor_profile = $vendor_obj->getVendorProfileByUserId($_SESSION['user_id']); // This method now exists
-    error_log("API Debug (get_booking_details.php): Fetched vendor_profile: " . print_r($vendor_profile, true));
-
-    if (!$vendor_profile || $booking_details['vendor_id'] != $vendor_profile['id']) {
-        error_log("API Error (get_booking_details.php): Access denied. Booking vendor ID: " . ($booking_details['vendor_id'] ?? 'N/A') . ", Logged-in vendor profile ID: " . ($vendor_profile['id'] ?? 'N/A'));
-        throw new Exception("Access denied. This booking does not belong to your account.");
-    }
-
-    // 4. Fetch related data for display
-    $client_details = $user_obj->getUserById($booking_details['user_id']);
-    error_log("API Debug (get_booking_details.php): Fetched client_details: " . print_r($client_details, true));
-
-    if (!$client_details) {
-        throw new Exception("Client details not found for booking user ID: " . $booking_details['user_id']);
-    }
-
-    // Fetch service name (assuming service_id in bookings maps to vendor_services.id)
-    $stmt_service = $pdo->prepare("SELECT service_name FROM vendor_services WHERE id = ?");
-    $stmt_service->execute([$booking_details['service_id']]);
-    $service_name = $stmt_service->fetchColumn();
-    error_log("API Debug (get_booking_details.php): Fetched service_name: " . $service_name);
-
-    // Fetch event title (assuming event_id in bookings maps to events.id)
-    $stmt_event = $pdo->prepare("SELECT title FROM events WHERE id = ?");
-    $stmt_event->execute([$booking_details['event_id']]);
-    $event_title = $stmt_event->fetchColumn();
-    error_log("API Debug (get_booking_details.php): Fetched event_title: " . $event_title);
-
-
-    $response = [
-        'success' => true,
-        'booking' => [
-            'id' => $booking_details['id'],
-            'event_id' => $booking_details['event_id'],
-            'event_title' => $event_title ?? 'N/A', // Null coalesce for safety
-            'user_id' => $booking_details['user_id'],
-            'vendor_id' => $booking_details['vendor_id'],
-            'service_id' => $booking_details['service_id'],
-            'service_name' => $service_name ?? 'N/A', // Null coalesce for safety
-            'service_date' => $booking_details['service_date'],
-            'final_amount' => $booking_details['final_amount'],
-            'deposit_amount' => $booking_details['deposit_amount'],
-            'special_instructions' => $booking_details['special_instructions'],
-            'status' => $booking_details['status'],
-            'screenshot_proof' => $booking_details['screenshot_proof'],
-            'created_at' => $booking_details['created_at'],
-            'updated_at' => $booking_details['updated_at']
-        ],
-        'client' => [
-            'id' => $client_details['id'],
-            'first_name' => $client_details['first_name'],
-            'last_name' => $client_details['last_name'],
-            'email' => $client_details['email'] ?? 'N/A' // Ensure email is handled safely
-        ]
-    ];
-
-} catch (Exception $e) {
-    error_log("API Error (get_booking_details.php) - Caught Exception: " . $e->getMessage());
-    $response['error'] = $e->getMessage();
+// Check user authentication
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'User not authenticated.']);
+    exit();
 }
 
-echo json_encode($response);
-exit();
+$bookingId = $_GET['booking_id'] ?? null;
+
+if (!is_numeric($bookingId)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid booking ID.']);
+    exit();
+}
+
+$bookingSystem = new Booking($pdo);
+$user = new User($pdo);
+$vendor = new Vendor($pdo); // Instantiate Vendor class
+
+try {
+    $booking = $bookingSystem->getBooking((int)$bookingId);
+
+    if (!$booking) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Booking not found.']);
+        exit();
+    }
+
+    // --- Access Control Check ---
+    // A user can view their own booking (if they are the customer)
+    // OR a vendor can view a booking if it belongs to their vendor profile.
+    
+    // Line 61: Corrected syntax for PHP < 7.0 by using ternary operator
+    $is_customer = (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 1 && $booking['user_id'] == $_SESSION['user_id']);
+    
+    $is_vendor = false;
+    if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2 && isset($_SESSION['vendor_id'])) {
+        // If current user is a vendor, check if the booking's vendor_id matches their vendor_profile_id
+        if ($booking['vendor_id'] == $_SESSION['vendor_id']) {
+            $is_vendor = true;
+        }
+    }
+
+    if (!$is_customer && !$is_vendor) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Access denied. This booking does not belong to your account.']);
+        error_log("Access denied. User ID: " . ($_SESSION['user_id'] ?? 'N/A') . ", User Type: " . ($_SESSION['user_type'] ?? 'N/A') . ", Booking User ID: {$booking['user_id']}, Booking Vendor ID: {$booking['vendor_id']}, Session Vendor ID: " . ($_SESSION['vendor_id'] ?? 'N/A'));
+        exit();
+    }
+    // --- End Access Control Check ---
+
+
+    // Fetch related details
+    $event_details = null;
+    if ($booking['event_id']) {
+        $event_details = $pdo->prepare("SELECT title FROM events WHERE id = ?");
+        $event_details->execute([$booking['event_id']]);
+        $event_details = $event_details->fetch(PDO::FETCH_ASSOC);
+        $booking['event_title'] = isset($event_details['title']) ? $event_details['title'] : 'N/A';
+    }
+
+    // Fetch client details (the user who made the booking)
+    $client_details = $user->getUserById($booking['user_id']);
+    // Filter client data to only send necessary fields for security
+    $client_safe_data = [
+        'id' => $client_details['id'],
+        'first_name' => $client_details['first_name'],
+        'last_name' => $client_details['last_name'],
+        'email' => $client_details['email'],
+    ];
+
+    // Fetch vendor business name (from vendor_profiles)
+    $vendor_profile_details = $vendor->getVendorProfileById($booking['vendor_id']); // Use getVendorProfileById as booking.vendor_id is vendor_profiles.id
+    $booking['vendor_business_name'] = isset($vendor_profile_details['business_name']) ? $vendor_profile_details['business_name'] : 'N/A';
+
+
+    // Fetch service name using service_id from bookings and vendor_services table
+    // $booking['service_id'] here refers to vendor_services.id
+    $service_name = 'N/A';
+    if ($booking['service_id']) {
+        $stmt_service = $pdo->prepare("SELECT service_name FROM vendor_services WHERE id = ?");
+        $stmt_service->execute([$booking['service_id']]);
+        $service_info = $stmt_service->fetch(PDO::FETCH_ASSOC);
+        $service_name = isset($service_info['service_name']) ? $service_info['service_name'] : 'N/A';
+    }
+    $booking['service_name'] = $service_name;
+
+
+    echo json_encode([
+        'success' => true,
+        'booking' => $booking,
+        'client' => $client_safe_data,
+        'vendor_business_name' => $booking['vendor_business_name']
+    ]);
+
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'An error occurred: ' . $e->getMessage()]);
+    error_log("Error in get_booking_details.php: " . $e->getMessage() . " on line " . $e->getLine() . " in file " . $e->getFile());
+}
+?>
