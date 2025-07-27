@@ -3,29 +3,46 @@ require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../classes/Vendor.class.php';
 
 $vendor = new Vendor($pdo); // Pass PDO
+
+// Determine if this is an AJAX request early
+$is_ajax_request = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') || (isset($_GET['ajax']) && $_GET['ajax'] == 1);
+
+// Ensure vendor is authenticated for all actions (both page load and API calls)
 $vendor->verifyVendorAccess(); // Your existing auth check, ensures $_SESSION['vendor_id'] is set
 
-if (!isset($_SESSION['vendor_id'])) {
-    // This should ideally be caught by verifyVendorAccess, but as a fallback
-    header('Location: ' . BASE_URL . 'public/login.php');
-    exit();
-}
+// Check if vendor ID is set in session after verification, or handle direct access attempts to API
+$session_vendor_id = $_SESSION['vendor_id'] ?? null;
 
-// Handle calendar updates (POST request) - This part remains the same as it's an API endpoint for FullCalendar
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // It's better to read input from php://input for AJAX POST requests
-    $data = json_decode(file_get_contents('php://input'), true);
+// --- START: Handle AJAX POST and GET requests (API endpoints) early and exit ---
 
-    // Ensure required data is present
-    if (!isset($data['date']) || !isset($data['start_time']) || !isset($data['end_time']) || !isset($data['status'])) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Missing availability data.']);
-        exit();
-    }
+// Add a top-level try-catch block for all AJAX responses to ensure valid JSON output
+try {
+    // Handle calendar updates (POST request)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json'); // Set JSON header for POST responses
+        error_log("vendor_availability.php: AJAX POST request received."); // Log start of AJAX POST
 
-    try {
+        // Validate vendor ID from session for API access
+        if (!is_numeric($session_vendor_id)) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication error: Invalid vendor ID in session.']);
+            error_log("vendor_availability.php: Invalid session_vendor_id for POST: {$session_vendor_id}");
+            exit();
+        }
+        error_log("vendor_availability.php: Valid session_vendor_id for POST: {$session_vendor_id}");
+
+        $data = json_decode(file_get_contents('php://input'), true);
+        error_log("vendor_availability.php: POST data received: " . print_r($data, true));
+
+        if (!isset($data['date']) || !isset($data['start_time']) || !isset($data['end_time']) || !isset($data['status'])) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Missing availability data.']);
+            error_log("vendor_availability.php: Missing data in POST request.");
+            exit();
+        }
+
         $vendor->updateAvailability(
-            $_SESSION['vendor_id'],
+            $session_vendor_id, // Use the validated session vendor ID
             $data['date'],
             $data['start_time'],
             $data['end_time'],
@@ -33,17 +50,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         http_response_code(200);
         echo json_encode(['success' => true, 'message' => 'Availability updated successfully!']);
-    } catch (Exception $e) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'error' => "Error updating availability: " . $e->getMessage()]);
+        error_log("vendor_availability.php: POST update successful. Exiting.");
+        exit(); // Important to exit after AJAX response
     }
-    exit(); // Important to exit after AJAX response
+
+    // Handle AJAX GET requests for calendar events (FullCalendar's 'events' source)
+    if ($is_ajax_request && $_SERVER['REQUEST_METHOD'] === 'GET') {
+        header('Content-Type: application/json'); // Set JSON header for GET responses
+        error_log("vendor_availability.php: AJAX GET request received."); // Log start of AJAX GET
+
+        // Validate vendor ID from session for API access
+        if (!is_numeric($session_vendor_id)) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication error: Invalid vendor ID in session.']);
+            error_log("vendor_availability.php: Invalid session_vendor_id for GET: {$session_vendor_id}");
+            exit();
+        }
+        error_log("vendor_availability.php: Valid session_vendor_id for GET: {$session_vendor_id}");
+
+        $start_date_fetch = $_GET['start'] ?? date('Y-m-01');
+        $end_date_fetch = $_GET['end'] ?? date('Y-m-t');
+
+        error_log("vendor_availability.php: Fetched raw start: {$_GET['start']}, raw end: {$_GET['end']}");
+        error_log("vendor_availability.php: Processed start: {$start_date_fetch}, end: {$end_date_fetch}");
+
+        // Ensure start_date_fetch is not in the past
+        $today = date('Y-m-d');
+        if ($start_date_fetch < $today) {
+            $start_date_fetch = $today;
+            error_log("vendor_availability.php: start_date_fetch adjusted to today: {$start_date_fetch}");
+        }
+
+        $availability = $vendor->getAvailability(
+            $session_vendor_id, // Use the validated session vendor ID
+            $start_date_fetch,
+            $end_date_fetch
+        );
+        error_log("vendor_availability.php: getAvailability returned data type: " . gettype($availability));
+        // Note: For debugging, you could log a snippet of $availability here, but be careful with large data.
+        // error_log("vendor_availability.php: Availability snippet: " . substr(print_r($availability, true), 0, 500));
+
+
+        $formattedEvents = [];
+        // FIX: Check if $availability is an array before iterating to prevent fatal errors
+        if (is_array($availability)) {
+            foreach ($availability as $event) {
+                $formattedEvents[] = [
+                    'id' => $event['id'],
+                    'title' => ucfirst($event['status']), // e.g., "Available", "Booked"
+                    'start' => $event['date'] . 'T' . $event['start_time'], // Full datetime string
+                    'end' => $event['date'] . 'T' . $event['end_time'],     // Full datetime string
+                    'allDay' => false,
+                    'extendedProps' => [
+                        'status' => $event['status'] // Custom property for styling
+                    ]
+                ];
+            }
+            error_log("vendor_availability.php: Successfully formatted " . count($formattedEvents) . " events.");
+        } else {
+            // If getAvailability returns false or not an array, send an empty array
+            // and log an error for debugging on the server-side.
+            error_log("vendor_availability.php: getAvailability returned non-array data for vendor ID: {$session_vendor_id}. This may indicate a database issue or a problem in Vendor.class.php. Check its internal logs too.");
+        }
+
+        echo json_encode($formattedEvents);
+        error_log("vendor_availability.php: JSON response sent for GET. Exiting.");
+        exit(); // Crucial: Exit after outputting JSON for AJAX GET requests
+    }
+
+} catch (Exception $e) {
+    // Catch any unexpected exceptions during AJAX processing
+    header('Content-Type: application/json'); // Ensure JSON header is set even on error
+    http_response_code(500); // Internal Server Error
+    // Log the full error for server-side debugging
+    error_log("FATAL ERROR in vendor_availability.php (AJAX): " . $e->getMessage() . " on line " . $e->getLine() . " in " . $e->getFile() . ". Trace: " . $e->getTraceAsString());
+    // Provide a generic error message to the client for security
+    echo json_encode(['success' => false, 'error' => 'An internal server error occurred. Please try again.']);
+    exit();
 }
 
+// --- END: Handle AJAX POST and GET requests. The script will exit if an AJAX call was made. ---
 
-// The initial PHP fetch for $fullCalendarEvents and $jsonEvents is no longer needed here
-// because the JavaScript will now fetch events directly via the FullCalendar event source function.
 
+// --- START: HTML Page Rendering for non-AJAX GET requests (default page load) ---
+// If the script reaches this point, it means it's a regular page load, not an AJAX request.
+include 'header.php'; // Includes the unified header
 ?>
 
 <!DOCTYPE html>
@@ -154,7 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body>
-    <?php include 'header.php'; // Includes the unified header ?>
+    <?php // include 'header.php'; // Included above for the full page load ?>
 
     <div id="calendar"></div>
 
@@ -211,28 +302,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 center: 'title',
                 right: 'dayGridMonth,timeGridWeek,timeGridDay'
             },
-            // FIX: Define events as a function that fetches from the API endpoint
-            events: function(fetchInfo, successCallback, failureCallback) {
-                // Construct the URL with start and end dates from FullCalendar's fetchInfo
-                const url = `<?= BASE_URL ?>public/availability.php?vendor_id=<?= $_SESSION['vendor_id'] ?>&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`;
-
-                fetch(url)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok: ' + response.statusText);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        // FullCalendar expects an array of event objects.
-                        // Our PHP endpoint already formats it correctly.
-                        successCallback(data);
-                    })
-                    .catch(error => {
-                        console.error('Error fetching availability:', error);
-                        alert('Failed to load calendar events: ' + error.message);
-                        failureCallback(error); // Notify FullCalendar of the error
-                    });
+            // ADDED: Restrict calendar navigation to current and future dates
+            validRange: {
+                start: '<?= date('Y-m-d') ?>' // Sets the start of the valid range to today
             },
             // Handle date range selection
             select: function(info) {
@@ -308,6 +380,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     statusClass = 'fc-event-holiday'; // New class for Holiday
                 }
                 return { html: `<div class="${statusClass}">${arg.event.title}</div>` };
+            },
+            // Events are fetched from the dedicated public/availability.php API endpoint
+            events: function(fetchInfo, successCallback, failureCallback) {
+                // Construct the URL with start and end dates from FullCalendar's fetchInfo
+                const url = `<?= BASE_URL ?>public/vendor_availability.php?vendor_id=<?= $session_vendor_id ?>&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}&ajax=1`; // Added &ajax=1
+
+                fetch(url)
+                    .then(response => {
+                        // Check if response is OK and then if it's JSON
+                        const contentType = response.headers.get("content-type");
+                        if (!response.ok) {
+                             if (contentType && contentType.indexOf("application/json") !== -1) {
+                                return response.json().then(errorData => {
+                                    throw new Error(errorData.error || 'Network response was not ok, but error message is JSON.');
+                                });
+                            } else {
+                                return response.text().then(text => {
+                                    throw new Error('Network response was not ok: ' + response.statusText + ' - ' + text.substring(0, 100) + '...'); // Show first 100 chars of non-JSON
+                                });
+                            }
+                        }
+                        if (contentType && contentType.indexOf("application/json") !== -1) {
+                            return response.json();
+                        } else {
+                            throw new TypeError("Oops, we haven't got JSON!");
+                        }
+                    })
+                    .then(data => {
+                        // FullCalendar expects an array of event objects.
+                        // Our PHP endpoint already formats it correctly.
+                        successCallback(data);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching availability:', error);
+                        alert('Failed to load calendar events: ' + error.message);
+                        failureCallback(error); // Notify FullCalendar of the error
+                    });
             }
         });
         calendar.render();
