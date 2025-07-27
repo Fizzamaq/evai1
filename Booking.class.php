@@ -9,13 +9,16 @@ class Booking {
 
     public function createBooking($data, $userId) {
         try {
+            // Log the data array received for debugging
+            error_log("createBooking: Data received: " . print_r($data, true));
+
             $stmt = $this->pdo->prepare("
                 INSERT INTO bookings (
-                    user_id, event_id, vendor_id, service_id, service_date,
+                    user_id, event_id, vendor_id, service_id, booking_date, service_date, /* ADDED booking_date */
                     final_amount, deposit_amount, special_instructions,
                     status, screenshot_proof, created_at, updated_at
                 ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
+                    ?, ?, ?, ?, NOW(), ?, /* ADDED NOW() for booking_date */ ?, ?, ?, ?, ?, NOW(), NOW()
                 )
             ");
             $success = $stmt->execute([
@@ -23,29 +26,32 @@ class Booking {
                 $data['event_id'],
                 $data['vendor_id'],
                 $data['service_id'],
+                /* NOW() replaces a placeholder here */
                 $data['service_date'],
                 $data['final_amount'],
                 $data['deposit_amount'],
                 $data['special_instructions'],
                 $data['status'],
-                $data['screenshot_filename'] // This is the 10th parameter
+                $data['screenshot_filename']
             ]);
 
             if ($success) {
-                return $this->pdo->lastInsertId();
+                $lastId = $this->pdo->lastInsertId();
+                error_log("createBooking: Successfully inserted booking with ID: " . $lastId);
+                return $lastId;
             } else {
                 // Log PDO error information if the execute fails
                 $errorInfo = $stmt->errorInfo();
-                error_log("Booking creation error: PDO Execute Failed. ErrorInfo: " . implode(" | ", $errorInfo) . " | Data: " . print_r($data, true));
+                error_log("createBooking Error: PDO Execute Failed. ErrorInfo: " . implode(" | ", $errorInfo) . " | Data: " . print_r($data, true));
                 return false;
             }
         } catch (PDOException $e) {
             // Catch and log any PDO exceptions during the process
-            error_log("Booking creation PDO Exception: " . $e->getMessage() . " | SQLSTATE: " . $e->getCode());
+            error_log("createBooking PDO Exception: " . $e->getMessage() . " | SQLSTATE: " . $e->getCode() . " | File: " . $e->getFile() . " | Line: " . $e->getLine());
             return false;
         } catch (Exception $e) {
             // Catch and log any other general exceptions
-            error_log("Booking creation General Exception: " . $e->getMessage());
+            error_log("createBooking General Exception: " . $e->getMessage() . " | File: " . $e->getFile() . " | Line: " . $e->getLine());
             return false;
         }
     }
@@ -66,7 +72,7 @@ class Booking {
             $stmt = $this->pdo->prepare("
                 SELECT b.*, v.business_name
                 FROM bookings b
-                JOIN vendor_profiles v ON b.vendor_id = v.user_id
+                JOIN vendor_profiles v ON b.vendor_id = v.id  /* Corrected JOIN: Use vp.id instead of vp.user_id if vendor_id in bookings refers to vendor_profiles.id */
                 WHERE b.id = ? AND b.user_id = ?
             ");
             $stmt->execute([$bookingId, $userId]);
@@ -86,7 +92,7 @@ class Booking {
                 $sql .= ", stripe_payment_id = ?";
                 $params[] = $stripePaymentId;
             }
-            if ($screenshotProof) { // New: Update screenshot proof
+            if ($screenshotProof) {
                 $sql .= ", screenshot_proof = ?";
                 $params[] = $screenshotProof;
             }
@@ -146,7 +152,7 @@ class Booking {
                 SELECT b.*, e.title as event_title, vp.business_name
                 FROM bookings b
                 LEFT JOIN events e ON b.event_id = e.id
-                JOIN vendor_profiles vp ON b.vendor_id = vp.id
+                JOIN vendor_profiles vp ON b.vendor_id = vp.id /* Corrected JOIN: Use vp.id instead of vp.user_id */
                 WHERE b.user_id = ?
                 ORDER BY b.created_at DESC
             ");
@@ -175,6 +181,84 @@ class Booking {
         } catch (PDOException $e) {
             error_log("Get bookings by event ID error: " . $e->getMessage());
             return [];
+        }
+    }
+
+    public function getVendorUpcomingBookings($vendorId, $limit = 5) {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT b.*, e.title as event_title, u.first_name, u.last_name
+                FROM bookings b
+                LEFT JOIN events e ON b.event_id = e.id
+                LEFT JOIN users u ON b.user_id = u.id
+                WHERE b.vendor_id = ? AND b.service_date >= CURDATE() AND b.status IN ('pending_review', 'confirmed')
+                ORDER BY b.service_date ASC
+                LIMIT ?
+            ");
+            $stmt->bindParam(1, $vendorId, PDO::PARAM_INT);
+            $stmt->bindParam(2, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Add 'client_name' for display convenience
+            foreach ($bookings as &$booking) {
+                $booking['client_name'] = trim($booking['first_name'] . ' ' . $booking['last_name']);
+            }
+            return $bookings;
+        } catch (PDOException $e) {
+            error_log("Error getting vendor upcoming bookings for vendor {$vendorId}: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getVendorRecentBookings($vendorId, $limit = 5) {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT b.*, e.title as event_title, u.first_name, u.last_name
+                FROM bookings b
+                LEFT JOIN events e ON b.event_id = e.id
+                LEFT JOIN users u ON b.user_id = u.id
+                WHERE b.vendor_id = ?
+                ORDER BY b.created_at DESC
+                LIMIT ?
+            ");
+            $stmt->bindParam(1, $vendorId, PDO::PARAM_INT);
+            $stmt->bindParam(2, $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Add 'client_name' for display convenience
+            foreach ($bookings as &$booking) {
+                $booking['client_name'] = trim($booking['first_name'] . ' ' . $booking['last_name']);
+            }
+            return $bookings;
+        } catch (PDOException $e) {
+            error_log("Error getting vendor recent bookings for vendor {$vendorId}: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getVendorBookingStats($vendorId) {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT
+                    COUNT(*) AS total_bookings,
+                    SUM(CASE WHEN status = 'pending_review' THEN 1 ELSE 0 END) AS pending_bookings,
+                    SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed_bookings,
+                    SUM(CASE WHEN status = 'completed' THEN final_amount ELSE 0 END) AS total_revenue
+                FROM bookings
+                WHERE vendor_id = ?
+            ");
+            $stmt->execute([$vendorId]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting vendor booking stats for vendor {$vendorId}: " . $e->getMessage());
+            return [
+                'total_bookings' => 0,
+                'pending_bookings' => 0,
+                'confirmed_bookings' => 0,
+                'total_revenue' => 0
+            ];
         }
     }
 }
