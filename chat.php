@@ -27,20 +27,22 @@ $is_ajax_request = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SER
 
 // All POST requests are handled here and exit immediately
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    error_log("chat.php POST: Request received."); // Added
     header('Content-Type: application/json'); // Set JSON header early for all POST responses
 
     // Check user authentication for POST requests
     if (!isset($_SESSION['user_id'])) {
-        error_log("Chat POST: User not authenticated.");
+        error_log("chat.php POST: User not authenticated for POST."); // Added
         echo json_encode(['success' => false, 'error' => 'User not authenticated. Please log in.', 'redirect' => BASE_URL . 'public/login.php']);
         exit();
     }
 
     // Handle specific POST actions
     if (isset($_POST['send_message'])) {
+        error_log("chat.php POST: send_message action detected."); // Added
         // Validate CSRF token
         if (!verifyCSRFToken($_POST['csrf_token'] ?? '')) {
-            error_log("CSRF token mismatch on chat message send for user " . ($_SESSION['user_id'] ?? 'N/A'));
+            error_log("chat.php POST: CSRF token mismatch."); // Added
             echo json_encode(['success' => false, 'error' => 'Invalid request. Please refresh the page and try again.']);
             exit();
         }
@@ -48,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = trim($_POST['message']);
 
         if (empty($message)) {
+            error_log("chat.php POST: Message is empty."); // Added
             echo json_encode(['success' => false, 'error' => 'Message cannot be empty.']);
             exit();
         }
@@ -67,18 +70,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $vendor_id_for_creation = $_POST['vendor_id_for_chat'] ?? null;
         $is_new_conversation = false;
 
+        error_log("chat.php POST: Initial conv_id: " . ($conversation_id ?? 'NULL') . ", vendor_id_for_creation: " . ($vendor_id_for_creation ?? 'NULL')); // Added
+
         // Logic to find/create conversation if vendor_id is passed without conversation_id
         if (!$conversation_id && $vendor_id_for_creation) {
+            error_log("chat.php POST: Attempting to start new conversation."); // Added
             $created_conversation_id = $chat->startConversation($event_id_for_creation, $_SESSION['user_id'], $vendor_id_for_creation);
+            
+            error_log("chat.php POST: startConversation returned: " . ($created_conversation_id ?? 'NULL')); // Added
+
             if (!$created_conversation_id) {
-                error_log("Chat POST: Failed to start new conversation for user " . ($_SESSION['user_id'] ?? 'N/A') . " and vendor " . ($vendor_id_for_creation ?? 'N/A'));
+                error_log("Chat POST: Failed to create new conversation (startConversation returned false).");
                 echo json_encode(['success' => false, 'error' => 'Failed to create new conversation.']);
                 exit();
             }
             $conversation_id = $created_conversation_id;
             $is_new_conversation = true;
+
+            error_log("chat.php POST: Verifying newly created conversation ID: " . $conversation_id); // Added
+            $verified_conversation_details = $chat->getConversationById((int)$conversation_id, (int)$_SESSION['user_id']);
+            if (!$verified_conversation_details) {
+                error_log("Chat POST: Conversation ID {$conversation_id} was created but not immediately verifiable.");
+                echo json_encode(['success' => false, 'error' => 'Failed to retrieve new conversation immediately. Please try again or refresh.']);
+                exit();
+            }
+            error_log("chat.php POST: Conversation ID {$conversation_id} successfully verified."); // Added
+
         } elseif (!$conversation_id) { // If no conversation_id and no vendor_id for new creation
-             error_log("Chat POST: Missing conversation ID or vendor_id for new conversation creation for user " . $_SESSION['user_id']);
+             error_log("Chat POST: No conversation ID and no vendor ID for new chat."); // Added
              echo json_encode(['success' => false, 'error' => 'A conversation or vendor must be identified to send a message.']);
              exit();
         }
@@ -86,16 +105,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // If conversation_id is now available (either pre-existing or just created), send message
         if ($conversation_id) {
+            error_log("chat.php POST: Attempting to send message for conversation ID: " . $conversation_id); // Added
             $message_sent = $chat->sendMessage($conversation_id, $_SESSION['user_id'], $message);
+            
+            error_log("chat.php POST: sendMessage returned: " . ($message_sent ?? 'false')); // Added
+
             if ($message_sent) {
+                error_log("chat.php POST: Message sent successfully."); // Added
                 if ($is_new_conversation) { // New conversation created via POST
+                     error_log("chat.php POST: Redirecting to new conversation URL."); // Added
                      echo json_encode(['success' => true, 'redirect_to_conversation' => BASE_URL . 'public/chat.php?conversation_id=' . $conversation_id]);
                 } else { // Message sent to existing conversation
+                     error_log("chat.php POST: Sent message to existing conversation."); // Added
                      echo json_encode(['success' => true, 'message' => 'Message sent.', 'message_id' => $message_sent]);
                 }
                 exit();
             } else {
-                error_log("Chat POST: Failed to save message to database for conversation " . $conversation_id);
+                error_log("Chat POST: sendMessage failed. Check Chat.class.php error logs for details.");
                 echo json_encode(['success' => false, 'error' => 'Failed to save message to database.']);
                 exit();
             }
@@ -105,24 +131,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
         }
     } elseif (isset($_POST['delete_chat'])) { // Handle chat deletion request
+        error_log("chat.php POST: delete_chat action detected."); // Added
         $conversation_id_to_delete = $_POST['conversation_id'];
         // Basic validation: ensure conversation_id is numeric and user is part of it.
         if (!empty($conversation_id_to_delete) && is_numeric($conversation_id_to_delete)) {
             if ($chat->markConversationAsArchived((int)$conversation_id_to_delete, $_SESSION['user_id'])) {
+                error_log("chat.php POST: Chat archived successfully."); // Added
                 echo json_encode(['success' => true, 'message' => 'Chat deleted successfully.', 'redirect' => BASE_URL . 'public/chat.php']);
             } else {
-                error_log("Chat POST: Failed to archive chat {$conversation_id_to_delete} for user " . $_SESSION['user_id']);
+                error_log("Chat POST: Failed to archive chat."); // Added
                 echo json_encode(['success' => false, 'error' => 'Failed to archive chat.']);
             }
         } else {
-            error_log("Chat POST: Invalid conversation ID for deletion: " . ($conversation_id_to_delete ?? 'NULL'));
+            error_log("Chat POST: Invalid conversation ID for deletion."); // Added
             echo json_encode(['success' => false, 'error' => 'Invalid conversation ID for deletion.']);
         }
         exit();
     }
     else {
-        // If other POST actions were sent to this file, handle or error out
-        error_log("Chat POST: Invalid POST action received.");
+        error_log("Chat POST: Invalid POST action received."); // Added
         echo json_encode(['success' => false, 'error' => 'Invalid POST action.']);
         exit();
     }
@@ -207,10 +234,7 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                     if ($is_ajax_request) { 
                         $last_message_id_for_polling = $_GET['last_message_id'] ?? null; 
                         $messages = $chat->getMessages($conversation_id, 100, 0, $last_message_id_for_polling);
-                        echo json_encode([
-                            'success' => true,
-                            'messages' => array_values($messages) 
-                        ]);
+                        echo json_encode(['success' => true, 'messages' => array_values($messages)]);
                         exit(); 
                     } else { // Initial page load
                         $messages = $chat->getMessages($conversation_id, 100); 
@@ -233,12 +257,15 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
         } elseif ($vendor_id_from_url) {
             // This case handles a *new* chat initiation directly from a vendor profile
             try {
+                // Ensure vendor_id_from_url is an integer
+                $vendor_user_id = (int)$vendor_id_from_url;
+
                 $stmt_vendor = $pdo->prepare("SELECT vp.business_name, up.profile_image FROM vendor_profiles vp JOIN users u ON vp.user_id = u.id LEFT JOIN user_profiles up ON u.id = up.user_id WHERE u.id = ?");
-                $stmt_vendor->execute([(int)$vendor_id_from_url]);
+                $stmt_vendor->execute([$vendor_user_id]);
                 $vendor_info = $stmt_vendor->fetch(PDO::FETCH_ASSOC);
                 if (is_array($vendor_info) && !empty($vendor_info)) {
                     $other_party = [
-                        'id' => (int)$vendor_id_from_url,
+                        'id' => $vendor_user_id,
                         'name' => htmlspecialchars((string)($vendor_info['business_name'] ?? 'Unknown Vendor')),
                         'image' => htmlspecialchars((string)($vendor_info['profile_image'] ?? ''))
                     ];
