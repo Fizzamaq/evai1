@@ -97,8 +97,7 @@ include 'header.php';
     <link rel="stylesheet" href="../assets/css/dashboard.css"> 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script> <!-- Include FullCalendar -->
-    <style>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script> <style>
         .booking-form-container {
             max-width: 700px;
             margin: var(--spacing-lg) auto;
@@ -369,10 +368,7 @@ include 'header.php';
         <?php endif; ?>
 
         <form action="<?= BASE_URL ?>public/process_booking.php" method="POST" enctype="multipart/form-data">
-            <input type="hidden" name="vendor_id" value="<?= htmlspecialchars($vendor_profile['id']) ?>"> <!-- CORRECTED: Use vendor_profile['id'] -->
-            
-            <!-- Hidden input for service_date, will be populated by JS from calendar selection -->
-            <input type="hidden" name="service_date" id="service_date_input" value="<?= htmlspecialchars($prefill_date ?? '') ?>">
+            <input type="hidden" name="vendor_id" value="<?= htmlspecialchars($vendor_profile['id']) ?>"> <input type="hidden" name="service_date" id="service_date_input" value="<?= htmlspecialchars($prefill_date ?? '') ?>">
 
             <div class="form-group">
                 <label for="new_event_title">New Event Name <span class="required">*</span></label>
@@ -389,24 +385,33 @@ include 'header.php';
                 </select>
             </div>
             
-            <!-- Optional: Add guest count and budget for new event if needed -->
             <div class="form-group">
                 <label for="new_event_guest_count">Approx. Guest Count</label>
                 <input type="number" id="new_event_guest_count" name="new_event_guest_count" class="form-control" min="1" placeholder="e.g., 50">
             </div>
+            <?php /*
             <div class="form-group">
-                <label for="new_event_budget_min">Min. Budget (PKR)</label>
+                <label for="new_event_budget_min">Min. Event Budget (PKR)</label>
                 <input type="number" id="new_event_budget_min" name="new_event_budget_min" class="form-control" min="0" placeholder="e.g., 10000">
             </div>
             <div class="form-group">
-                <label for="new_event_budget_max">Max. Budget (PKR)</label>
+                <label for="new_event_budget_max">Max. Event Budget (PKR)</label>
                 <input type="number" id="new_event_budget_max" name="new_event_budget_max" class="form-control" min="0" placeholder="e.g., 50000">
+            </div>
+            */ ?>
+
+            <div class="form-group">
+                <label for="final_booking_amount">Final Booking Amount (PKR) <span class="required">*</span></label>
+                <input type="number" id="final_booking_amount" name="final_booking_amount" class="form-control" min="0" step="0.01" required placeholder="e.g., 25000.00">
+            </div>
+            <div class="form-group">
+                <label for="deposit_booking_amount">Deposit Amount (PKR) <span class="required">*</span></label>
+                <input type="number" id="deposit_booking_amount" name="deposit_booking_amount" class="form-control" min="0" step="0.01" required placeholder="e.g., 5000.00">
             </div>
 
 
             <div class="form-group">
                 <label for="display_selected_date">Selected Service Date <span class="required">*</span></label>
-                <!-- Display the selected date to the user, updated by JS -->
                 <input type="text" id="display_selected_date" class="form-control" 
                        value="<?= htmlspecialchars($prefill_date ? date('F j, Y', strtotime($prefill_date)) : 'No date selected') ?>" readonly>
                 <small class="text-muted">Click on an available date in the calendar below to select it.</small>
@@ -593,6 +598,9 @@ include 'header.php';
                 const pictureUploadInput = document.getElementById('picture_upload');
                 const newEventTitleInput = document.getElementById('new_event_title'); // NEW
                 const newEventTypeSelect = document.getElementById('new_event_type_id'); // NEW
+                const finalBookingAmountInput = document.getElementById('final_booking_amount'); // NEW
+                const depositBookingAmountInput = document.getElementById('deposit_booking_amount'); // NEW
+
 
                 if (selectedServices.length === 0) {
                     alert('Please select at least one service to book.');
@@ -614,6 +622,23 @@ include 'header.php';
                 }
                 if (!newEventTypeSelect.value) {
                     alert('Please select an event type for your new event.');
+                    event.preventDefault();
+                    return;
+                }
+
+                // NEW: Validate explicit booking amounts
+                if (!finalBookingAmountInput.value || parseFloat(finalBookingAmountInput.value) <= 0) {
+                    alert('Please enter a valid Final Booking Amount greater than 0.');
+                    event.preventDefault();
+                    return;
+                }
+                if (!depositBookingAmountInput.value || parseFloat(depositBookingAmountInput.value) < 0) {
+                    alert('Please enter a valid Deposit Amount.');
+                    event.preventDefault();
+                    return;
+                }
+                if (parseFloat(depositBookingAmountInput.value) > parseFloat(finalBookingAmountInput.value)) {
+                    alert('Deposit Amount cannot be greater than Final Booking Amount.');
                     event.preventDefault();
                     return;
                 }
