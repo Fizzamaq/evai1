@@ -8,6 +8,7 @@ class Vendor {
     }
 
     // Register a new vendor (or complete profile if user_id exists)
+    // This method does not explicitly start its own transaction but relies on internal calls
     public function registerVendor($user_id, $data) {
         try {
             $existingVendor = $this->getVendorByUserId($user_id);
@@ -199,7 +200,6 @@ class Vendor {
     }
 
     // NEW METHOD: Update a specific service offering
-    // This now updates the *overall* price range and description on the vendor_service_offerings table
     public function updateServiceOffering($service_offering_id, $vendor_id, $data) {
         try {
             $query = "UPDATE vendor_service_offerings SET
@@ -228,7 +228,7 @@ class Vendor {
     // NEW METHOD: Delete a specific service offering (and all its packages/images)
     public function deleteServiceOffering($service_offering_id, $vendor_id) {
         try {
-            $this->conn->beginTransaction();
+            // REMOVED: $this->conn->beginTransaction(); // This method now relies on caller's transaction
 
             // All associated packages and their images will be cascade-deleted by database foreign key constraints
             // We need to fetch package images manually to delete physical files
@@ -258,17 +258,17 @@ class Vendor {
                         error_log("File not found for deletion during service offering delete: " . $physical_path);
                     }
                 }
-                $this->conn->commit();
+                // REMOVED: $this->conn->commit(); // This method now relies on caller's transaction
                 return true;
             }
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             return false;
         } catch (PDOException $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("Delete service offering error: " . $e->getMessage());
             throw new Exception("Failed to delete service offering: " . $e->getMessage());
         } catch (Exception $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("Delete service offering general error: " . $e->getMessage());
             throw $e;
         }
@@ -482,7 +482,7 @@ class Vendor {
     // NEW METHOD: Delete a service package
     public function deleteServicePackage($package_id, $service_offering_id) {
         try {
-            $this->conn->beginTransaction();
+            // REMOVED: $this->conn->beginTransaction(); // This method now relies on caller's transaction
 
             // Fetch images to delete physical files
             $images_to_delete = $this->getServicePackageImages($package_id);
@@ -505,17 +505,17 @@ class Vendor {
                         error_log("File not found for deletion during package delete: " . $physical_path);
                     }
                 }
-                $this->conn->commit();
+                // REMOVED: $this->conn->commit(); // This method now relies on caller's transaction
                 return true;
             }
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             return false;
         } catch (PDOException $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("Delete service package error: " . $e->getMessage());
             throw new Exception("Failed to delete package: " . $e->getMessage());
         } catch (Exception $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("Delete service package general error: " . $e->getMessage());
             throw $e;
         }
@@ -559,7 +559,7 @@ class Vendor {
     // NEW METHOD: Delete a specific image from a service package
     public function deleteServicePackageImage($image_id, $service_package_id) {
         try {
-            $this->conn->beginTransaction();
+            // REMOVED: $this->conn->beginTransaction(); // This method now relies on caller's transaction
             // Get image URL to delete physical file
             $stmt = $this->conn->prepare("SELECT image_url FROM service_package_images WHERE id = ? AND service_package_id = ?");
             $stmt->execute([$image_id, $service_package_id]);
@@ -571,22 +571,29 @@ class Vendor {
                 $relative_path_from_web_root = str_replace(BASE_URL, '', $image_data['image_url']);
                 $physical_path = realpath(__DIR__ . '/../../') . '/' . $relative_path_from_web_root;
 
-                if (file_exists($physical_path)) {
-                    $uploader->deleteFile(basename($physical_path), dirname($relative_path_from_web_root) . '/');
-                } else {
-                    error_log("File not found for deletion (service package image): " . $physical_path);
+                // Delete from DB
+                $stmt_delete_db = $this->conn->prepare("DELETE FROM service_package_images WHERE id = ? AND service_package_id = ?");
+                $success = $stmt_delete_db->execute([$image_id, $service_package_id]);
+
+                // Delete physical file only if DB delete was successful
+                if ($success) {
+                    if (file_exists($physical_path)) {
+                        $uploader->deleteFile(basename($physical_path), dirname($relative_path_from_web_root) . '/');
+                    } else {
+                        error_log("File not found for deletion (service package image): " . $physical_path);
+                    }
                 }
-                $this->conn->commit();
+                // REMOVED: $this->conn->commit(); // This method now relies on caller's transaction
                 return true;
             }
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             return false;
         } catch (PDOException $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("Delete service package image error: " . $e->getMessage());
             return false;
         } catch (Exception $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("Delete service package image general error: " . $e->getMessage());
             return false;
         }
@@ -680,14 +687,11 @@ class Vendor {
 
     // Deletes a portfolio item.
     public function deletePortfolioItem($portfolioItemId, $vendorId) {
-        // NOTE: The portfolio_images table has ON DELETE CASCADE on portfolio_item_id,
-        // so deleting from vendor_portfolios will automatically delete associated image records.
-        // We still need to manually delete the physical image files.
         try {
             // First, get all image URLs associated with this portfolio item
             $images = $this->getPortfolioImagesByItemId($portfolioItemId);
 
-            // REMOVED: $this->conn->beginTransaction(); // Transaction managed by calling script
+            // REMOVED: $this->conn->beginTransaction(); // This method now relies on caller's transaction
 
             // Delete portfolio item from database (this will cascade delete from portfolio_images)
             $stmt = $this->conn->prepare("DELETE FROM vendor_portfolios WHERE id = ? AND vendor_id = ?");
@@ -699,16 +703,7 @@ class Vendor {
                 $uploader = new UploadHandler();
 
                 foreach ($images as $image) {
-                    // The image_url stored in DB is relative to BASE_URL (e.g., assets/uploads/vendors/portfolio/filename.jpg)
-                    // We need the physical path for unlink. Assuming BASE_DIR is defined or inferable.
-                    // For this context, assuming BASE_URL is 'http://example.com/' and asset path is 'assets/uploads/'.
-                    // So, if image_url is 'assets/uploads/vendors/portfolio/image.jpg', we remove 'assets/'
-                    // and prepend __DIR__ . '/../' to get the full path to the web root relative to classes/
                     $relative_path_from_web_root = str_replace(BASE_URL, '', $image['image_url']);
-                    // Construct physical path relative to the current script.
-                    // Assuming upload dir is at project_root/assets/uploads/
-                    // And current script is project_root/classes/Vendor.class.php
-                    // So, go up two directories to project_root, then into assets/uploads/
                     $physical_path = realpath(__DIR__ . '/../../') . '/' . $relative_path_from_web_root;
 
                     if (file_exists($physical_path)) {
@@ -717,18 +712,18 @@ class Vendor {
                         error_log("File not found for deletion: " . $physical_path);
                     }
                 }
-                // REMOVED: $this->conn->commit(); // Transaction managed by calling script
+                // REMOVED: $this->conn->commit(); // This method now relies on caller's transaction
                 return true;
             } else {
-                // REMOVED: $this->conn->rollBack(); // Transaction managed by calling script
+                // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
                 return false;
             }
         } catch (PDOException $e) {
-            // REMOVED: $this->conn->rollBack(); // Transaction managed by calling script
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("Delete portfolio item PDO error: " . $e->getMessage());
             return false;
         } catch (Exception $e) {
-            // REMOVED: $this->conn->rollBack(); // Transaction managed by calling script
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("Delete portfolio item general error: " . $e->getMessage());
             return false;
         }
@@ -788,7 +783,7 @@ class Vendor {
      */
     public function deletePortfolioImage($imageId, $portfolioItemId, $vendorId) {
         try {
-            $this->conn->beginTransaction();
+            // REMOVED: $this->conn->beginTransaction(); // This method now relies on caller's transaction
             // First, get the image URL to delete the physical file
             $stmt = $this->conn->prepare("
                 SELECT pi.image_url
@@ -820,17 +815,17 @@ class Vendor {
                         error_log("File not found for deletion (single image): " . $physical_path);
                     }
                 }
-                $this->conn->commit();
-                return $success;
+                // REMOVED: $this->conn->commit(); // This method now relies on caller's transaction
+                return true;
             }
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             return false; // Image not found or not owned by vendor
         } catch (PDOException $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("Delete portfolio image error: " . $e->getMessage());
             return false;
         } catch (Exception $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("Delete portfolio image general error: " . $e->getMessage());
             return false;
         }
@@ -1393,7 +1388,7 @@ class Vendor {
      */
     public function deleteVendorProfile($vendorProfileId) {
         try {
-            $this->conn->beginTransaction();
+            // REMOVED: $this->conn->beginTransaction(); // This method now relies on caller's transaction
 
             // Fetch any associated physical files (portfolio images, service offering images, package images)
             // This is complex and would ideally be handled by a dedicated file cleanup process
@@ -1409,19 +1404,19 @@ class Vendor {
             $success = $stmt->execute([$vendorProfileId]);
 
             if ($success) {
-                $this->conn->commit();
+                // REMOVED: $this->conn->commit(); // This method now relies on caller's transaction
                 return true;
             } else {
-                $this->conn->rollBack();
+                // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
                 error_log("Failed to delete vendor profile ID {$vendorProfileId}: " . implode(" | ", $stmt->errorInfo()));
                 return false;
             }
         } catch (PDOException $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("PDOException deleting vendor profile ID {$vendorProfileId}: " . $e->getMessage());
             return false;
         } catch (Exception $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("General Exception deleting vendor profile ID {$vendorProfileId}: " . $e->getMessage());
             return false;
         }
@@ -1533,7 +1528,7 @@ class Vendor {
      */
     public function updateVendorServiceOfferings($vendorProfileId, array $newServiceOfferingsData) {
         try {
-            $this->conn->beginTransaction();
+            // REMOVED: $this->conn->beginTransaction(); // This method now relies on caller's transaction
 
             // 1. Fetch current service offerings for this vendor
             $currentOfferings = $this->getVendorServices($vendorProfileId);
@@ -1586,15 +1581,15 @@ class Vendor {
                 $stmt->execute(array_merge([$vendorProfileId], $servicesToDelete));
             }
 
-            $this->conn->commit();
+            // REMOVED: $this->conn->commit(); // This method now relies on caller's transaction
             return true;
         } catch (PDOException $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("Error in updateVendorServiceOfferings: " . $e->getMessage());
             // Re-throw to allow higher-level error handling
             throw new Exception("Database error updating vendor service offerings: " . $e->getMessage());
         } catch (Exception $e) {
-            $this->conn->rollBack();
+            // REMOVED: $this->conn->rollBack(); // This method now relies on caller's transaction
             error_log("General error in updateVendorServiceOfferings: " . $e->getMessage());
             throw $e;
         }
