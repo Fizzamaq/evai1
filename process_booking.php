@@ -41,8 +41,14 @@ try {
     $new_event_title = $_POST['new_event_title'] ?? null;
     $new_event_type_id = $_POST['new_event_type_id'] ?? null;
     $new_event_guest_count = $_POST['new_event_guest_count'] ?? null;
-    $new_event_budget_min = $_POST['new_event_budget_min'] ?? null;
-    $new_event_budget_max = $_POST['new_event_budget_max'] ?? null;
+    // Old event budget fields are no longer read here, as explicit booking amounts are used.
+    // $new_event_budget_min = $_POST['new_event_budget_min'] ?? null;
+    // $new_event_budget_max = $_POST['new_event_budget_max'] ?? null;
+
+    // NEW: Explicit booking amounts from the form
+    $final_amount = filter_var($_POST['final_booking_amount'] ?? 0, FILTER_VALIDATE_FLOAT);
+    $deposit_amount = filter_var($_POST['deposit_booking_amount'] ?? 0, FILTER_VALIDATE_FLOAT);
+
 
     // --- DEBUGGING INPUTS ---
     error_log("PROCESS_BOOKING: Received POST data: " . print_r($_POST, true));
@@ -65,10 +71,21 @@ try {
     if (empty($new_event_type_id) || !is_numeric($new_event_type_id)) {
         throw new Exception("Missing or invalid new event type.");
     }
+    if ($final_amount === false || $final_amount < 0) { // Validate explicit final amount
+        throw new Exception("Invalid final booking amount.");
+    }
+    if ($deposit_amount === false || $deposit_amount < 0) { // Validate explicit deposit amount
+        throw new Exception("Invalid deposit amount.");
+    }
+    if ($deposit_amount > $final_amount) {
+        throw new Exception("Deposit amount cannot be greater than final amount.");
+    }
+
 
     // --- IMPORTANT FIX: Get the actual service_id from the selected service_offering_id ---
     // The `bookings` table's `service_id` references `vendor_services.id`.
     // The form submits `vendor_service_offerings.id`. We need to convert this.
+    // Assuming a single service_id for the booking, take the first selected offering's service_id.
     $actual_service_id = $vendor_obj->getServiceIdByOfferingId((int)$selected_service_offerings_ids[0]);
     if (!$actual_service_id) {
         throw new Exception("Invalid selected service offering. Could not find corresponding service ID.");
@@ -84,8 +101,8 @@ try {
         'event_date' => $service_date, // Use selected service date as event date
         'event_type_id' => (int)$new_event_type_id,
         'guest_count' => !empty($new_event_guest_count) ? (int)$new_event_guest_count : null, // Handle null/empty
-        'budget_min' => !empty($new_event_budget_min) ? (float)$new_event_budget_min : null, // Handle null/empty
-        'budget_max' => !empty($new_event_budget_max) ? (float)$new_event_budget_max : null, // Handle null/empty
+        'budget_min' => $final_amount, // Use the explicit final amount as event budget min
+        'budget_max' => $final_amount, // Use the explicit final amount as event budget max
         'status' => 'active', // Set initial status for newly created event
         'ai_preferences' => null, // Not AI-generated if created this way
         'location_string' => null, // Not capturing location here, unless form had it
@@ -124,16 +141,10 @@ try {
         throw new Exception("Payment screenshot is required. Please upload one.");
     }
 
-    // DUMMY VALUES FOR AMOUNTS (as they are not coming from the form)
-    // You MUST implement logic to calculate these based on selected services/packages.
-    // Setting to 0.00 for now, assuming DB allows 0 or is nullable.
-    $final_amount = 0.00; 
-    $deposit_amount = 0.00;
-
     // Append selected services and uploaded picture URL to special instructions for logging
     $selected_service_names = [];
     foreach ($selected_service_offerings_ids as $offering_id) {
-        $offering_details = $vendor_obj->getServiceOfferingById($offering_id, $vendor_id); // Fetch full offering details to get service name
+        $offering_details = $vendor_obj->getServiceOfferingById((int)$offering_id, (int)$vendor_id); // Fetch full offering details to get service name
         if ($offering_details) {
             $selected_service_names[] = $offering_details['service_name'];
         }
@@ -154,8 +165,8 @@ try {
         'vendor_id' => (int)$vendor_id,
         'service_id' => (int)$actual_service_id, // Use the CORRECTED actual service ID here
         'service_date' => $service_date,
-        'final_amount' => (float)$final_amount,
-        'deposit_amount' => (float)$deposit_amount,
+        'final_amount' => (float)$final_amount, // Use the explicit amount from form
+        'deposit_amount' => (float)$deposit_amount, // Use the explicit amount from form
         'special_instructions' => $special_instructions_for_db, // Use the updated instructions string
         'status' => 'pending_review',
         'screenshot_filename' => $screenshot_filename
