@@ -86,6 +86,226 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
     <link rel="stylesheet" href="../assets/css/dashboard.css">
     <link rel="stylesheet" href="../assets/css/events.css"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Add specific styles for the customer dashboard layout and elements */
+        .customer-dashboard-container {
+            width: 100%; /* Make it take full width initially */
+            max-width: 1200px; /* Max width for larger screens */
+            margin: 0 auto; /* Center the container */
+            padding: 20px; /* Padding on all sides */
+            box-sizing: border-box; /* Include padding in width calculation */
+        }
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e1e5e9;
+            flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+        }
+        .dashboard-header > div {
+            margin-bottom: 10px; /* Add some space when items wrap */
+        }
+        .customer-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #2d3436;
+        }
+        .metric-label {
+            color: #636e72;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .dashboard-sections {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Two columns for content sections */
+            gap: 30px;
+        }
+        .section-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .section-card h2 {
+            margin-top: 0;
+            color: #2d3436;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .list-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap; /* Allow list items to wrap */
+        }
+        .list-item:last-child {
+            border-bottom: none; /* Remove border from the last item */
+        }
+        .list-item-title {
+            font-weight: 600;
+            color: #2d3436;
+            flex-basis: 100%; /* Take full width on wrap */
+        }
+        .list-item-meta {
+            font-size: 0.9em;
+            color: #636e72;
+            flex-basis: 100%; /* Take full width on wrap */
+            margin-top: 5px;
+            display: flex; /* Make meta info a flex container */
+            align-items: center;
+            gap: 8px; /* Gap between icon and text, and status badge */
+        }
+        .list-item-meta i {
+            color: #667eea;
+        }
+        .list-item .btn-link {
+            margin-top: 10px; /* Space out button when wrapped */
+        }
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #636e72;
+        }
+        .btn-link {
+            text-decoration: none;
+            color: #667eea; /* A nice primary color for links */
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+        .btn-link:hover {
+            color: #764ba2; /* Darker shade on hover */
+        }
+
+        /* Specific styles for Activity list (reusing admin_dashboard.php styles) */
+        .activity-log {
+            /* Styles for the overall activity log container */
+        }
+        .activity-item {
+            display: flex;
+            align-items: flex-start; /* Align icon to the top of message */
+            gap: 15px;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        .activity-icon {
+            flex-shrink: 0; /* Prevent icon from shrinking */
+            font-size: 1.4em; /* Slightly larger icon */
+            color: var(--primary-color);
+            width: 30px; /* Fixed width for consistent alignment */
+            text-align: center;
+        }
+        .activity-content {
+            flex-grow: 1; /* Allow content to take remaining space */
+        }
+        .activity-message {
+            font-size: 0.95em;
+            color: var(--text-dark);
+            line-height: 1.4;
+        }
+        .activity-time {
+            font-size: 0.8em;
+            color: var(--text-subtle);
+            margin-top: 5px;
+            display: flex; /* For aligning time and view link */
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* NEW: Personalized Vendor Recommendations Section */
+        /* REMOVED FROM THIS PAGE */
+
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 768px) {
+            .dashboard-sections {
+                grid-template-columns: 1fr; /* Stack sections vertically on small screens */
+            }
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .dashboard-header > div:last-child {
+                display: flex;
+                flex-direction: column;
+                width: 100%;
+            }
+            .dashboard-header .btn {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            .personalized-vendors-grid { /* Keep these styles, but the section itself is removed */
+                grid-template-columns: 1fr; /* Stack vendor cards */
+            }
+            .vendor-card-image { /* Keep these styles, but the section itself is removed */
+                height: 200px; /* Adjust image height for single column */
+            }
+        }
+
+        @media (max-width: 480px) {
+            .customer-dashboard-container {
+                padding: 15px; /* Slightly less padding on very small screens */
+            }
+        }
+        /* Further styling for event-actions buttons for better, decent, well-organized look */
+        .event-actions {
+            display: flex;
+            justify-content: flex-start; /* Aligned to the left */
+            align-items: center;
+            gap: 10px; /* Consistent space between buttons */
+            margin-top: 20px; /* More vertical space from description */
+            flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+        }
+        .event-actions .btn,
+        .event-actions button { /* Target both <a> and <button> elements for consistent styling */
+            display: flex; /* Make buttons flex containers to align icon and text */
+            align-items: center;
+            justify-content: center; /* Center content within button if space allows */
+            gap: 8px; /* Slightly more space between icon and text */
+            padding: 10px 15px; /* Consistent padding for all buttons */
+            font-size: 0.95em; /* Slightly larger, more readable font */
+            min-width: 130px; /* Increased min-width for better consistency */
+            height: 40px; /* Consistent height for all buttons */
+            border-radius: var(--border-radius); /* Inherit from style.css for consistent corners */
+            text-decoration: none; /* Ensure links don't have underlines */
+            transition: all 0.2s ease-in-out; /* Smooth transitions for hover effects */
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+        }
+
+        /* Specific styles for the Delete button to ensure it looks 'decent' */
+        .event-actions .btn-danger {
+            background-color: var(--error-color); /* Use primary error color */
+            color: var(--white); /* White text for contrast */
+            border: 1px solid var(--error-color); /* Solid border matching background */
+            box-shadow: var(--shadow-sm); /* Subtle shadow for depth */
+        }
+        .event-actions .btn-danger:hover {
+            background-color: #CC0000; /* Slightly darker red on hover */
+            border-color: #CC0000;
+            box-shadow: var(--shadow-md); /* More pronounced shadow on hover */
+            transform: translateY(-1px); /* Slight lift effect */
+        }
+    </style>
 </head>
 <body>
     <?php include 'header.php'; ?>
@@ -94,7 +314,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
         <div class="events-header">
             <div>
                 <h1>My Events</h1>
-                <p>Track your AI-planned and booked events.</p>
+                <p>Track your event plans and bookings.</p>
             </div>
             <div>
                 <a href="ai_chat.php" class="btn btn-primary">Plan New Event with AI</a>
@@ -126,13 +346,36 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
                             <span><i class="fas fa-users"></i> <?php echo $event_item['guest_count'] ?: 'TBD'; ?> guests</span>
                             <span><i class="fas fa-dollar-sign"></i> $<?php echo number_format($event_item['budget_min'] ?? 0, 0); ?> - $<?php echo number_format($event_item['budget_max'] ?? 0, 0); ?></span>
                             
-                            <?php if ($event_item['is_booked']): // Display "Booked" if bookings exist ?>
-                                <span class="status-badge status-booked">Booked</span>
-                            <?php else: // Otherwise, show the event's planning status ?>
-                                <span class="status-badge status-<?php echo strtolower($event_item['status'] ?: 'planning'); ?>">
-                                    <?php echo $event_item['status'] ?: 'Planning'; ?>
-                                </span>
-                            <?php endif; ?>
+                            <?php 
+                            // Determine the display status for the card based on bookings or event status
+                            $cardDisplayStatus = ucfirst(htmlspecialchars($event_item['status']));
+                            $cardStatusClass = strtolower(htmlspecialchars($event_item['status']));
+
+                            if ($event_item['is_booked']) {
+                                // Prioritize booking status if any booking exists
+                                $hasConfirmedBooking = false;
+                                $hasPendingBooking = false;
+                                $hasDeclinedBooking = false;
+
+                                foreach ($event_item['bookings'] as $booking) {
+                                    if ($booking['status'] === 'confirmed') { $hasConfirmedBooking = true; }
+                                    if ($booking['status'] === 'pending_review' || $booking['status'] === 'pending') { $hasPendingBooking = true; }
+                                    if ($booking['status'] === 'cancelled') { $hasDeclinedBooking = true; } // Assuming cancelled means declined by vendor
+                                }
+
+                                if ($hasConfirmedBooking) {
+                                    $cardDisplayStatus = 'Booked';
+                                    $cardStatusClass = 'booked';
+                                } elseif ($hasPendingBooking) {
+                                    $cardDisplayStatus = 'Pending';
+                                    $cardStatusClass = 'pending';
+                                } elseif ($hasDeclinedBooking) {
+                                    $cardDisplayStatus = 'Declined by Vendor';
+                                    $cardStatusClass = 'declined';
+                                }
+                            }
+                            ?>
+                            <span class="status-badge status-<?= $cardStatusClass ?>"><?= $cardDisplayStatus ?></span>
                         </div>
 
                         <div class="event-description">
@@ -140,11 +383,13 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
                         </div>
 
                         <div class="event-actions">
-                            <a href="event.php?id=<?php echo $event_item['id']; ?>" class="btn btn-primary btn-sm">View Details</a>
-                            <a href="edit_event.php?id=<?php echo $event_item['id']; ?>" class="btn btn-secondary btn-sm">Edit</a>
-                            <form method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this event? This action cannot be undone.');">
+                            <a href="event.php?id=<?php echo $event_item['id']; ?>" class="btn btn-primary btn-sm"><i class="fas fa-eye"></i> View Details</a>
+                            <?php if (!$event_item['is_booked']): // Only show edit if no bookings exist for this event ?>
+                                <a href="edit_event.php?id=<?php echo $event_item['id']; ?>" class="btn btn-secondary btn-sm"><i class="fas fa-edit"></i> Edit</a>
+                            <?php endif; ?>
+                            <form method="POST" onsubmit="return confirm('Are you sure you want to delete this event? This action cannot be undone.');">
                                 <input type="hidden" name="event_id" value="<?php echo $event_item['id']; ?>">
-                                <button type="submit" name="delete_event" class="btn btn-danger btn-sm">Delete</button>
+                                <button type="submit" name="delete_event" class="btn btn-danger btn-sm"><i class="fas fa-trash-alt"></i> Delete</button>
                             </form>
                         </div>
                     </div>
