@@ -59,6 +59,13 @@ try {
         $bookings_for_event = $booking_obj->getBookingsByEventId($event_item['id']);
         $event_item['is_booked'] = !empty($bookings_for_event); // True if any bookings exist
         $event_item['bookings'] = $bookings_for_event; // Attach booking details if needed
+
+        // --- DEBUGGING: Log event and booking status for each item ---
+        error_log("Events Page Debug: Event ID: {$event_item['id']}, Event Title: '{$event_item['title']}', Original Status: '{$event_item['status']}', Is Booked: " . ($event_item['is_booked'] ? 'True' : 'False'));
+        if ($event_item['is_booked']) {
+            error_log("Events Page Debug: Bookings for Event ID {$event_item['id']}: " . json_encode($event_item['bookings']));
+        }
+        // --- END DEBUGGING ---
     }
     unset($event_item); // Break the reference with the last element
 
@@ -174,7 +181,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
             gap: 8px; /* Gap between icon and text, and status badge */
         }
         .list-item-meta i {
-            color: #667eea;
+            color: var(--primary-color);
         }
         .list-item .btn-link {
             margin-top: 10px; /* Space out button when wrapped */
