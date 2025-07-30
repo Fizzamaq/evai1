@@ -109,9 +109,6 @@ class Chat {
         } catch (PDOException | Exception $e) {
             $this->debugToFile("Chat.class.php startConversation PDOException caught: " . $e->getMessage() . " (Code: " . $e->getCode() . ") SQLSTATE: " . ($e->errorInfo[0] ?? 'N/A') . " - Trace: " . $e->getTraceAsString() . " (caller should roll back).");
             return false;
-        } catch (Exception $e) {
-            $this->debugToFile("Chat.class.php startConversation General Exception caught: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
-            return false;
         }
     }
 
@@ -170,28 +167,56 @@ class Chat {
      */
     public function getConversationById(int $conversationId, int $userId) {
         try {
-            $stmt = $this->conn->prepare("
-                SELECT cc.*,
-                       e.title as event_title,
-                       CASE
-                         WHEN cc.user_id = ? THEN IFNULL(vp.business_name, CONCAT(u.first_name, ' ', u.last_name)) -- If customer (logged in user is cc.user_id), show business name or vendor's user name
-                         ELSE CONCAT(u2.first_name, ' ', u2.last_name) -- If vendor (logged in user is cc.vendor_id), show customer's full name
-                       END as other_party_name,
-                       CASE
-                         WHEN cc.user_id = ? THEN up_vendor.profile_image
-                         ELSE up_user.profile_image
-                       END as other_party_image
+            $sql = "
+                SELECT 
+                    cc.*,
+                    e.title as event_title,
+                    -- Determine other_party_id (user ID of the other party)
+                    (CASE
+                        WHEN cc.user_id = :userId1 THEN u_vendor.id    -- If logged in user is the customer, other party is the vendor (users.id)
+                        ELSE u_customer.id                          -- If logged in user is the vendor, other party is the customer (users.id)
+                    END) as other_party_id,
+                    -- Determine other_party_profile_id (actual profile ID for linking)
+                    (CASE
+                        WHEN cc.user_id = :userId2 THEN vp.id             -- If logged in user is customer, link to vendor_profiles.id
+                        ELSE up_customer.user_id                   -- If logged in user is vendor, link to user_profiles.user_id (which is users.id)
+                    END) as other_party_profile_id,
+                    -- Determine other_party_type_id 
+                    (CASE
+                        WHEN cc.user_id = :userId3 THEN u_vendor.user_type_id 
+                        ELSE u_customer.user_type_id                  
+                    END) as other_party_type_id,
+                    -- Determine other_party_name
+                    (CASE
+                        WHEN cc.user_id = :userId4 THEN IFNULL(vp.business_name, CONCAT(u_vendor.first_name, ' ', u_vendor.last_name)) 
+                        ELSE CONCAT(u_customer.first_name, ' ', u_customer.last_name)
+                    END) as other_party_name,
+                    -- Determine other_party_image
+                    (CASE
+                        WHEN cc.user_id = :userId5 THEN up_vendor.profile_image
+                        ELSE up_customer.profile_image
+                    END) as other_party_image
                 FROM chat_conversations cc
                 LEFT JOIN events e ON cc.event_id = e.id
-                LEFT JOIN users u ON cc.vendor_id = u.id -- Alias for the vendor's user record
-                LEFT JOIN vendor_profiles vp ON u.id = vp.user_id
-                LEFT JOIN user_profiles up_vendor ON u.id = up_vendor.user_id
-                LEFT JOIN users u2 ON cc.user_id = u2.id -- Alias for the customer's user record
-                LEFT JOIN user_profiles up_user ON u2.id = up_user.user_id
-                WHERE cc.id = ? AND (cc.user_id = ? OR cc.vendor_id = ?)
-            ");
-            $params = [(int)$userId, (int)$userId, (int)$conversationId, (int)$userId, (int)$userId];
-            $stmt->execute($params);
+                LEFT JOIN users u_vendor ON cc.vendor_id = u_vendor.id -- Alias for the vendor's user record
+                LEFT JOIN vendor_profiles vp ON u_vendor.id = vp.user_id -- Join to get vendor_profiles.id
+                LEFT JOIN user_profiles up_vendor ON u_vendor.id = up_vendor.user_id
+                LEFT JOIN users u_customer ON cc.user_id = u_customer.id -- Alias for the customer's user record
+                LEFT JOIN user_profiles up_customer ON u_customer.id = up_customer.user_id
+                WHERE cc.id = :conversationId AND (cc.user_id = :userId6 OR cc.vendor_id = :userId7)
+            ";
+
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bindValue(':userId1', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':userId2', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':userId3', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':userId4', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':userId5', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':conversationId', $conversationId, PDO::PARAM_INT);
+            $stmt->bindValue(':userId6', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':userId7', $userId, PDO::PARAM_INT);
+
+            $stmt->execute();
             return $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException | Exception $e) {
             $this->debugToFile("Chat.class.php getConversationById error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
@@ -230,7 +255,7 @@ class Chat {
 
             $message_id = $this->conn->lastInsertId();
 
-            // 2. Update conversation's last message time directly here
+            // 2. Update conversation's last message at time
             $stmt_update_conv_time = $this->conn->prepare("UPDATE chat_conversations
                 SET last_message_at = NOW(), updated_at = NOW() -- Added updated_at to ensure rowCount is non-zero
                 WHERE id = ?");
@@ -238,19 +263,16 @@ class Chat {
 
             // Allow execution to continue even if rowCount is 0 for this update, as the message was sent.
             // This handles cases where MySQL returns rowCount=0 if timestamp value is identical.
-            if (!$update_conv_success || $stmt_update_conv_time->rowCount() === 0) {
-                $errorInfo = $stmt_update_conv_time->errorInfo();
-                // Log a warning, but don't stop the message flow.
-                $this->debugToFile("Chat.class.php sendMessage Warning: last_message_at update for conv_id: {$conversation_id} affected 0 rows. ErrorInfo: " . implode(" ", $errorInfo) . " Likely due to identical timestamp.");
+            if (!$update_conv_success && $stmt_update_conv_time->rowCount() === 0) { // Check only if execution failed AND no rows were affected
+                 $errorInfo = $stmt_update_conv_time->errorInfo();
+                 // Log a warning, but don't stop the message flow.
+                 $this->debugToFile("Chat.class.php sendMessage Warning: last_message_at update for conv_id: {$conversation_id} affected 0 rows. ErrorInfo: " . implode(" ", $errorInfo) . " Likely due to identical timestamp.");
             }
 
             return $message_id; // Return the new message ID on success (message itself was inserted)
 
         } catch (PDOException | Exception $e) {
             $this->debugToFile("Chat.class.php sendMessage PDO error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
-            return false;
-        } catch (Exception $e) {
-            $this->debugToFile("Chat.class.php sendMessage general error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         }
     }
@@ -271,19 +293,13 @@ class Chat {
     public function getMessages($conversation_id, $limit = 50, $offset = 0, $last_message_id = null) {
         try {
             $sql = "SELECT * FROM chat_messages WHERE conversation_id = ?";
-            // No need for $params array if binding values by position directly
-            // Removed: $params = [(int)$conversation_id];
-
             if ($last_message_id !== null) {
                 $sql .= " AND id > ?";
-                // Removed: $params[] = (int)$last_message_id;
             }
-
             $sql .= " ORDER BY created_at ASC, id ASC LIMIT ? OFFSET ?"; // Order oldest first for appending
 
             $stmt = $this->conn->prepare($sql);
 
-            // Use bindValue for all parameters, ensuring types are correct and avoiding pass-by-reference issues
             $paramIndex = 1;
             $stmt->bindValue($paramIndex++, (int)$conversation_id, PDO::PARAM_INT);
             
@@ -310,45 +326,73 @@ class Chat {
     public function getUserConversations($user_id, $limit = 50) { // Changed default limit from 10 to 50
         try {
             $stmt = $this->conn->prepare("
-                SELECT cc.*,
-                       e.title as event_title, -- event_title might be NULL if event_id is NULL
-                       CASE
-                         WHEN cc.user_id = ? THEN IFNULL(vp.business_name, CONCAT(u.first_name, ' ', u.last_name)) -- Logged-in user is customer, show business name or vendor's user name
-                         ELSE CONCAT(u2.first_name, ' ', u2.last_name) -- Logged-in user is vendor, show customer's full name
-                       END as other_party_name,
-                       CASE
-                         WHEN cc.user_id = ? THEN up_vendor.profile_image
-                         ELSE up_user.profile_image
-                       END as other_party_image,
-                       -- Use correlated subqueries to get the last message and its time
-                       (SELECT message_content FROM chat_messages WHERE conversation_id = cc.id ORDER BY created_at DESC, id DESC LIMIT 1) as last_message,
-                       (SELECT created_at FROM chat_messages WHERE conversation_id = cc.id ORDER BY created_at DESC, id DESC LIMIT 1) as last_message_time,
-                       (SELECT COUNT(*) FROM chat_messages
-                        WHERE conversation_id = cc.id AND sender_id != ? AND is_read = FALSE) as unread_count
+                SELECT 
+                    cc.*,
+                    e.title as event_title, -- event_title might be NULL if event_id is NULL
+                    -- Determine other_party_id (user ID of the other party)
+                    CASE
+                        WHEN cc.user_id = :userId1 THEN u_vendor.id    
+                        ELSE u_customer.id                          
+                    END as other_party_id,
+                    -- Determine other_party_profile_id (actual profile ID for linking)
+                    CASE
+                        WHEN cc.user_id = :userId2 THEN vp.id             -- If logged in user is customer, link to vendor_profiles.id
+                        ELSE up_customer.user_id                   -- If logged in user is vendor, link to user_profiles.user_id
+                    END as other_party_profile_id,
+                    -- Determine other_party_type_id 
+                    CASE
+                        WHEN cc.user_id = :userId3 THEN u_vendor.user_type_id 
+                        ELSE u_customer.user_type_id                  
+                    END as other_party_type_id,
+                    -- Determine other_party_name
+                    CASE
+                        WHEN cc.user_id = :userId4 THEN IFNULL(vp.business_name, CONCAT(u_vendor.first_name, ' ', u_vendor.last_name)) 
+                        ELSE CONCAT(u_customer.first_name, ' ', u_customer.last_name)
+                    END as other_party_name,
+                    -- Determine other_party_image
+                    CASE
+                        WHEN cc.user_id = :userId5 THEN up_vendor.profile_image
+                        ELSE up_customer.profile_image
+                    END as other_party_image,
+                    -- Use correlated subqueries to get the last message and its time
+                    (SELECT message_content FROM chat_messages WHERE conversation_id = cc.id ORDER BY created_at DESC, id DESC LIMIT 1) as last_message,
+                    (SELECT created_at FROM chat_messages WHERE conversation_id = cc.id ORDER BY created_at DESC, id DESC LIMIT 1) as last_message_time,
+                    (SELECT COUNT(*) FROM chat_messages
+                        WHERE conversation_id = cc.id AND sender_id != :userId6 AND is_read = FALSE) as unread_count
                 FROM chat_conversations cc
                 LEFT JOIN events e ON cc.event_id = e.id -- Use LEFT JOIN because event_id can now be NULL
-                LEFT JOIN users u ON cc.vendor_id = u.id -- Alias 'u' for the vendor's user record
-                LEFT JOIN vendor_profiles vp ON u.id = vp.user_id
-                LEFT JOIN user_profiles up_vendor ON u.id = up_vendor.user_id
-                LEFT JOIN users u2 ON cc.user_id = u2.id -- Alias 'u2' for the customer's user record
-                LEFT JOIN user_profiles up_user ON u2.id = up_user.user_id -- Customer's user_profile
-                WHERE (cc.user_id = ? OR cc.vendor_id = ?)
+                LEFT JOIN users u_vendor ON cc.vendor_id = u_vendor.id -- Alias for the vendor's user record
+                LEFT JOIN vendor_profiles vp ON u_vendor.id = vp.user_id -- Join to get vendor_profiles.id
+                LEFT JOIN user_profiles up_vendor ON u_vendor.id = up_vendor.user_id
+                LEFT JOIN users u_customer ON cc.user_id = u_customer.id -- Alias for the customer's user record
+                LEFT JOIN user_profiles up_customer ON u_customer.id = up_customer.user_id
+                WHERE (cc.user_id = :userId7 OR cc.vendor_id = :userId8)
                 AND cc.status != 'archived' -- ADDED: Exclude archived chats
                 GROUP BY cc.id -- Group by cc.id to ensure one row per conversation
                 ORDER BY cc.last_message_at DESC, cc.id DESC -- Order by last_message_at primarily, then by ID for stability
-                LIMIT ?
+                LIMIT :limitVal
             ");
-            // Parameters: first two for CASE statements, third for unread_count subquery, next two for WHERE clause, last for LIMIT
-            $stmt->execute([(int)$user_id, (int)$user_id, (int)$user_id, (int)$user_id, (int)$user_id, (int)$limit]); // Cast all params to int
-            $results = $stmt->fetchAll(PDO::FETCH_ASSOC); // Fetch results
+            // Count parameters for execute: 8 for CASE statements + 1 for unread_count + 2 for WHERE + 1 for LIMIT = 12
+            $stmt->bindValue(':userId1', $user_id, PDO::PARAM_INT);
+            $stmt->bindValue(':userId2', $user_id, PDO::PARAM_INT);
+            $stmt->bindValue(':userId3', $user_id, PDO::PARAM_INT);
+            $stmt->bindValue(':userId4', $user_id, PDO::PARAM_INT);
+            $stmt->bindValue(':userId5', $user_id, PDO::PARAM_INT);
+            $stmt->bindValue(':userId6', $user_id, PDO::PARAM_INT);
+            $stmt->bindValue(':userId7', $user_id, PDO::PARAM_INT);
+            $stmt->bindValue(':userId8', $user_id, PDO::PARAM_INT);
+            $stmt->bindValue(':limitVal', $limit, PDO::PARAM_INT);
+
+            $stmt->execute();
+            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             // --- DEBUG LOGGING ADDED HERE ---
-            $this->debugToFile("getUserConversations: Query returned " . count($results) . " conversations. Results: " . json_encode($results)); // Corrected here
+            $this->debugToFile("getUserConversations: Query returned " . count($results) . " conversations. Results: " . json_encode($results)); 
             // --- END DEBUG LOGGING ---
 
             return $results;
         } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
-            $this->debugToFile("Chat.class.php getUserConversations error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString()); // Corrected here
+            $this->debugToFile("Chat.class.php getUserConversations error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString()); 
             return false;
         }
     }
@@ -374,7 +418,7 @@ class Chat {
             return $result;
         } catch (PDOException | Exception $e) {
             // Removed: $this->conn->rollBack(); // This method now relies on caller's transaction
-            $this->debugToFile("markConversationAsArchived error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString()); // Corrected here
+            $this->debugToFile("markConversationAsArchived error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString()); 
             return false;
         }
     }
@@ -392,7 +436,7 @@ class Chat {
                 WHERE conversation_id = ? AND sender_id != ? AND is_read = FALSE");
             return $stmt->execute([(int)$conversation_id, (int)$user_id]); // Cast to int for safety
         } catch (PDOException | Exception $e) {
-            $this->debugToFile("Chat.class.php markMessagesAsRead error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString()); // Corrected here
+            $this->debugToFile("Chat.class.php markMessagesAsRead error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString()); 
             return false;
         }
     }
@@ -417,7 +461,7 @@ class Chat {
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             return $result['unread_count'] ?? 0;
         } catch (PDOException | Exception $e) {
-            $this->debugToFile("Chat.class.php getUnreadCount error: " . $e->getTraceAsString()); // Corrected here
+            $this->debugToFile("Chat.class.php getUnreadCount error: " . $e->getTraceAsString()); 
             return 0;
         }
     }
