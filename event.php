@@ -1,7 +1,10 @@
 <?php
 require_once '../includes/config.php';
 require_once '../classes/Event.class.php'; // Include Event class
-include 'header.php';
+require_once '../classes/Booking.class.php'; // Include Booking class to check bookings
+require_once '../classes/User.class.php'; // For getting user details if event created by another user
+
+include 'header.php'; // This header automatically handles user type and loads appropriate CSS
 
 if (!isset($_SESSION['user_id']) || !isset($_GET['id'])) {
     header("Location: " . BASE_URL . "public/login.php");
@@ -11,56 +14,254 @@ if (!isset($_SESSION['user_id']) || !isset($_GET['id'])) {
 $eventId = (int)$_GET['id'];
 $userId = $_SESSION['user_id'];
 
-$event = new Event($pdo); // Pass PDO
-$eventDetails = $event->getEventById($eventId, $userId); // Use getEventById
+$event_obj = new Event($pdo); // Pass PDO
+$booking_obj = new Booking($pdo); // Instantiate Booking class
+$user_obj = new User($pdo); // Instantiate User class
+
+$eventDetails = $event_obj->getEventById($eventId); // Use getEventById without user_id for general view
+
+// Important: Add an authorization check here to ensure only the owner or an admin can view.
+// If the user is not an admin, verify ownership.
+if (!isset($_SESSION['user_type']) || ($_SESSION['user_type'] != 3)) { // Assuming 3 is admin type
+    if (!isset($eventDetails['user_id']) || $eventDetails['user_id'] != $userId) {
+        $_SESSION['error_message'] = "You do not have permission to view this event.";
+        header("Location: " . BASE_URL . "public/events.php");
+        exit();
+    }
+}
+
 
 if (empty($eventDetails)) {
+    $_SESSION['error_message'] = "Event not found.";
     header("Location: " . BASE_URL . "public/events.php");
     exit();
 }
+
+// --- Determine displayed status based on bookings ---
+$displayStatus = ucfirst(htmlspecialchars($eventDetails['status'])); // Default to event status
+$statusClass = strtolower(htmlspecialchars($eventDetails['status'])); // Default to event status class
+
+$bookingsForEvent = $booking_obj->getBookingsByEventId($eventId); // Fetch all bookings for this event
+$hasAnyBooking = !empty($bookingsForEvent); // Flag to check if any booking exists for the event
+
+if ($hasAnyBooking) {
+    $hasConfirmed = false;
+    $hasPendingReview = false;
+    $hasDeclined = false;
+
+    foreach ($bookingsForEvent as $booking) {
+        if ($booking['status'] === 'confirmed') {
+            $hasConfirmed = true;
+            break; // Confirmed takes precedence
+        }
+        if ($booking['status'] === 'pending_review' || $booking['status'] === 'pending') {
+            $hasPendingReview = true;
+        }
+        // Assuming 'cancelled' by vendor implies 'declined by vendor'
+        // If you add a specific 'declined' status in DB enum, use that here.
+        if ($booking['status'] === 'cancelled') { 
+            $hasDeclined = true;
+        }
+    }
+
+    if ($hasConfirmed) {
+        $displayStatus = 'Booked';
+        $statusClass = 'booked';
+    } elseif ($hasPendingReview) {
+        $displayStatus = 'Pending';
+        $statusClass = 'pending';
+    } elseif ($hasDeclined) {
+        $displayStatus = 'Declined by Vendor'; // More specific wording
+        $statusClass = 'declined'; // New class for declined
+    }
+    // If multiple bookings, and none of the above, it will still default to the first logic that sets $displayStatus.
+    // If it falls through all and there are bookings, but not of these statuses, it stays at original event status.
+}
+
+// Get the name of the user who created the event
+$eventCreator = $user_obj->getUserById($eventDetails['user_id']);
+$creatorName = htmlspecialchars($eventCreator['first_name'] ?? 'N/A') . ' ' . htmlspecialchars($eventCreator['last_name'] ?? '');
+
 ?>
+<style>
+    /* Add any specific styles for event.php if not covered by general styles */
+    .event-details-container {
+        max-width: 900px;
+        margin: var(--spacing-lg) auto;
+        padding: var(--spacing-md);
+        background: var(--white);
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .event-details-container h1 {
+        text-align: center;
+        margin-bottom: var(--spacing-lg);
+        color: var(--primary-color);
+        font-size: 2.5em;
+        border-bottom: 2px solid var(--border-color);
+        padding-bottom: var(--spacing-md);
+    }
+    .event-section-card {
+        background: var(--background-light);
+        padding: var(--spacing-md);
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: var(--spacing-lg);
+        border: 1px solid var(--light-grey-border);
+    }
+    .event-section-card h3 {
+        font-size: 1.6em;
+        color: var(--text-dark);
+        margin-top: 0;
+        margin-bottom: var(--spacing-md);
+        border-bottom: 1px dashed var(--border-color);
+        padding-bottom: var(--spacing-sm);
+    }
+    .event-section-card p {
+        margin-bottom: var(--spacing-sm);
+        color: var(--text-subtle);
+    }
+    .event-section-card p strong {
+        color: var(--text-dark);
+    }
+    .event-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: var(--spacing-sm);
+    }
+    .event-meta-grid p {
+        margin-bottom: 0;
+    }
+    .event-services-list ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .event-services-list li {
+        background-color: var(--white);
+        padding: var(--spacing-sm) var(--spacing-md);
+        border-radius: 6px;
+        margin-bottom: var(--spacing-xs);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        font-size: 0.95em;
+        color: var(--text-dark);
+    }
+    .event-actions {
+        display: flex;
+        justify-content: center;
+        gap: var(--spacing-md);
+        margin-top: var(--spacing-xl);
+        flex-wrap: wrap;
+    }
+    .event-actions .btn {
+        width: auto;
+        padding: 12px 25px;
+    }
+    /* New Status Badges (added for this page's context) */
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 15px; /* More rounded pill shape */
+        font-size: 0.75em;
+        font-weight: 600;
+        text-transform: uppercase;
+        white-space: nowrap;
+        vertical-align: middle; /* Align with text */
+    }
+    .status-booked { /* Represents 'confirmed' booking */
+        background: #d4edda; /* Light green */
+        color: #155724; /* Dark green */
+    }
+    .status-pending { /* Represents 'pending_review' or 'pending' booking */
+        background: #fff3cd; /* Light yellow */
+        color: #856404; /* Dark yellow */
+    }
+    .status-declined { /* Represents 'cancelled' booking, or a true 'declined' if added */
+        background: #f8d7da; /* Light red */
+        color: #721c24; /* Dark red */
+    }
+    /* Existing event statuses for fallback */
+    .status-planning { background: #ffeaa7; color: #fdcb6e; }
+    .status-active { background: #55efc4; color: #00b894; }
+    .status-completed { background: #a29bfe; color: #6c5ce7; }
+    .status-cancelled { background: #ff7675; color: #d63031; } /* Event cancelled status */
+
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .event-meta-grid {
+            grid-template-columns: 1fr;
+        }
+        .event-actions {
+            flex-direction: column;
+        }
+        .event-actions .btn {
+            width: 100%;
+        }
+    }
+</style>
+
 <div class="event-details-container">
     <h1><?= htmlspecialchars($eventDetails['title']) ?></h1>
 
-    <div class="event-meta">
-        <p><strong>Type:</strong> <?= htmlspecialchars($eventDetails['type_name'] ?? 'N/A') ?></p>
-        <p><strong>Start Date:</strong> <?= date('F j, Y', strtotime($eventDetails['event_date'])) ?></p>
-        <?php if ($eventDetails['event_time']): ?>
-        <p><strong>Start Time:</strong> <?= date('g:i A', strtotime($eventDetails['event_time'])) ?></p>
+    <div class="event-section-card">
+        <h3><i class="fas fa-info-circle"></i> Basic Information</h3>
+        <div class="event-meta-grid">
+            <p><strong>Type:</strong> <?= htmlspecialchars($eventDetails['type_name'] ?? 'N/A') ?></p>
+            <p><strong>Status:</strong> <span class="status-badge status-<?= $statusClass ?>"><?= $displayStatus ?></span></p>
+            <p><strong>Created By:</strong> <?= $creatorName ?></p>
+            <p><strong>Created On:</strong> <?= date('F j, Y', strtotime($eventDetails['created_at'])) ?></p>
+        </div>
+        <?php if ($eventDetails['description']): ?>
+            <p style="margin-top: var(--spacing-md);"><strong>Description:</strong></p>
+            <p><?= nl2br(htmlspecialchars($eventDetails['description'])) ?></p>
         <?php endif; ?>
-        <?php if ($eventDetails['end_date']): ?>
-        <p><strong>End Date:</strong> <?= date('F j, Y', strtotime($eventDetails['end_date'])) ?></p>
-        <?php endif; ?>
-        <?php if ($eventDetails['end_time']): ?>
-        <p><strong>End Time:</strong> <?= date('g:i A', strtotime($eventDetails['end_time'])) ?></p>
-        <?php endif; ?>
-        <p><strong>Status:</strong> <?= ucfirst(htmlspecialchars($eventDetails['status'])) ?></p>
     </div>
 
-    <?php if ($eventDetails['description']): ?>
-    <div class="event-description">
-        <h3>Description</h3>
-        <p><?= nl2br(htmlspecialchars($eventDetails['description'])) ?></p>
+    <div class="event-section-card">
+        <h3><i class="fas fa-calendar-alt"></i> Dates & Times</h3>
+        <div class="event-meta-grid">
+            <p><strong>Start Date:</strong> <?= date('F j, Y', strtotime($eventDetails['event_date'])) ?></p>
+            <?php if ($eventDetails['event_time']): ?>
+                <p><strong>Start Time:</strong> <?= date('g:i A', strtotime($eventDetails['event_time'])) ?></p>
+            <?php endif; ?>
+            <?php if ($eventDetails['end_date']): ?>
+                <p><strong>End Date:</strong> <?= date('F j, Y', strtotime($eventDetails['end_date'])) ?></p>
+            <?php endif; ?>
+            <?php if ($eventDetails['end_time']): ?>
+                <p><strong>End Time:</strong> <?= date('g:i A', strtotime($eventDetails['end_time'])) ?></p>
+            <?php endif; ?>
+        </div>
     </div>
-    <?php endif; ?>
 
-    <div class="event-location-details">
-        <h3>Location Details</h3>
+    <div class="event-section-card">
+        <h3><i class="fas fa-map-marker-alt"></i> Location Details</h3>
         <?php if ($eventDetails['location_string']): ?>
-            <p><strong>Location:</strong> <?= htmlspecialchars($eventDetails['location_string']) ?></p>
+            <p><strong>Location String:</strong> <?= htmlspecialchars($eventDetails['location_string']) ?></p>
         <?php endif; ?>
         <?php if ($eventDetails['venue_name']): ?>
             <p><strong>Venue Name:</strong> <?= htmlspecialchars($eventDetails['venue_name']) ?></p>
         <?php endif; ?>
-        <?php if ($eventDetails['venue_address']): ?>
-            <p><strong>Address:</strong> <?= htmlspecialchars($eventDetails['venue_address']) ?>, <?= htmlspecialchars($eventDetails['venue_city']) ?>, <?= htmlspecialchars($eventDetails['venue_state']) ?>, <?= htmlspecialchars($eventDetails['venue_postal_code']) ?>, <?= htmlspecialchars($eventDetails['venue_country']) ?></p>
+        <?php if ($eventDetails['venue_address'] || $eventDetails['venue_city']): ?>
+            <p><strong>Full Address:</strong> 
+                <?php 
+                    $address_parts = [];
+                    if($eventDetails['venue_address']) $address_parts[] = htmlspecialchars($eventDetails['venue_address']);
+                    if($eventDetails['venue_city']) $address_parts[] = htmlspecialchars($eventDetails['venue_city']);
+                    if($eventDetails['venue_state']) $address_parts[] = htmlspecialchars($eventDetails['venue_state']);
+                    if($eventDetails['venue_postal_code']) $address_parts[] = htmlspecialchars($eventDetails['venue_postal_code']);
+                    if($eventDetails['venue_country']) $address_parts[] = htmlspecialchars($eventDetails['venue_country']);
+                    echo implode(', ', $address_parts);
+                ?>
+            </p>
         <?php endif; ?>
     </div>
 
-    <div class="event-guest-budget">
-        <h3>Guests & Budget</h3>
-        <p><strong>Expected Guests:</strong> <?= htmlspecialchars($eventDetails['guest_count'] ?? 'TBD') ?></p>
-        <p><strong>Budget Range:</strong> $<?= number_format($eventDetails['budget_min'] ?? 0, 2) ?> - $<?= number_format($eventDetails['budget_max'] ?? 0, 2) ?></p>
+    <div class="event-section-card">
+        <h3><i class="fas fa-users"></i> Guests & Budget</h3>
+        <div class="event-meta-grid">
+            <p><strong>Expected Guests:</strong> <?= htmlspecialchars($eventDetails['guest_count'] ?? 'TBD') ?></p>
+            <p><strong>Budget Range:</strong> PKR <?= number_format($eventDetails['budget_min'] ?? 0, 2) ?> - PKR <?= number_format($eventDetails['budget_max'] ?? 0, 2) ?></p>
+        </div>
     </div>
 
     <?php
@@ -73,13 +274,13 @@ if (empty($eventDetails)) {
     ", [$eventId]);
     if (!empty($requiredServices)):
     ?>
-    <div class="event-services">
-        <h3>Required Services</h3>
+    <div class="event-section-card event-services-list">
+        <h3><i class="fas fa-concierge-bell"></i> Required Services</h3>
         <ul>
             <?php foreach ($requiredServices as $service): ?>
                 <li>
                     <strong><?= htmlspecialchars($service['service_name']) ?></strong> (Priority: <?= ucfirst(htmlspecialchars($service['priority'])) ?>)
-                    <?php if ($service['budget_allocated']): ?> - Allocated: $<?= number_format($service['budget_allocated'], 2) ?><?php endif; ?>
+                    <?php if ($service['budget_allocated']): ?> - Allocated: PKR <?= number_format($service['budget_allocated'], 2) ?><?php endif; ?>
                     <?php if ($service['specific_requirements']): ?> <br> <em>"<?= htmlspecialchars($service['specific_requirements']) ?>"</em><?php endif; ?>
                 </li>
             <?php endforeach; ?>
@@ -88,16 +289,22 @@ if (empty($eventDetails)) {
     <?php endif; ?>
 
     <?php if ($eventDetails['special_requirements']): ?>
-    <div class="event-special-requirements">
-        <h3>Special Requirements</h3>
+    <div class="event-section-card">
+        <h3><i class="fas fa-clipboard-list"></i> Special Requirements</h3>
         <p><?= nl2br(htmlspecialchars($eventDetails['special_requirements'])) ?></p>
     </div>
     <?php endif; ?>
 
     <div class="event-actions">
-        <a href="edit_event.php?id=<?= $eventId ?>" class="btn btn-primary">Edit Event</a>
-        <a href="ai_chat.php?event_id=<?= $eventId ?>" class="btn btn-secondary">Get AI Recommendations</a>
-        <a href="<?= BASE_URL ?>public/chat.php?event_id=<?= $eventId ?>&user_id=<?= $_SESSION['user_id'] ?>&vendor_id=" class="btn">Start Chat</a>
+        <?php if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 3): // Admin actions ?>
+            <a href="<?= BASE_URL ?>public/admin/events.php" class="btn btn-secondary">Back to Events Management</a>
+        <?php else: // Customer actions ?>
+            <?php if (!$hasAnyBooking): // Only show edit if no bookings exist for this event ?>
+                <a href="edit_event.php?id=<?= $eventId ?>" class="btn btn-primary">Edit Event</a>
+            <?php endif; ?>
+            <a href="ai_chat.php?event_id=<?= $eventId ?>" class="btn btn-secondary">Get AI Recommendations</a>
+            <a href="<?= BASE_URL ?>public/chat.php?event_id=<?= $eventId ?>&vendor_id=" class="btn">Start Chat</a>
+        <?php endif; ?>
     </div>
 </div>
 <?php include 'footer.php'; ?>
