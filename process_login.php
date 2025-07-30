@@ -59,7 +59,15 @@ try {
     }
 } catch (Exception $e) {
     // Catch the specific exceptions thrown by the login method
-    $_SESSION['login_error'] = $e->getMessage();
+    $errorMessage = $e->getMessage();
+    // Check for specific messages to provide more user-friendly errors
+    if (strpos($errorMessage, "email address is not verified") !== false) {
+        $_SESSION['login_error'] = "Your email address is not verified. Please check your inbox for the verification link.";
+    } elseif (strpos($errorMessage, "account has been deactivated") !== false) {
+        $_SESSION['login_error'] = "Your account has been deactivated. Please contact support for assistance.";
+    } else {
+        $_SESSION['login_error'] = "Login failed: " . $errorMessage; // Fallback for other unexpected errors
+    }
     header("Location: login.php");
     exit();
 }
