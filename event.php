@@ -3,6 +3,7 @@ require_once '../includes/config.php';
 require_once '../classes/Event.class.php'; // Include Event class
 require_once '../classes/Booking.class.php'; // Include Booking class to check bookings
 require_once '../classes/User.class.php'; // For getting user details if event created by another user
+require_once '../classes/Vendor.class.php'; // For vendor profile link
 
 include 'header.php'; // This header automatically handles user type and loads appropriate CSS
 
@@ -17,6 +18,7 @@ $userId = $_SESSION['user_id'];
 $event_obj = new Event($pdo); // Pass PDO
 $booking_obj = new Booking($pdo); // Instantiate Booking class
 $user_obj = new User($pdo); // Instantiate User class
+$vendor_obj = new Vendor($pdo); // Instantiate Vendor class
 
 $eventDetails = $event_obj->getEventById($eventId); // Use getEventById without user_id for general view
 
@@ -78,7 +80,7 @@ if ($hasAnyBooking) {
     // If it falls through all and there are bookings, but not of these statuses, it stays at original event status.
 }
 
-// Get the name of the user who created the event
+// Get the name and details of the user who created the event
 $eventCreator = $user_obj->getUserById($eventDetails['user_id']);
 $creatorName = htmlspecialchars($eventCreator['first_name'] ?? 'N/A') . ' ' . htmlspecialchars($eventCreator['last_name'] ?? '');
 
@@ -185,6 +187,62 @@ $creatorName = htmlspecialchars($eventCreator['first_name'] ?? 'N/A') . ' ' . ht
     .status-completed { background: #a29bfe; color: #6c5ce7; }
     .status-cancelled { background: #ff7675; color: #d63031; } /* Event cancelled status */
 
+    /* New styles for AI Preferences and booking lists */
+    .ai-preferences-toggle {
+        background: none;
+        border: none;
+        color: var(--primary-color);
+        text-decoration: underline;
+        cursor: pointer;
+        font-size: 0.9em;
+        margin-top: var(--spacing-sm);
+        display: block;
+        text-align: left;
+    }
+    .ai-preferences-content {
+        display: none;
+        background-color: var(--white);
+        padding: var(--spacing-sm);
+        border-radius: 5px;
+        margin-top: var(--spacing-sm);
+        font-family: monospace;
+        white-space: pre-wrap; /* Preserve whitespace and newlines */
+        font-size: 0.85em;
+        color: var(--text-dark);
+        border: 1px solid var(--border-color);
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .ai-preferences-content.active {
+        display: block;
+    }
+    .bookings-list-item {
+        background-color: var(--white);
+        padding: var(--spacing-sm) var(--spacing-md);
+        border-radius: 6px;
+        margin-bottom: var(--spacing-xs);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-xs);
+    }
+    .bookings-list-item p {
+        margin: 0;
+        color: var(--text-dark);
+        font-size: 0.95em;
+    }
+    .bookings-list-item p strong {
+        color: var(--primary-color);
+    }
+    .bookings-list-item .booking-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-sm);
+    }
+    .bookings-list-item .booking-actions .btn {
+        padding: 5px 10px;
+        font-size: 0.8em;
+    }
 
     /* Responsive adjustments */
     @media (max-width: 768px) {
@@ -209,11 +267,24 @@ $creatorName = htmlspecialchars($eventCreator['first_name'] ?? 'N/A') . ' ' . ht
             <p><strong>Type:</strong> <?= htmlspecialchars($eventDetails['type_name'] ?? 'N/A') ?></p>
             <p><strong>Status:</strong> <span class="status-badge status-<?= $statusClass ?>"><?= $displayStatus ?></span></p>
             <p><strong>Created By:</strong> <?= $creatorName ?></p>
+            <?php if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 3): // Admin-specific details ?>
+                <p><strong>Creator Email:</strong> <?= htmlspecialchars($eventCreator['email'] ?? 'N/A') ?></p>
+                <p><strong>Creator Phone:</strong> <?= htmlspecialchars($eventCreator['phone'] ?? 'N/A') ?></p>
+            <?php endif; ?>
             <p><strong>Created On:</strong> <?= date('F j, Y', strtotime($eventDetails['created_at'])) ?></p>
         </div>
         <?php if ($eventDetails['description']): ?>
             <p style="margin-top: var(--spacing-md);"><strong>Description:</strong></p>
             <p><?= nl2br(htmlspecialchars($eventDetails['description'])) ?></p>
+        <?php endif; ?>
+
+        <?php if (!empty($eventDetails['ai_preferences']) && (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 3)): // Show AI preferences only to admin ?>
+            <h4 style="margin-top: var(--spacing-lg); color: var(--text-dark);">AI Planning Details:</h4>
+            <p>This event was planned with AI assistance. </p>
+            <button type="button" class="ai-preferences-toggle" data-target="#ai-preferences-content">View AI Preferences (JSON)</button>
+            <div id="ai-preferences-content" class="ai-preferences-content">
+                <?= htmlspecialchars(json_encode(json_decode($eventDetails['ai_preferences'], true), JSON_PRETTY_PRINT)) ?>
+            </div>
         <?php endif; ?>
     </div>
 
@@ -295,10 +366,34 @@ $creatorName = htmlspecialchars($eventCreator['first_name'] ?? 'N/A') . ' ' . ht
     </div>
     <?php endif; ?>
 
+    <?php if ($hasAnyBooking): ?>
+    <div class="event-section-card event-bookings-list">
+        <h3><i class="fas fa-book-open"></i> Associated Bookings</h3>
+        <?php foreach ($bookingsForEvent as $booking):
+            $vendorProfile = $vendor_obj->getVendorProfileById($booking['vendor_id']);
+            $vendorName = htmlspecialchars($vendorProfile['business_name'] ?? 'N/A');
+            $bookingStatusClass = strtolower(htmlspecialchars($booking['status']));
+            $bookingDisplayStatus = ucfirst(htmlspecialchars($booking['status']));
+            ?>
+            <div class="bookings-list-item">
+                <p><strong>Booking ID:</strong> <?= htmlspecialchars($booking['id']) ?></p>
+                <p><strong>Vendor:</strong> <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($booking['vendor_id']) ?>"><?= $vendorName ?></a></p>
+                <p><strong>Service Date:</strong> <?= date('F j, Y', strtotime($booking['service_date'])) ?></p>
+                <p><strong>Amount:</strong> PKR <?= number_format($booking['final_amount'], 2) ?> (Deposit: PKR <?= number_format($booking['deposit_amount'], 2) ?>)</p>
+                <p><strong>Status:</strong> <span class="status-badge status-<?= $bookingStatusClass ?>"><?= $bookingDisplayStatus ?></span></p>
+                <p><strong>Booked On:</strong> <?= date('F j, Y g:i A', strtotime($booking['created_at'])) ?></p>
+                <div class="booking-actions">
+                    <a href="<?= BASE_URL ?>public/booking.php?id=<?= htmlspecialchars($booking['id']) ?>" class="btn btn-sm btn-info">View Booking Details</a>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
     <div class="event-actions">
         <?php if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 3): // Admin actions ?>
             <a href="<?= BASE_URL ?>public/admin/events.php" class="btn btn-secondary">Back to Events Management</a>
-        <?php else: // Customer actions ?>
+        <?php else: // Customer actions (these links are still there but admin view takes precedence) ?>
             <?php if (!$hasAnyBooking): // Only show edit if no bookings exist for this event ?>
                 <a href="edit_event.php?id=<?= $eventId ?>" class="btn btn-primary">Edit Event</a>
             <?php endif; ?>
@@ -307,4 +402,26 @@ $creatorName = htmlspecialchars($eventCreator['first_name'] ?? 'N/A') . ' ' . ht
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle AI Preferences JSON display
+    const aiPreferencesToggle = document.querySelector('.ai-preferences-toggle');
+    if (aiPreferencesToggle) {
+        aiPreferencesToggle.addEventListener('click', function() {
+            const targetId = this.dataset.target;
+            const targetElement = document.querySelector(targetId);
+            if (targetElement) {
+                targetElement.classList.toggle('active');
+                if (targetElement.classList.contains('active')) {
+                    this.textContent = 'Hide AI Preferences (JSON)';
+                } else {
+                    this.textContent = 'View AI Preferences (JSON)';
+                }
+            }
+        });
+    }
+});
+</script>
+
 <?php include 'footer.php'; ?>
