@@ -55,18 +55,20 @@ class User {
 
     public function login($email, $password) {
         try {
-            $stmt = $this->pdo->prepare("SELECT id, password_hash, user_type_id, first_name, email, email_verified, is_active FROM users WHERE email = ? AND is_active = 1");
+            $stmt = $this->pdo->prepare("SELECT id, password_hash, user_type_id, first_name, email, email_verified, is_active FROM users WHERE email = ?"); // Removed is_active=1 from query
             $stmt->execute([$email]);
             $user = $stmt->fetch();
 
             if ($user && password_verify($password, $user['password_hash'])) {
                 if (!$user['email_verified']) {
-                    // Check if email is verified
-                    throw new Exception("Your email address is not verified. Please check your inbox.");
+                    throw new Exception("Your email address is not verified. Please check your inbox for the verification link.");
                 }
-                // if (!$user['is_active']) { // is_active check is already part of the SQL query.
-                //     throw new Exception("Your account is not active. Please contact support.");
-                // }
+                // --- NEW: Check for deactivated account specifically ---
+                if (!$user['is_active']) {
+                    throw new Exception("Your account has been deactivated. Please contact support for assistance.");
+                }
+                // --- END NEW CHECK ---
+
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_type'] = $user['user_type_id'];
                 $_SESSION['user_name'] = $user['first_name'];
@@ -79,8 +81,7 @@ class User {
             error_log("Login error: " . $e->getMessage());
             return false;
         } catch (Exception $e) {
-            // Catch custom exceptions like "email not verified" and re-throw them
-            // so login.php can display them.
+            // Re-throw custom exceptions like "email not verified" or "account deactivated"
             throw $e;
         }
     }
@@ -314,6 +315,55 @@ class User {
         } catch (PDOException $e) {
             error_log("Error in User::getAllUsers(): " . $e->getMessage());
             return [];
+        }
+    }
+    
+    /**
+     * NEW: Method to update a user's active status.
+     * @param int $userId The ID of the user to update.
+     * @param int $isActive 1 for active, 0 for inactive.
+     * @return bool True on success, false on failure.
+     */
+    public function updateUserStatus(int $userId, int $isActive): bool {
+        try {
+            $stmt = $this->pdo->prepare("UPDATE users SET is_active = ?, updated_at = NOW() WHERE id = ?");
+            return $stmt->execute([$isActive, $userId]);
+        } catch (PDOException $e) {
+            error_log("Failed to update user status for ID {$userId}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * NEW: Method to delete a user and all associated data.
+     * @param int $userId The ID of the user to delete.
+     * @return bool True on success, false on failure.
+     */
+    public function deleteUser(int $userId): bool {
+        try {
+            $this->pdo->beginTransaction(); // Start a transaction for atomicity
+
+            // Deleting from 'users' table will trigger cascade deletes in most related tables
+            // (user_profiles, events, bookings, chat_conversations, etc.) due to FK constraints.
+            $stmt = $this->pdo->prepare("DELETE FROM users WHERE id = ?");
+            $success = $stmt->execute([$userId]);
+
+            if ($success) {
+                $this->pdo->commit();
+                return true;
+            } else {
+                $this->pdo->rollBack();
+                error_log("Failed to delete user ID {$userId}: " . implode(" | ", $stmt->errorInfo()));
+                return false;
+            }
+        } catch (PDOException $e) {
+            $this->pdo->rollBack();
+            error_log("PDOException deleting user ID {$userId}: " . $e->getMessage());
+            return false;
+        } catch (Exception $e) {
+            $this->pdo->rollBack();
+            error_log("General Exception deleting user ID {$userId}: " . $e->getMessage());
+            return false;
         }
     }
 }
