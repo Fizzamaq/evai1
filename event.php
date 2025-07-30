@@ -54,13 +54,12 @@ if ($hasAnyBooking) {
     foreach ($bookingsForEvent as $booking) {
         if ($booking['status'] === 'confirmed') {
             $hasConfirmed = true;
-            break; // Confirmed takes precedence
+            break; 
         }
-        if ($booking['status'] === 'pending_review' || $booking['status'] === 'pending') {
-            $hasPendingReview = true;
+        // Treat empty string status as 'pending' for display
+        if ($booking['status'] === 'pending_review' || $booking['status'] === 'pending' || $booking['status'] === "") { 
+            $hasPendingReview = true; 
         }
-        // Assuming 'cancelled' by vendor implies 'declined by vendor'
-        // If you add a specific 'declined' status in DB enum, use that here.
         if ($booking['status'] === 'cancelled') { 
             $hasDeclined = true;
         }
@@ -73,8 +72,8 @@ if ($hasAnyBooking) {
         $displayStatus = 'Pending';
         $statusClass = 'pending';
     } elseif ($hasDeclined) {
-        $displayStatus = 'Declined by Vendor'; // More specific wording
-        $statusClass = 'declined'; // New class for declined
+        $displayStatus = 'Declined by Vendor';
+        $statusClass = 'declined';
     }
     // If multiple bookings, and none of the above, it will still default to the first logic that sets $displayStatus.
     // If it falls through all and there are bookings, but not of these statuses, it stays at original event status.
