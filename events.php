@@ -366,7 +366,10 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
 
                                 foreach ($event_item['bookings'] as $booking) {
                                     if ($booking['status'] === 'confirmed') { $hasConfirmedBooking = true; }
-                                    if ($booking['status'] === 'pending_review' || $booking['status'] === 'pending') { $hasPendingBooking = true; }
+                                    // Treat empty string status as 'pending' for display
+                                    if ($booking['status'] === 'pending_review' || $booking['status'] === 'pending' || $booking['status'] === "") { 
+                                        $hasPendingBooking = true; 
+                                    }
                                     if ($booking['status'] === 'cancelled') { $hasDeclinedBooking = true; } // Assuming cancelled means declined by vendor
                                 }
 
