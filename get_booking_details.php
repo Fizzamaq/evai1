@@ -45,13 +45,14 @@ try {
     // A user can view their own booking (if they are the customer)
     // OR a vendor can view a booking if it belongs to their vendor profile.
     
-    // Line 61: Corrected syntax for PHP < 7.0 by using ternary operator
+    // Check if the logged-in user is the customer for this booking
     $is_customer = (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 1 && $booking['user_id'] == $_SESSION['user_id']);
     
+    // Check if the logged-in user is the vendor for this booking
     $is_vendor = false;
-    if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2 && isset($_SESSION['vendor_id'])) {
-        // If current user is a vendor, check if the booking's vendor_id matches their vendor_profile_id
-        if ($booking['vendor_id'] == $_SESSION['vendor_id']) {
+    if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 2 is vendor type
+        $vendor_profile_for_session_user = $vendor->getVendorByUserId($_SESSION['user_id']); // Get the vendor profile ID for the logged-in vendor user
+        if ($vendor_profile_for_session_user && $booking['vendor_id'] == $vendor_profile_for_session_user['id']) {
             $is_vendor = true;
         }
     }
@@ -59,7 +60,7 @@ try {
     if (!$is_customer && !$is_vendor) {
         http_response_code(403);
         echo json_encode(['success' => false, 'error' => 'Access denied. This booking does not belong to your account.']);
-        error_log("Access denied. User ID: " . ($_SESSION['user_id'] ?? 'N/A') . ", User Type: " . ($_SESSION['user_type'] ?? 'N/A') . ", Booking User ID: {$booking['user_id']}, Booking Vendor ID: {$booking['vendor_id']}, Session Vendor ID: " . ($_SESSION['vendor_id'] ?? 'N/A'));
+        error_log("Access denied. User ID: " . ($_SESSION['user_id'] ?? 'N/A') . ", User Type: " . ($_SESSION['user_type'] ?? 'N/A') . ", Booking User ID: {$booking['user_id']}, Booking Vendor ID: {$booking['vendor_id']}, Session Vendor Profile ID: " . ($vendor_profile_for_session_user['id'] ?? 'N/A'));
         exit();
     }
     // --- End Access Control Check ---
@@ -68,9 +69,9 @@ try {
     // Fetch related details
     $event_details = null;
     if ($booking['event_id']) {
-        $event_details = $pdo->prepare("SELECT title FROM events WHERE id = ?");
-        $event_details->execute([$booking['event_id']]);
-        $event_details = $event_details->fetch(PDO::FETCH_ASSOC);
+        $event_details_stmt = $pdo->prepare("SELECT title FROM events WHERE id = ?");
+        $event_details_stmt->execute([$booking['event_id']]);
+        $event_details = $event_details_stmt->fetch(PDO::FETCH_ASSOC);
         $booking['event_title'] = isset($event_details['title']) ? $event_details['title'] : 'N/A';
     }
 
@@ -82,6 +83,7 @@ try {
         'first_name' => $client_details['first_name'],
         'last_name' => $client_details['last_name'],
         'email' => $client_details['email'],
+        'phone' => $client_details['phone'] ?? null, // Include phone for admin/vendor if needed
     ];
 
     // Fetch vendor business name (from vendor_profiles)
