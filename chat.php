@@ -188,112 +188,79 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
     if ($conversation_id) {
         $chat->markMessagesAsRead($conversation_id, $_SESSION['user_id']); // Mark as read on full page load or AJAX refresh
 
-        try {
-            $stmt = $pdo->prepare("
-                SELECT cc.*,
-                       e.title as event_title,
-                       CASE
-                         WHEN cc.user_id = ? THEN vp.business_name
-                         ELSE CONCAT(u.first_name, ' ', u.last_name)
-                       END as other_party_name,
-                       CASE
-                         WHEN cc.user_id = ? THEN up_vendor.profile_image
-                         ELSE up_user.profile_image
-                       END as other_party_image
-                    FROM chat_conversations cc
-                    LEFT JOIN events e ON cc.event_id = e.id
-                    LEFT JOIN users u ON cc.vendor_id = u.id
-                    LEFT JOIN vendor_profiles vp ON u.id = vp.user_id
-                    LEFT JOIN user_profiles up_vendor ON u.id = up_vendor.user_id
-                    LEFT JOIN users u2 ON cc.user_id = u2.id
-                    LEFT JOIN user_profiles up_user ON u2.id = up_user.user_id
-                    WHERE cc.id = ?
-                    AND (cc.user_id = ? OR cc.vendor_id = ?)
-                ");
-                $params = [ 
-                    $_SESSION['user_id'], 
-                    $_SESSION['user_id'], 
-                    $conversation_id,
-                    $_SESSION['user_id'], 
-                    $_SESSION['user_id']  
-                ];
-                $stmt->execute($params);
-                $current_conversation_details = $stmt->fetch(PDO::FETCH_ASSOC);
+        // Use the getConversationById method to fetch details including other_party_id and type
+        $current_conversation_details = $chat->getConversationById((int)$conversation_id, (int)$_SESSION['user_id']);
 
-                if ($current_conversation_details) {
-                    // Determine the 'other party' (the vendor in this customer chat)
-                    $other_party_user_id = ($current_conversation_details['user_id'] == $_SESSION['user_id']) ? $current_conversation_details['vendor_id'] : $current_conversation_details['user_id'];
-
-                    $other_party = [
-                        'id' => (int)$other_party_user_id,
-                        'name' => htmlspecialchars((string)($current_conversation_details['other_party_name'] ?? 'Unknown User')),
-                        'image' => htmlspecialchars((string)($current_conversation_details['other_party_image'] ?? ''))
-                    ];
-                    
-                    // If it's an AJAX request (polling), return JSON
-                    if ($is_ajax_request) { 
-                        $last_message_id_for_polling = $_GET['last_message_id'] ?? null; 
-                        $messages = $chat->getMessages($conversation_id, 100, 0, $last_message_id_for_polling);
-                        echo json_encode(['success' => true, 'messages' => array_values($messages)]);
-                        exit(); 
-                    } else { // Initial page load
-                        $messages = $chat->getMessages($conversation_id, 100); 
-                    }
-
-                } else {
-                    error_log("Chat GET: Conversation ID {$conversation_id} not found or not accessible to user {$_SESSION['user_id']}.");
-                    $conversation_id = null; 
-                }
-            } catch (PDOException $e) {
-                error_log("Chat GET: Get conversation details error: " . $e->getMessage());
-                if ($is_ajax_request) {
-                    echo json_encode(['success' => false, 'error' => 'Failed to load conversation details for polling.']);
-                } else {
-                    $_SESSION['error_message'] = "Could not load conversation details. Please try again.";
-                }
-                $current_conversation_details = null;
-                $conversation_id = null; 
+        if ($current_conversation_details) {
+            // Use other_party_profile_id for constructing the link
+            $other_party = [
+                'id' => (int)($current_conversation_details['other_party_id'] ?? 0), // This is the users.id
+                'profile_id' => (int)($current_conversation_details['other_party_profile_id'] ?? 0), // This is the vendor_profiles.id or users.id for regular user
+                'name' => htmlspecialchars((string)($current_conversation_details['other_party_name'] ?? 'Unknown User')),
+                'image' => htmlspecialchars((string)($current_conversation_details['other_party_image'] ?? '')),
+                'type_id' => (int)($current_conversation_details['other_party_type_id'] ?? 0)
+            ];
+            
+            // If it's an AJAX request (polling), return JSON
+            if ($is_ajax_request) { 
+                $last_message_id_for_polling = $_GET['last_message_id'] ?? null; 
+                $messages = $chat->getMessages($conversation_id, 100, 0, $last_message_id_for_polling);
+                echo json_encode(['success' => true, 'messages' => array_values($messages)]);
+                exit(); 
+            } else { // Initial page load
+                $messages = $chat->getMessages($conversation_id, 100); 
             }
-        } elseif ($vendor_id_from_url) {
-            // This case handles a *new* chat initiation directly from a vendor profile
-            try {
-                // Ensure vendor_id_from_url is an integer
-                $vendor_user_id = (int)$vendor_id_from_url;
 
-                $stmt_vendor = $pdo->prepare("SELECT vp.business_name, up.profile_image FROM vendor_profiles vp JOIN users u ON vp.user_id = u.id LEFT JOIN user_profiles up ON u.id = up.user_id WHERE u.id = ?");
-                $stmt_vendor->execute([$vendor_user_id]);
-                $vendor_info = $stmt_vendor->fetch(PDO::FETCH_ASSOC);
-                if (is_array($vendor_info) && !empty($vendor_info)) {
-                    $other_party = [
-                        'id' => $vendor_user_id,
-                        'name' => htmlspecialchars((string)($vendor_info['business_name'] ?? 'Unknown Vendor')),
-                        'image' => htmlspecialchars((string)($vendor_info['profile_image'] ?? ''))
-                    ];
-                    // Also get event title if available
-                    if (!empty($event_id_from_url)) {
-                        $event_details_for_new_chat = $event->getEventById((int)$event_id_from_url); 
-                        if ($event_details_for_new_chat) {
-                            $current_conversation_details = ['event_title' => $event_details_for_new_chat['title']];
-                        }
-                    }
-                } else {
-                    error_log("Chat GET: Error fetching vendor info: Vendor ID '{$vendor_id_from_url}' not found or no profile.");
-                    $other_party = null; 
-                    $_SESSION['error_message'] = "Invalid vendor selected to start chat.";
-                }
-            } catch (PDOException $e) {
-                error_log("Chat GET: Error fetching vendor info for new chat initiation (GET): " . $e->getMessage());
-                $other_party = null; 
-                $_SESSION['error_message'] = "Could not prepare new chat. Please try again.";
-            }
+        } else {
+            error_log("Chat GET: Conversation ID {$conversation_id} not found or not accessible to user {$_SESSION['user_id']}.");
+            $conversation_id = null; 
         }
+    } elseif ($vendor_id_from_url) {
+        // This case handles a *new* chat initiation directly from a vendor profile
+        try {
+            // Ensure vendor_id_from_url is an integer
+            $vendor_user_id = (int)$vendor_id_from_url;
+
+            // Fetch vendor's user info and profile for the new chat header
+            // Explicitly selecting u.id, u.user_type_id, and vp.id for the profile link
+            $stmt_vendor = $pdo->prepare("SELECT u.id AS user_id, u.user_type_id, vp.id AS vendor_profile_id, vp.business_name, up.profile_image FROM users u LEFT JOIN vendor_profiles vp ON u.id = vp.user_id LEFT JOIN user_profiles up ON u.id = up.user_id WHERE u.id = ?");
+            $stmt_vendor->execute([$vendor_user_id]);
+            $vendor_info = $stmt_vendor->fetch(PDO::FETCH_ASSOC);
+            if (is_array($vendor_info) && !empty($vendor_info)) {
+                $other_party = [
+                    'id' => (int)($vendor_info['user_id'] ?? 0), // This is the users.id
+                    'profile_id' => (int)($vendor_info['vendor_profile_id'] ?? 0), // This is the actual vendor_profiles.id
+                    'name' => htmlspecialchars((string)($vendor_info['business_name'] ?? 'Unknown Vendor')),
+                    'image' => htmlspecialchars((string)($vendor_info['profile_image'] ?? '')),
+                    'type_id' => (int)($vendor_info['user_type_id'] ?? 0)
+                ];
+                // Also get event title if available
+                if (!empty($event_id_from_url)) {
+                    $event_details_for_new_chat = $event->getEventById((int)$event_id_from_url); 
+                    if ($event_details_for_new_chat) {
+                        $current_conversation_details = ['event_title' => $event_details_for_new_chat['title']];
+                    }
+                }
+            } else {
+                error_log("Chat GET: Error fetching vendor info: Vendor ID '{$vendor_id_from_url}' not found or no profile.");
+                $other_party = null; 
+                $_SESSION['error_message'] = "Invalid vendor selected to start chat.";
+            }
+        } catch (PDOException $e) {
+            error_log("Chat GET: Error fetching vendor info for new chat initiation (GET): " . $e->getMessage());
+            $other_party = null; 
+            $_SESSION['error_message'] = "Could not prepare new chat. Please try again.";
+        }
+    }
     
     // If other_party is not set by now (i.e., not an existing convo or new convo with vendor_id), set a default
     if (!isset($other_party)) {
         $other_party = [
             'id' => null,
+            'profile_id' => null, // Ensure this is also null
             'name' => 'Select Chat',
-            'image' => ''
+            'image' => '',
+            'type_id' => null
         ];
     }
 
@@ -312,6 +279,18 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
     <link rel="stylesheet" href="<?= BASE_URL ?>assets/css/chat.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .chat-header-info .profile-link {
+            text-decoration: none;
+            color: inherit;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+        .chat-header-info .profile-link:hover {
+            color: var(--primary-color); /* Or a highlight color */
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
     <?php include 'header.php'; ?>
@@ -361,7 +340,26 @@ $csrf_token = generateCSRFToken(); // Generate for GET form
                 <div class="chat-header">
                     <div class="chat-header-avatar" style="background-image: url('<?php echo htmlspecialchars((string)($other_party['image'] ? BASE_URL . 'assets/uploads/users/' . $other_party['image'] : BASE_URL . 'assets/images/default-avatar.jpg')); ?>')"></div>
                     <div class="chat-header-info">
-                        <div class="chat-header-title"><?php echo htmlspecialchars((string)($other_party['name'] ?? 'New Chat')); ?></div>
+                        <div class="chat-header-title">
+                            <?php 
+                            // Determine the profile link based on other_party_type_id and other_party_profile_id
+                            $profile_link = '';
+                            if (isset($other_party['profile_id']) && $other_party['profile_id'] !== null && isset($other_party['type_id']) && $other_party['type_id'] !== null) {
+                                if ($other_party['type_id'] == 2) { // Assuming 2 is vendor type
+                                    $profile_link = BASE_URL . 'public/vendor_profile.php?id=' . $other_party['profile_id'];
+                                } else { // Otherwise, it's a regular user, use their profile_id (which is their users.id)
+                                    $profile_link = BASE_URL . 'public/user_profile.php?id=' . $other_party['profile_id'];
+                                }
+                            }
+                            ?>
+                            <?php if (!empty($profile_link)): ?>
+                                <a href="<?= $profile_link ?>" class="profile-link">
+                                    <?= htmlspecialchars((string)($other_party['name'] ?? 'New Chat')) ?>
+                                </a>
+                            <?php else: ?>
+                                <?= htmlspecialchars((string)($other_party['name'] ?? 'New Chat')) ?>
+                            <?php endif; ?>
+                        </div>
                         <div class="chat-header-subtitle">
                             <?php
                             if (isset($current_conversation_details['event_title']) && $current_conversation_details['event_title'] !== null) {
