@@ -7,7 +7,18 @@ class Event {
         $this->pdo = $pdo;
     }
 
-    // MODIFIED: createEvent now takes a data array for flexibility
+    // --- NEW DEBUGGING FUNCTION (TEMPORARY) ---
+    private function debugToFile($message) {
+        $logFile = __DIR__ . '/chat_debug.log'; // Using chat_debug.log for consistency, could be event_debug.log
+        $timestamp = date('Y-m-d H:i:s');
+        file_put_contents($logFile, "[{$timestamp}] {$message}\n", FILE_APPEND);
+    }
+    // --- END NEW DEBUGGING FUNCTION ---
+
+
+    /**
+     * MODIFIED: createEvent now takes a data array for flexibility.
+     */
     public function createEvent($data) {
         try {
             // Default values for optional fields if not provided in $data
@@ -176,7 +187,6 @@ class Event {
             error_log("Delete Event PDO Exception: " . $e->getMessage());
             return false;
         } catch (Exception $e) {
-            // Catch and log any other general exceptions
             error_log("Delete Event General Exception: " . $e->getMessage());
             return false;
         }
@@ -392,13 +402,16 @@ class Event {
 
     /**
      * NEW: Method to get all events for the admin panel.
+     * Includes the earliest booking date for each event.
      * @return array
      */
     public function getAllEvents() {
         try {
-            $sql = "SELECT e.*, et.type_name
+            $sql = "SELECT e.*, et.type_name,
+                           (SELECT MIN(b.created_at) FROM bookings b WHERE b.event_id = e.id) as date_of_booking
                     FROM events e
                     JOIN event_types et ON e.event_type_id = et.id
+                    WHERE e.status != 'deleted' /* ADDED: Filter out soft-deleted events */
                     ORDER BY e.event_date ASC, e.created_at DESC";
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute();
@@ -417,7 +430,7 @@ class Event {
      */
     public function updateEventStatus($eventId, $newStatus) {
         try {
-            $stmt = $this->pdo->prepare("UPDATE events SET status = ?, updated_at = NOW() WHERE id = ?");
+            $stmt = this->pdo->prepare("UPDATE events SET status = ?, updated_at = NOW() WHERE id = ?");
             return $stmt->execute([$newStatus, $eventId]);
         } catch (PDOException $e) {
             error_log("Failed to update event status by admin: " . $e->getMessage());
@@ -431,12 +444,29 @@ class Event {
      * @return bool
      */
     public function deleteEventSoft($eventId) {
+        $this->debugToFile("deleteEventSoft: Attempting to soft delete event ID: " . $eventId); // Log start of method
         try {
             $stmt = $this->pdo->prepare("UPDATE events SET status = 'deleted', updated_at = NOW() WHERE id = ?");
-            return $stmt->execute([$eventId]);
-        } catch (PDOException $e) {
-            error_log("Failed to soft delete event by admin: " . $e->getMessage());
-            throw new Exception("Failed to soft delete event.");
+            $result = $stmt->execute([$eventId]);
+
+            if ($result) {
+                $rowsAffected = $stmt->rowCount();
+                if ($rowsAffected > 0) {
+                    $this->debugToFile("deleteEventSoft: Successfully soft deleted event ID: " . $eventId . ". Rows affected: " . $rowsAffected);
+                    return true;
+                } else {
+                    $this->debugToFile("deleteEventSoft: No rows affected for event ID: " . $eventId . ". Event might not exist or already deleted.");
+                    return false;
+                }
+            } else {
+                $errorInfo = $stmt->errorInfo();
+                $this->debugToFile("deleteEventSoft: PDO execute failed for event ID: " . $eventId . ". ErrorInfo: " . implode(" | ", $errorInfo));
+                return false;
+            }
+        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+            $this->debugToFile("deleteEventSoft: Exception caught for event ID: " . $eventId . ". Error: " . $e->getMessage() . ". Trace: " . $e->getTraceAsString());
+            error_log("Failed to soft delete event by admin: " . $e->getMessage()); // Keep original error log for server
+            throw new Exception("Failed to soft delete event: " . $e->getMessage()); // Re-throw with message
         }
     }
 }
