@@ -272,7 +272,7 @@ class User {
     // Missing method: isVendor (referenced in Vendor.class.php verifyVendorAccess)
     public function isVendor($userId) {
         if ($userId === null) return false;
-        $stmt = $this->pdo->prepare("SELECT user_type_id FROM users WHERE id = ?");
+        $stmt = this->pdo->prepare("SELECT user_type_id FROM users WHERE id = ?");
         $stmt->execute([$userId]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result && $result['user_type_id'] == 2; // Assuming 2 is vendor type
@@ -312,8 +312,8 @@ class User {
             ");
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error in User::getAllUsers(): " . $e->getMessage());
+        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+            error_log("Error in User::getAllUsers(): " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return [];
         }
     }
@@ -328,8 +328,8 @@ class User {
         try {
             $stmt = $this->pdo->prepare("UPDATE users SET is_active = ?, updated_at = NOW() WHERE id = ?");
             return $stmt->execute([$isActive, $userId]);
-        } catch (PDOException $e) {
-            error_log("Failed to update user status for ID {$userId}: " . $e->getMessage());
+        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+            error_log("Failed to update user status for ID {$userId}: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         }
     }
@@ -356,13 +356,9 @@ class User {
                 error_log("Failed to delete user ID {$userId}: " . implode(" | ", $stmt->errorInfo()));
                 return false;
             }
-        } catch (PDOException $e) {
+        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
             $this->pdo->rollBack();
-            error_log("PDOException deleting user ID {$userId}: " . $e->getMessage());
-            return false;
-        } catch (Exception $e) {
-            $this->pdo->rollBack();
-            error_log("General Exception deleting user ID {$userId}: " . $e->getMessage());
+            error_log("PDOException deleting user ID {$userId}: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         }
     }
