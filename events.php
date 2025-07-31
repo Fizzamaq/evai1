@@ -61,7 +61,8 @@ try {
         $event_item['bookings'] = $bookings_for_event; // Attach booking details if needed
 
         // --- NEW/MODIFIED LOGIC FOR DISPLAY STATUS ---
-        $event_item['display_status'] = ucfirst(htmlspecialchars($event_item['status'])); // Default to event's own status
+        // Default to event's own status initially
+        $event_item['display_status'] = ucfirst(htmlspecialchars($event_item['status']));
         $event_item['status_class'] = strtolower(htmlspecialchars($event_item['status']));
 
         $isEventDatePast = (strtotime($event_item['event_date']) < time());
@@ -71,53 +72,37 @@ try {
             $hasPendingBooking = false;
             $hasCancelledOrFailedBooking = false;
 
-            // Flags to determine the *highest priority* status to display
-            $display_as_booked = false;
-            $display_as_cancelled = false;
-            $display_as_pending = false;
-            $display_as_pending_overdue_review = false;
-
+            // Loop through bookings to find the highest priority status
             foreach ($event_item['bookings'] as $booking) {
-                // If any booking is confirmed, event should be 'Booked' (highest priority)
                 if ($booking['status'] === 'confirmed') {
-                    $display_as_booked = true;
-                    // No need to process other bookings for this event, as "Booked" overrides all.
-                    // However, we continue the loop for comprehensive flags in case logic changes.
+                    $hasConfirmedBooking = true;
                 }
-                
-                // If not 'confirmed', check for cancelled/failed states
-                if ($booking['status'] === 'cancelled' || $booking['status'] === 'payment_failed' || $booking['status'] === 'refunded') { 
-                    $hasCancelledOrFailedBooking = true;
-                }
-
-                // Check for pending states
                 if ($booking['status'] === 'pending_review' || $booking['status'] === 'pending' || $booking['status'] === "") { 
                     $hasPendingBooking = true; 
                 }
-
-                // Check for 'Pending Review' condition (event date past, confirmed/completed, not reviewed)
-                if ($isEventDatePast && ($booking['status'] === 'confirmed' || $booking['status'] === 'completed') && ($booking['is_reviewed'] == 0)) {
-                    $display_as_pending_overdue_review = true;
+                if ($booking['status'] === 'cancelled' || $booking['status'] === 'payment_failed' || $booking['status'] === 'refunded') { 
+                    $hasCancelledOrFailedBooking = true;
                 }
             }
 
             // Apply determined status based on strict prioritization
-            if ($display_as_booked) {
+            if ($hasConfirmedBooking) {
                 $event_item['display_status'] = 'Booked';
                 $event_item['status_class'] = 'booked';
             } elseif ($hasCancelledOrFailedBooking) {
                 $event_item['display_status'] = 'Cancelled/Failed';
                 $event_item['status_class'] = 'cancelled';
-            } elseif ($display_as_pending_overdue_review) {
-                // This implies event date is past, and there's a confirmed/completed booking not yet reviewed
-                $event_item['display_status'] = 'Pending Review'; 
-                $event_item['status_class'] = 'pending-review-action'; 
             } elseif ($hasPendingBooking) {
-                // This covers future/current date pending bookings
-                $event_item['display_status'] = 'Pending'; 
-                $event_item['status_class'] = 'pending';
+                if ($isEventDatePast) {
+                    $event_item['display_status'] = 'Pending Review (Overdue)';
+                    $event_item['status_class'] = 'pending-overdue'; 
+                } else {
+                    $event_item['display_status'] = 'Pending';
+                    $event_item['status_class'] = 'pending';
+                }
             }
-            // If none of the above booking-related statuses are met, event's initial status remains.
+            // If is_booked is true but no booking matches the prioritized states (confirmed, cancelled/failed, pending),
+            // the event_item's initial 'display_status' and 'status_class' (from the events table) will remain.
         }
         // --- END NEW/MODIFIED LOGIC ---
 
@@ -194,8 +179,8 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
             color: #2d3436;
         }
         .metric-label {
-            color: #636e72;
             font-size: 0.9em;
+            color: #636e72;
             margin-top: 5px;
         }
         .dashboard-sections {
@@ -427,7 +412,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
                         <div class="event-meta">
                             <span><i class="fas fa-calendar-alt"></i> <?php echo date('M j, Y', strtotime($event_item['event_date'])); ?></span>
                             <span><i class="fas fa-users"></i> <?php echo $event_item['guest_count'] ?: 'TBD'; ?> guests</span>
-                            <span><i class="fas fa-dollar-sign"></i> Pkr<?php echo number_format($event_item['budget_min'] ?? 0, 0); ?> - Pkr<?php echo number_format($event_item['budget_max'] ?? 0, 0); ?></span>
+                            <span><i class="fas fa-dollar-sign"></i> $<?php echo number_format($event_item['budget_min'] ?? 0, 0); ?> - $<?php echo number_format($event_item['budget_max'] ?? 0, 0); ?></span>
                             
                             <?php 
                             // Display the status determined in the PHP logic above
