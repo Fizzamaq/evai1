@@ -33,7 +33,7 @@ if (isset($_POST['delete_event'])) {
         $_SESSION['error_message'] = "Failed to delete event. Please check logs for details."; // More informative message
     }
     // Redirect to clear POST data and show message
-    header('Location: ' . BASE_URL . 'public/events.php');
+    header('Location: ./' . basename(__FILE__)); // Redirect to events.php
     exit();
 }
 
@@ -60,8 +60,69 @@ try {
         $event_item['is_booked'] = !empty($bookings_for_event); // True if any bookings exist
         $event_item['bookings'] = $bookings_for_event; // Attach booking details if needed
 
+        // --- NEW/MODIFIED LOGIC FOR DISPLAY STATUS ---
+        $event_item['display_status'] = ucfirst(htmlspecialchars($event_item['status'])); // Default to event's own status
+        $event_item['status_class'] = strtolower(htmlspecialchars($event_item['status']));
+
+        $isEventDatePast = (strtotime($event_item['event_date']) < time());
+
+        if ($event_item['is_booked']) {
+            $hasConfirmedBooking = false;
+            $hasPendingBooking = false;
+            $hasCancelledOrFailedBooking = false;
+
+            // Flags to determine the *highest priority* status to display
+            $display_as_booked = false;
+            $display_as_cancelled = false;
+            $display_as_pending = false;
+            $display_as_pending_overdue_review = false;
+
+            foreach ($event_item['bookings'] as $booking) {
+                // If any booking is confirmed, event should be 'Booked' (highest priority)
+                if ($booking['status'] === 'confirmed') {
+                    $display_as_booked = true;
+                    // No need to process other bookings for this event, as "Booked" overrides all.
+                    // However, we continue the loop for comprehensive flags in case logic changes.
+                }
+                
+                // If not 'confirmed', check for cancelled/failed states
+                if ($booking['status'] === 'cancelled' || $booking['status'] === 'payment_failed' || $booking['status'] === 'refunded') { 
+                    $hasCancelledOrFailedBooking = true;
+                }
+
+                // Check for pending states
+                if ($booking['status'] === 'pending_review' || $booking['status'] === 'pending' || $booking['status'] === "") { 
+                    $hasPendingBooking = true; 
+                }
+
+                // Check for 'Pending Review' condition (event date past, confirmed/completed, not reviewed)
+                if ($isEventDatePast && ($booking['status'] === 'confirmed' || $booking['status'] === 'completed') && ($booking['is_reviewed'] == 0)) {
+                    $display_as_pending_overdue_review = true;
+                }
+            }
+
+            // Apply determined status based on strict prioritization
+            if ($display_as_booked) {
+                $event_item['display_status'] = 'Booked';
+                $event_item['status_class'] = 'booked';
+            } elseif ($hasCancelledOrFailedBooking) {
+                $event_item['display_status'] = 'Cancelled/Failed';
+                $event_item['status_class'] = 'cancelled';
+            } elseif ($display_as_pending_overdue_review) {
+                // This implies event date is past, and there's a confirmed/completed booking not yet reviewed
+                $event_item['display_status'] = 'Pending Review'; 
+                $event_item['status_class'] = 'pending-review-action'; 
+            } elseif ($hasPendingBooking) {
+                // This covers future/current date pending bookings
+                $event_item['display_status'] = 'Pending'; 
+                $event_item['status_class'] = 'pending';
+            }
+            // If none of the above booking-related statuses are met, event's initial status remains.
+        }
+        // --- END NEW/MODIFIED LOGIC ---
+
         // --- DEBUGGING: Log event and booking status for each item ---
-        error_log("Events Page Debug: Event ID: {$event_item['id']}, Event Title: '{$event_item['title']}', Original Status: '{$event_item['status']}', Is Booked: " . ($event_item['is_booked'] ? 'True' : 'False'));
+        error_log("Events Page Debug: Event ID: {$event_item['id']}, Event Title: '{$event_item['title']}', Original Status: '{$event_item['status']}', Is Booked: " . ($event_item['is_booked'] ? 'True' : 'False') . ", Display Status: '{$event_item['display_status']}'");
         if ($event_item['is_booked']) {
             error_log("Events Page Debug: Bookings for Event ID {$event_item['id']}: " . json_encode($event_item['bookings']));
         }
@@ -174,7 +235,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
         .list-item-meta {
             font-size: 0.9em;
             color: #636e72;
-            flex-basis: 100%; /* Take full width on wrap */
+            flex-basis: 100%;
             margin-top: 5px;
             display: flex; /* Make meta info a flex container */
             align-items: center;
@@ -216,14 +277,14 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
             border-bottom: none;
         }
         .activity-icon {
-            flex-shrink: 0; /* Prevent icon from shrinking */
+            flex-shrink: 0;
             font-size: 1.4em; /* Slightly larger icon */
             color: var(--primary-color);
-            width: 30px; /* Fixed width for consistent alignment */
+            width: 30px;
             text-align: center;
         }
         .activity-content {
-            flex-grow: 1; /* Allow content to take remaining space */
+            flex-grow: 1;
         }
         .activity-message {
             font-size: 0.95em;
@@ -234,7 +295,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
             font-size: 0.8em;
             color: var(--text-subtle);
             margin-top: 5px;
-            display: flex; /* For aligning time and view link */
+            display: flex;
             justify-content: space-between;
             align-items: center;
         }
@@ -312,6 +373,21 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
             box-shadow: var(--shadow-md); /* More pronounced shadow on hover */
             transform: translateY(-1px); /* Slight lift effect */
         }
+
+        /* NEW STATUS BADGE STYLES for events.php */
+        .status-pending-overdue { /* For pending review but event date passed */
+            background: #f1c40f; /* Orange/Yellow for warning */
+            color: #e67e22; /* Darker orange */
+        }
+        /* Make sure default .status-pending is defined too in dashboard.css for general pending */
+        .status-booked { /* Event is confirmed booked */
+            background: #27ae60; /* Darker green */
+            color: #d4edda; /* Lighter text */
+        }
+        .status-pending-review-action { /* Specific style for when review is needed */
+            background: #8e44ad; /* Purple shade */
+            color: #ecf0f1; /* Light text */
+        }
     </style>
 </head>
 <body>
@@ -351,41 +427,12 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
                         <div class="event-meta">
                             <span><i class="fas fa-calendar-alt"></i> <?php echo date('M j, Y', strtotime($event_item['event_date'])); ?></span>
                             <span><i class="fas fa-users"></i> <?php echo $event_item['guest_count'] ?: 'TBD'; ?> guests</span>
-                            <span><i class="fas fa-dollar-sign"></i> $<?php echo number_format($event_item['budget_min'] ?? 0, 0); ?> - $<?php echo number_format($event_item['budget_max'] ?? 0, 0); ?></span>
+                            <span><i class="fas fa-dollar-sign"></i> Pkr<?php echo number_format($event_item['budget_min'] ?? 0, 0); ?> - Pkr<?php echo number_format($event_item['budget_max'] ?? 0, 0); ?></span>
                             
                             <?php 
-                            // Determine the display status for the card based on bookings or event status
-                            $cardDisplayStatus = ucfirst(htmlspecialchars($event_item['status']));
-                            $cardStatusClass = strtolower(htmlspecialchars($event_item['status']));
-
-                            if ($event_item['is_booked']) {
-                                // Prioritize booking status if any booking exists
-                                $hasConfirmedBooking = false;
-                                $hasPendingBooking = false;
-                                $hasDeclinedBooking = false;
-
-                                foreach ($event_item['bookings'] as $booking) {
-                                    if ($booking['status'] === 'confirmed') { $hasConfirmedBooking = true; }
-                                    // Treat empty string status as 'pending' for display
-                                    if ($booking['status'] === 'pending_review' || $booking['status'] === 'pending' || $booking['status'] === "") { 
-                                        $hasPendingBooking = true; 
-                                    }
-                                    if ($booking['status'] === 'cancelled') { $hasDeclinedBooking = true; } // Assuming cancelled means declined by vendor
-                                }
-
-                                if ($hasConfirmedBooking) {
-                                    $cardDisplayStatus = 'Booked';
-                                    $cardStatusClass = 'booked';
-                                } elseif ($hasPendingBooking) {
-                                    $cardDisplayStatus = 'Pending';
-                                    $cardStatusClass = 'pending';
-                                } elseif ($hasDeclinedBooking) {
-                                    $cardDisplayStatus = 'Declined by Vendor';
-                                    $cardStatusClass = 'declined';
-                                }
-                            }
+                            // Display the status determined in the PHP logic above
                             ?>
-                            <span class="status-badge status-<?= $cardStatusClass ?>"><?= $cardDisplayStatus ?></span>
+                            <span class="status-badge status-<?= $event_item['status_class'] ?>"><?= $event_item['display_status'] ?></span>
                         </div>
 
                         <div class="event-description">
@@ -397,7 +444,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
                             <?php if (!$event_item['is_booked']): // Only show edit if no bookings exist for this event ?>
                                 <a href="edit_event.php?id=<?php echo $event_item['id']; ?>" class="btn btn-secondary btn-sm"><i class="fas fa-edit"></i> Edit</a>
                             <?php endif; ?>
-                            <form method="POST" onsubmit="return confirm('Are you sure you want to delete this event? This action cannot be undone.');">
+                            <form method="POST" style="display: inline-block;" onsubmit="return confirm('Are you sure you want to delete this event? This action cannot be undone.');">
                                 <input type="hidden" name="event_id" value="<?php echo $event_item['id']; ?>">
                                 <button type="submit" name="delete_event" class="btn btn-danger btn-sm"><i class="fas fa-trash-alt"></i> Delete</button>
                             </form>
