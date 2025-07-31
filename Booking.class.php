@@ -132,7 +132,7 @@ class Booking {
      */
     public function updateBookingStripePaymentId($bookingId, $stripePaymentId) {
         try {
-            $stmt = $this->pdo->prepare("UPDATE bookings SET stripe_payment_id = ? WHERE id = ?");
+            $stmt = this->pdo->prepare("UPDATE bookings SET stripe_payment_id = ? WHERE id = ?");
             return $stmt->execute([$stripePaymentId, $bookingId]);
         } catch (PDOException $e) {
             error_log("Update booking Stripe payment ID error: " . $e->getMessage());
@@ -205,8 +205,8 @@ class Booking {
                 $booking['client_name'] = trim($booking['first_name'] . ' ' . $booking['last_name']);
             }
             return $bookings;
-        } catch (PDOException $e) {
-            error_log("Error getting vendor upcoming bookings for vendor {$vendorId}: " . $e->getMessage());
+        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+            error_log("Error getting vendor upcoming bookings for vendor {$vendorId}: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return [];
         }
     }
@@ -232,8 +232,8 @@ class Booking {
                 $booking['client_name'] = trim($booking['first_name'] . ' ' . $booking['last_name']);
             }
             return $bookings;
-        } catch (PDOException $e) {
-            error_log("Error getting vendor recent bookings for vendor {$vendorId}: " . $e->getMessage());
+        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+            error_log("Error getting vendor recent bookings for vendor {$vendorId}: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return [];
         }
     }
@@ -251,8 +251,8 @@ class Booking {
             ");
             $stmt->execute([$vendorId]);
             return $stmt->fetch(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error getting vendor booking stats for vendor {$vendorId}: " . $e->getMessage());
+        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+            error_log("Error getting vendor booking stats for vendor {$vendorId}: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return [
                 'total_bookings' => 0,
                 'pending_bookings' => 0,
