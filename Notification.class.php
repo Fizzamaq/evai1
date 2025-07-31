@@ -33,8 +33,8 @@ class Notification {
         try {
             $stmt = $this->pdo->prepare("UPDATE notifications SET is_read = TRUE, read_at = NOW() WHERE id = ? AND user_id = ?");
             return $stmt->execute([$notificationId, $userId]);
-        } catch (PDOException $e) {
-            error_log("Mark notification as read error: " . $e->getMessage());
+        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+            error_log("Mark notification as read error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         }
     }
@@ -43,8 +43,8 @@ class Notification {
         try {
             $stmt = $this->pdo->prepare("DELETE FROM notifications WHERE id = ? AND user_id = ?");
             return $stmt->execute([$notificationId, $userId]);
-        } catch (PDOException $e) {
-            error_log("Delete notification error: " . $e->getMessage());
+        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+            error_log("Delete notification error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return false;
         }
     }
@@ -55,10 +55,9 @@ class Notification {
             $stmt->execute([$userId]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             return $result['unread_count'] ?? 0;
-        } catch (PDOException $e) {
-            error_log("Get unread notifications count error: " . $e->getMessage());
+        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+            error_log("Get unread notifications count error: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return 0;
         }
     }
 }
-?>
