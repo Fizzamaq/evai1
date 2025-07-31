@@ -34,10 +34,10 @@ try {
 
     // Instantiate necessary classes
     $bookingSystem = new Booking($pdo);
-    $notification_obj = new Notification($pdo); // Renamed to avoid clash with parameter
+    $notification_obj = new Notification($pdo);
     $vendor_obj = new Vendor($pdo); 
-    $user_obj = new User($pdo); // Instantiate User class
-    $mailSender = new MailSender(); // Instantiate MailSender
+    $user_obj = new User($pdo);
+    $mailSender = new MailSender(); 
 
     // Start a transaction for atomicity of status update, notification, and email
     $pdo->beginTransaction();
@@ -81,7 +81,7 @@ try {
             (int)$bookingId
         );
 
-        // 6. Send Email Notification to User
+        // 6. Send Email Notification to User (Modified for better debugging)
         $email_subject = "EventCraftAI Booking Update: Your Booking for {$event_title} is {$newStatus}";
         $email_html_body = "
             <p>Dear {$client_name},</p>
@@ -98,6 +98,8 @@ try {
         if (!$email_sent) {
             error_log("API Error (update_booking_status.php): Failed to send email to client {$client_email} for booking ID {$bookingId}.");
             // This is a warning, not a critical failure for the booking update itself.
+        } else {
+            error_log("API Debug (update_booking_status.php): Successfully sent email to {$client_email} for booking ID {$bookingId}.");
         }
     }
 
