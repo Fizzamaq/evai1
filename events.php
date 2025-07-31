@@ -1,5 +1,6 @@
 <?php
 // public/events.php
+session_start();
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';
 require_once '../classes/Event.class.php';
@@ -64,6 +65,7 @@ try {
         // Default to event's own status initially
         $event_item['display_status'] = ucfirst(htmlspecialchars($event_item['status']));
         $event_item['status_class'] = strtolower(htmlspecialchars($event_item['status']));
+        $event_item['needs_review'] = false; // New flag for review button
 
         $isEventDatePast = (strtotime($event_item['event_date']) < time());
 
@@ -72,7 +74,6 @@ try {
             $hasPendingBooking = false;
             $hasCancelledOrFailedBooking = false;
 
-            // Loop through bookings to find the highest priority status
             foreach ($event_item['bookings'] as $booking) {
                 if ($booking['status'] === 'confirmed') {
                     $hasConfirmedBooking = true;
@@ -83,17 +84,25 @@ try {
                 if ($booking['status'] === 'cancelled' || $booking['status'] === 'payment_failed' || $booking['status'] === 'refunded') { 
                     $hasCancelledOrFailedBooking = true;
                 }
+                
+                // Check if a confirmed booking's date has passed and it's not reviewed yet
+                if (($booking['status'] === 'confirmed') && $isEventDatePast && ($booking['is_reviewed'] == 0)) {
+                    $event_item['needs_review'] = true;
+                }
             }
-
+            
             // Apply determined status based on strict prioritization
-            if ($hasConfirmedBooking) {
+            if ($event_item['needs_review']) {
+                $event_item['display_status'] = 'Pending Review';
+                $event_item['status_class'] = 'pending-review-action';
+            } elseif ($hasConfirmedBooking) {
                 $event_item['display_status'] = 'Booked';
                 $event_item['status_class'] = 'booked';
             } elseif ($hasCancelledOrFailedBooking) {
                 $event_item['display_status'] = 'Cancelled/Failed';
                 $event_item['status_class'] = 'cancelled';
             } elseif ($hasPendingBooking) {
-                if ($isEventDatePast) {
+                 if ($isEventDatePast) {
                     $event_item['display_status'] = 'Pending Review (Overdue)';
                     $event_item['status_class'] = 'pending-overdue'; 
                 } else {
@@ -101,8 +110,6 @@ try {
                     $event_item['status_class'] = 'pending';
                 }
             }
-            // If is_booked is true but no booking matches the prioritized states (confirmed, cancelled/failed, pending),
-            // the event_item's initial 'display_status' and 'status_class' (from the events table) will remain.
         }
         // --- END NEW/MODIFIED LOGIC ---
 
@@ -118,7 +125,7 @@ try {
 } catch (PDOException $e) {
     error_log("Error fetching user events: " . $e->getMessage());
     $_SESSION['error_message'] = "Failed to load events. Please try again.";
-    $user_events = []; // Ensure $user_events is an empty array on error
+    $user_events = [];
 }
 // --- End of modified logic ---
 
@@ -142,11 +149,11 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
     <style>
         /* Add specific styles for the customer dashboard layout and elements */
         .customer-dashboard-container {
-            width: 100%; /* Make it take full width initially */
-            max-width: 1200px; /* Max width for larger screens */
-            margin: 0 auto; /* Center the container */
-            padding: 20px; /* Padding on all sides */
-            box-sizing: border-box; /* Include padding in width calculation */
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            box-sizing: border-box;
         }
         .dashboard-header {
             display: flex;
@@ -155,10 +162,10 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
             margin-bottom: 30px;
             padding-bottom: 20px;
             border-bottom: 2px solid #e1e5e9;
-            flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+            flex-wrap: wrap;
         }
         .dashboard-header > div {
-            margin-bottom: 10px; /* Add some space when items wrap */
+            margin-bottom: 10px;
         }
         .customer-stats-grid {
             display: grid;
@@ -185,7 +192,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
         }
         .dashboard-sections {
             display: grid;
-            grid-template-columns: 1fr 1fr; /* Two columns for content sections */
+            grid-template-columns: 1fr 1fr;
             gap: 30px;
         }
         .section-card {
@@ -207,30 +214,30 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap; /* Allow list items to wrap */
+            flex-wrap: wrap;
         }
         .list-item:last-child {
-            border-bottom: none; /* Remove border from the last item */
+            border-bottom: none;
         }
         .list-item-title {
             font-weight: 600;
             color: #2d3436;
-            flex-basis: 100%; /* Take full width on wrap */
+            flex-basis: 100%;
         }
         .list-item-meta {
             font-size: 0.9em;
             color: #636e72;
             flex-basis: 100%;
             margin-top: 5px;
-            display: flex; /* Make meta info a flex container */
+            display: flex;
             align-items: center;
-            gap: 8px; /* Gap between icon and text, and status badge */
+            gap: 8px;
         }
         .list-item-meta i {
             color: var(--primary-color);
         }
         .list-item .btn-link {
-            margin-top: 10px; /* Space out button when wrapped */
+            margin-top: 10px;
         }
         .empty-state {
             text-align: center;
@@ -239,12 +246,12 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
         }
         .btn-link {
             text-decoration: none;
-            color: #667eea; /* A nice primary color for links */
+            color: #667eea;
             font-weight: 600;
             transition: color 0.2s;
         }
         .btn-link:hover {
-            color: #764ba2; /* Darker shade on hover */
+            color: #764ba2;
         }
 
         /* Specific styles for Activity list (reusing admin_dashboard.php styles) */
@@ -253,7 +260,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
         }
         .activity-item {
             display: flex;
-            align-items: flex-start; /* Align icon to the top of message */
+            align-items: flex-start;
             gap: 15px;
             padding: 10px 0;
             border-bottom: 1px solid #eee;
@@ -263,7 +270,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
         }
         .activity-icon {
             flex-shrink: 0;
-            font-size: 1.4em; /* Slightly larger icon */
+            font-size: 1.4em;
             color: var(--primary-color);
             width: 30px;
             text-align: center;
@@ -292,7 +299,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
         /* Responsive adjustments for smaller screens */
         @media (max-width: 768px) {
             .dashboard-sections {
-                grid-template-columns: 1fr; /* Stack sections vertically on small screens */
+                grid-template-columns: 1fr;
             }
             .dashboard-header {
                 flex-direction: column;
@@ -307,71 +314,70 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
                 width: 100%;
                 margin-bottom: 10px;
             }
-            .personalized-vendors-grid { /* Keep these styles, but the section itself is removed */
-                grid-template-columns: 1fr; /* Stack vendor cards */
+            .personalized-vendors-grid {
+                grid-template-columns: 1fr;
             }
-            .vendor-card-image { /* Keep these styles, but the section itself is removed */
-                height: 200px; /* Adjust image height for single column */
+            .vendor-card-image {
+                height: 200px;
             }
         }
 
         @media (max-width: 480px) {
             .customer-dashboard-container {
-                padding: 15px; /* Slightly less padding on very small screens */
+                padding: 15px;
             }
         }
         /* Further styling for event-actions buttons for better, decent, well-organized look */
         .event-actions {
             display: flex;
-            justify-content: flex-start; /* Aligned to the left */
+            justify-content: flex-start;
             align-items: center;
-            gap: 10px; /* Consistent space between buttons */
-            margin-top: 20px; /* More vertical space from description */
-            flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
         }
         .event-actions .btn,
-        .event-actions button { /* Target both <a> and <button> elements for consistent styling */
-            display: flex; /* Make buttons flex containers to align icon and text */
+        .event-actions button {
+            display: flex;
             align-items: center;
-            justify-content: center; /* Center content within button if space allows */
-            gap: 8px; /* Slightly more space between icon and text */
-            padding: 10px 15px; /* Consistent padding for all buttons */
-            font-size: 0.95em; /* Slightly larger, more readable font */
-            min-width: 130px; /* Increased min-width for better consistency */
-            height: 40px; /* Consistent height for all buttons */
-            border-radius: var(--border-radius); /* Inherit from style.css for consistent corners */
-            text-decoration: none; /* Ensure links don't have underlines */
-            transition: all 0.2s ease-in-out; /* Smooth transitions for hover effects */
-            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 15px;
+            font-size: 0.95em;
+            min-width: 130px;
+            height: 40px;
+            border-radius: var(--border-radius);
+            text-decoration: none;
+            transition: all 0.2s ease-in-out;
+            box-sizing: border-box;
         }
 
         /* Specific styles for the Delete button to ensure it looks 'decent' */
         .event-actions .btn-danger {
-            background-color: var(--error-color); /* Use primary error color */
-            color: var(--white); /* White text for contrast */
-            border: 1px solid var(--error-color); /* Solid border matching background */
-            box-shadow: var(--shadow-sm); /* Subtle shadow for depth */
+            background-color: var(--error-color);
+            color: var(--white);
+            border: 1px solid var(--error-color);
+            box-shadow: var(--shadow-sm);
         }
         .event-actions .btn-danger:hover {
-            background-color: #CC0000; /* Slightly darker red on hover */
+            background-color: #CC0000;
             border-color: #CC0000;
-            box-shadow: var(--shadow-md); /* More pronounced shadow on hover */
-            transform: translateY(-1px); /* Slight lift effect */
+            box-shadow: var(--shadow-md);
+            transform: translateY(-1px);
         }
 
         /* NEW STATUS BADGE STYLES for events.php */
-        .status-pending-overdue { /* For pending review but event date passed */
-            background: #f1c40f; /* Orange/Yellow for warning */
-            color: #e67e22; /* Darker orange */
+        .status-pending-overdue {
+            background: #f1c40f;
+            color: #e67e22;
         }
-        /* Make sure default .status-pending is defined too in dashboard.css for general pending */
-        .status-booked { /* Event is confirmed booked */
-            background: #27ae60; /* Darker green */
-            color: #d4edda; /* Lighter text */
+        .status-booked {
+            background: #27ae60;
+            color: #d4edda;
         }
-        .status-pending-review-action { /* Specific style for when review is needed */
-            background: #8e44ad; /* Purple shade */
-            color: #ecf0f1; /* Light text */
+        .status-pending-review-action {
+            background: #8e44ad;
+            color: #ecf0f1;
         }
     </style>
 </head>
