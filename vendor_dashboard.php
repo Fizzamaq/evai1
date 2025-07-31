@@ -51,7 +51,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vendor Dashboard - EventCraftAI</title>
     <link rel="stylesheet" href="../assets/css/style.css">
-    <link rel="stylesheet" href="../assets/css/dashboard.css"> 
+    <link rel="stylesheet" href="../assets/css/dashboard.css">
     <link rel="stylesheet" href="../assets/css/vendor.css"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -139,6 +139,12 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             color: #636e72;
             flex-basis: 100%;
             margin-top: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .list-item-meta i {
+            color: var(--primary-color);
         }
         .list-item .btn-link {
             margin-top: 10px;
@@ -277,7 +283,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             gap: var(--spacing-md); /* Space between buttons */
             flex-shrink: 0; /* Prevent footer from shrinking */
             /* Add background to ensure it stands out if content scrolls behind it */
-            background-color: var(--white); 
+            background-color: var(--white);
             z-index: 10; /* Ensure it's above scrolling content */
         }
         .booking-details-lightbox-footer .btn { /* Style for buttons within the footer */
@@ -509,8 +515,8 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                 </div>
             </div>
             <div class="booking-details-lightbox-footer">
-                <button id="proceedBookingBtn" class="btn btn-primary">Proceed</button>
-                <a href="#" id="messageClientBtn" class="btn btn-secondary">Message Client</a>
+                <button id="proceedBookingBtn" class="btn btn-primary"><i class="fas fa-handshake"></i> Proceed</button>
+                <a href="#" id="messageClientBtn" class="btn btn-secondary"><i class="fas fa-comment"></i> Message Client</a>
             </div>
         </div>
     </div>
@@ -593,17 +599,15 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                         // Set the message client button's href based on client ID
                         messageClientBtn.href = `<?= BASE_URL ?>public/vendor_chat.php?user_id=${client.id}`; // Link to chat with client
 
-                        // Show/hide action buttons based on status
-                        // 'Proceed' and 'Message Client' should be visible for 'pending' bookings
-                        if (booking.status === 'pending') { 
+                        // Show/hide action buttons based on whether client ID is available
+                        if (client.id && client.id !== 0) {
                             proceedBookingBtn.style.display = 'inline-block';
-                            // "Message Client" is always an option if there's a client ID
-                            messageClientBtn.style.display = (client.id && client.id !== 0) ? 'inline-block' : 'none'; 
+                            messageClientBtn.style.display = 'inline-block';
                         } else {
                             proceedBookingBtn.style.display = 'none';
-                            // "Message Client" is always an option regardless of booking status if there's a client ID
-                            messageClientBtn.style.display = (client.id && client.id !== 0) ? 'inline-block' : 'none'; 
+                            messageClientBtn.style.display = 'none';
                         }
+
 
                         bookingDetailsLightbox.classList.add('active');
                         document.body.style.overflow = 'hidden';
