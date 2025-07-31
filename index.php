@@ -122,7 +122,7 @@ if (isset($_SESSION['user_id']) && ($_SESSION['user_type'] ?? null) == 1) {
 <body>
     <section class="hero" id="hero-section">
         <div class="hero-content">
-            <h1>Plan Perfect Events with AI Assistance</h1>
+            <h1>Plan Your Perfect Events!</h1>
             <p class="subtitle">From weddings to corporate gatherings, streamline your event planning with smart tools and vendor connections.</p>
             <div class="search-bar-container">
                 <form action="vendors.php" method="GET" class="search-form">
