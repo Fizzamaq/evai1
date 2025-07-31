@@ -594,7 +594,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                         // 'Proceed' button will link to a booking management page (hypothetical, needs implementation)
                         proceedBookingBtn.dataset.bookingId = booking.id; // Store ID if needed for action
                         // For now, let 'Proceed' take them to a dedicated booking management/quote page for this booking
-                        proceedBookingBtn.onclick = () => { window.location.href = `<?= BASE_URL ?>public/vendor_booking_management.php?booking_id=${booking.id}`; }; 
+                        proceedBookingBtn.onclick = () => { window.location.href = `<?= BASE_URL ?>public/booking_confirmed_message.php?booking_id=${booking.id}`; }; 
                         
                         // Set the message client button's href based on client ID
                         messageClientBtn.href = `<?= BASE_URL ?>public/vendor_chat.php?user_id=${client.id}`; // Link to chat with client
