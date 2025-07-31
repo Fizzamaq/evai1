@@ -218,6 +218,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
         }
         .booking-details-lightbox-content {
             background: var(--white);
+            padding: var(--spacing-md); /* Overall padding for the content */
             border-radius: 12px;
             box-shadow: 0 0 30px rgba(0, 0, 0, 0.6);
             width: 90%;
@@ -225,14 +226,15 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             height: 90%;
             max-height: 700px; /* Adjust max-height as needed */
             display: flex;
-            overflow: hidden; /* Ensure content stays within bounds */
+            overflow: hidden; /* Ensures content stays within bounds */
             position: relative;
             flex-direction: column; /* Stack header, content, actions */
         }
         .booking-details-lightbox-header {
-            padding: var(--spacing-md);
+            padding-bottom: var(--spacing-md);
             border-bottom: 1px solid var(--border-color);
             text-align: center;
+            flex-shrink: 0; /* Prevent header from shrinking */
         }
         .booking-details-lightbox-header h3 {
             margin: 0;
@@ -266,12 +268,22 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
+        /* Make footer always visible and at bottom */
         .booking-details-lightbox-footer {
-            padding: var(--spacing-md);
+            padding-top: var(--spacing-md);
             border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: flex-end;
-            gap: var(--spacing-md);
+            display: flex; /* Ensure flexbox for buttons */
+            justify-content: flex-end; /* Align buttons to the right */
+            gap: var(--spacing-md); /* Space between buttons */
+            flex-shrink: 0; /* Prevent footer from shrinking */
+            /* Add background to ensure it stands out if content scrolls behind it */
+            background-color: var(--white); 
+            z-index: 10; /* Ensure it's above scrolling content */
+        }
+        .booking-details-lightbox-footer .btn { /* Style for buttons within the footer */
+            padding: 10px 15px; /* Adjust padding for better size */
+            font-size: 0.9em; /* Adjust font size */
+            border-radius: 8px; /* Consistent border radius */
         }
         .booking-details-lightbox-close {
             position: absolute;
@@ -387,7 +399,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
         <div class="dashboard-sections">
             <div class="section-card section-card-half">
                 <h2>Upcoming Bookings</h2>
-                <?php $upcomingBookings = $booking->getVendorUpcomingBookings($vendor_profile['id']); ?>
+                <?php $upcomingBookings = $booking->getVendorUpcomingBookings($vendor_profile['id'], 5); ?>
                 <?php if (empty($upcomingBookings)): ?>
                     <div class="empty-state">No upcoming bookings.</div>
                 <?php else: ?>
@@ -466,7 +478,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
         </div>
 
         <div class="dashboard-actions" style="margin-top: var(--spacing-lg); text-align: center;">
-            <a href="<?= BASE_URL ?>public/vendor_manage_services.php" class="btn btn-primary btn-large">Manage My Services & Packages</a>
+            <a href="vendor_manage_services.php" class="btn btn-primary btn-large">Manage My Services & Packages</a>
         </div>
     </div>
 
@@ -497,9 +509,8 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                 </div>
             </div>
             <div class="booking-details-lightbox-footer">
-                <button id="acceptBookingBtn" class="btn btn-success">Accept Booking</button>
-                <button id="declineBookingBtn" class="btn btn-danger">Decline Booking</button>
-                <a href="#" id="messageClientBtn" class="btn btn-primary">Message Client</a>
+                <button id="proceedBookingBtn" class="btn btn-primary">Proceed</button>
+                <a href="#" id="messageClientBtn" class="btn btn-secondary">Message Client</a>
             </div>
         </div>
     </div>
@@ -524,8 +535,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             const lightboxCreatedAt = document.getElementById('lightboxCreatedAt');
             const lightboxScreenshotProof = document.getElementById('lightboxScreenshotProof');
             const noScreenshotMessage = document.getElementById('noScreenshotMessage');
-            const acceptBookingBtn = document.getElementById('acceptBookingBtn');
-            const declineBookingBtn = document.getElementById('declineBookingBtn');
+            const proceedBookingBtn = document.getElementById('proceedBookingBtn'); // New button
             const messageClientBtn = document.getElementById('messageClientBtn');
 
             // --- Function to open and populate lightbox ---
@@ -542,10 +552,15 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                         const booking = data.booking;
                         const client = data.client; // Client data from API
 
+                        // --- DEBUGGING LOG ---
+                        console.log("Booking Status received by JS:", booking.status); // Log the exact status string
+                        // --- END DEBUGGING LOG ---
+
+
                         lightboxBookingTitle.textContent = `Booking ID: ${booking.id}`;
                         lightboxBookingId.textContent = booking.id;
                         lightboxEventTitle.textContent = booking.event_title || 'N/A';
-                        lightboxClientName.textContent = client.first_name + ' ' + client.last_name;
+                        lightboxClientName.textContent = client.first_name + ' ' + client.last_name + (client.phone ? ` (${client.phone})` : ''); // Show phone if available
                         lightboxClientEmail.textContent = client.email;
                         lightboxServiceDate.textContent = new Date(booking.service_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
                         lightboxServiceName.textContent = booking.service_name || 'N/A';
@@ -553,7 +568,8 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                         lightboxDepositAmount.textContent = parseFloat(booking.deposit_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                         lightboxInstructions.textContent = booking.special_instructions || 'None provided.';
                         
-                        lightboxStatus.textContent = booking.status;
+                        // Update status badge
+                        lightboxStatus.textContent = ucfirst(booking.status);
                         lightboxStatus.className = `status-badge status-${booking.status.toLowerCase().replace(/_/g, '-')}`;
 
                         lightboxCreatedAt.textContent = new Date(booking.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -568,18 +584,25 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                             noScreenshotMessage.style.display = 'block';
                         }
 
-                        // Set button data-attributes for actions
-                        acceptBookingBtn.dataset.bookingId = booking.id;
-                        declineBookingBtn.dataset.bookingId = booking.id;
+                        // Set button data-attributes/hrefs for actions
+                        // 'Proceed' button will link to a booking management page (hypothetical, needs implementation)
+                        proceedBookingBtn.dataset.bookingId = booking.id; // Store ID if needed for action
+                        // For now, let 'Proceed' take them to a dedicated booking management/quote page for this booking
+                        proceedBookingBtn.onclick = () => { window.location.href = `<?= BASE_URL ?>public/vendor_booking_management.php?booking_id=${booking.id}`; }; 
+                        
+                        // Set the message client button's href based on client ID
                         messageClientBtn.href = `<?= BASE_URL ?>public/vendor_chat.php?user_id=${client.id}`; // Link to chat with client
 
                         // Show/hide action buttons based on status
-                        if (booking.status === 'pending_review') {
-                            acceptBookingBtn.style.display = 'inline-block';
-                            declineBookingBtn.style.display = 'inline-block';
+                        // 'Proceed' and 'Message Client' should be visible for 'pending' bookings
+                        if (booking.status === 'pending') { 
+                            proceedBookingBtn.style.display = 'inline-block';
+                            // "Message Client" is always an option if there's a client ID
+                            messageClientBtn.style.display = (client.id && client.id !== 0) ? 'inline-block' : 'none'; 
                         } else {
-                            acceptBookingBtn.style.display = 'none';
-                            declineBookingBtn.style.display = 'none';
+                            proceedBookingBtn.style.display = 'none';
+                            // "Message Client" is always an option regardless of booking status if there's a client ID
+                            messageClientBtn.style.display = (client.id && client.id !== 0) ? 'inline-block' : 'none'; 
                         }
 
                         bookingDetailsLightbox.classList.add('active');
@@ -593,6 +616,14 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                     console.error('Error opening booking details lightbox:', error);
                     alert('Could not load booking details. Please try again.');
                 }
+            }
+
+            // Helper for ucfirst (since it's a PHP function)
+            function ucfirst(string) {
+                if (typeof string !== 'string' || string.length === 0) {
+                    return '';
+                }
+                return string.charAt(0).toUpperCase() + string.slice(1);
             }
 
             // --- Event Listeners for "View" buttons ---
@@ -629,6 +660,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             });
 
             // --- Booking Action Buttons (Accept/Decline) ---
+            // These buttons are removed per the new plan, but keep the updateBookingStatus function if it's still used elsewhere
             async function updateBookingStatus(bookingId, status) {
                 if (!confirm(`Are you sure you want to ${status} this booking (ID: ${bookingId})?`)) {
                     return;
@@ -657,9 +689,9 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                 }
             }
 
-            acceptBookingBtn.addEventListener('click', () => updateBookingStatus(acceptBookingBtn.dataset.bookingId, 'confirmed'));
-            declineBookingBtn.addEventListener('click', () => updateBookingStatus(declineBookingBtn.dataset.bookingId, 'declined'));
-            // messageClientBtn already has its href set dynamically
+            // acceptBookingBtn.addEventListener('click', () => updateBookingStatus(acceptBookingBtn.dataset.bookingId, 'confirmed'));
+            // declineBookingBtn.addEventListener('click', () => updateBookingStatus(declineBookingBtn.dataset.bookingId, 'cancelled')); 
+            // The above listeners are commented out as buttons are removed per new plan.
 
             // Initialize FullCalendar for availability display on the vendor dashboard
             const calendarEl = document.getElementById('availability-calendar');
@@ -672,10 +704,16 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                     },
                     // Events are fetched from the dedicated public/availability.php API endpoint
                     events: function(fetchInfo, successCallback, failureCallback) {
-                        fetch(`<?= BASE_URL ?>public/availability.php?vendor_id=<?= $_SESSION['vendor_id'] ?? ($vendor_profile['id'] ?? 0) ?>&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`) // Safely access vendor_id
+                        fetch(`<?= BASE_URL ?>public/vendor_availability.php?vendor_id=<?= $_SESSION['vendor_id'] ?? ($vendor_profile['id'] ?? 0) ?>&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`) // Safely access vendor_id
                             .then(response => {
                                 if (!response.ok) {
-                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                    // It appears vendor_availability.php might output HTML errors if vendor_id is problematic.
+                                    // Let's try to get the raw text to see the PHP error.
+                                    return response.text().then(text => {
+                                        console.error('Error fetching availability: Server response not OK.', response.status, text);
+                                        // Throw an error with the text to prevent JSON parsing
+                                        throw new Error('Server returned unexpected HTML/error for availability data. Check server logs.');
+                                    });
                                 }
                                 return response.json();
                             })
