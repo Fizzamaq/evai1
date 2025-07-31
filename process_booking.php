@@ -41,14 +41,13 @@ try {
     $new_event_title = $_POST['new_event_title'] ?? null;
     $new_event_type_id = $_POST['new_event_type_id'] ?? null;
     $new_event_guest_count = $_POST['new_event_guest_count'] ?? null;
-    // Old event budget fields are no longer read here, as explicit booking amounts are used.
-    // $new_event_budget_min = $_POST['new_event_budget_min'] ?? null;
-    // $new_event_budget_max = $_POST['new_event_budget_max'] ?? null;
+    $new_event_budget_min = $_POST['new_event_budget_min'] ?? null;
+    $new_event_budget_max = $_POST['new_event_budget_max'] ?? null;
 
     // NEW: Explicit booking amounts from the form
+    // Note: These must be properly validated and converted to float
     $final_amount = filter_var($_POST['final_booking_amount'] ?? 0, FILTER_VALIDATE_FLOAT);
     $deposit_amount = filter_var($_POST['deposit_booking_amount'] ?? 0, FILTER_VALIDATE_FLOAT);
-
 
     // --- DEBUGGING INPUTS ---
     error_log("PROCESS_BOOKING: Received POST data: " . print_r($_POST, true));
@@ -71,11 +70,12 @@ try {
     if (empty($new_event_type_id) || !is_numeric($new_event_type_id)) {
         throw new Exception("Missing or invalid new event type.");
     }
-    if ($final_amount === false || $final_amount < 0) { // Validate explicit final amount
-        throw new Exception("Invalid final booking amount.");
+    // Validate explicit final and deposit amounts
+    if ($final_amount === false || $final_amount < 0) { 
+        throw new Exception("Invalid final booking amount. Must be a number greater than or equal to 0.");
     }
-    if ($deposit_amount === false || $deposit_amount < 0) { // Validate explicit deposit amount
-        throw new Exception("Invalid deposit amount.");
+    if ($deposit_amount === false || $deposit_amount < 0) {
+        throw new Exception("Invalid deposit amount. Must be a number greater than or equal to 0.");
     }
     if ($deposit_amount > $final_amount) {
         throw new Exception("Deposit amount cannot be greater than final amount.");
@@ -94,6 +94,7 @@ try {
 
 
     // --- Create New Event Record FIRST ---
+    // Note: Using explicit final amount for event budget min/max as per previous discussion.
     $event_data_for_creation = [
         'user_id' => $_SESSION['user_id'],
         'title' => $new_event_title,
@@ -101,8 +102,8 @@ try {
         'event_date' => $service_date, // Use selected service date as event date
         'event_type_id' => (int)$new_event_type_id,
         'guest_count' => !empty($new_event_guest_count) ? (int)$new_event_guest_count : null, // Handle null/empty
-        'budget_min' => $final_amount, // Use the explicit final amount as event budget min
-        'budget_max' => $final_amount, // Use the explicit final amount as event budget max
+        'budget_min' => (float)$final_amount, // Use the explicit final amount as event budget min
+        'budget_max' => (float)$final_amount, // Use the explicit final amount as event budget max
         'status' => 'active', // Set initial status for newly created event
         'ai_preferences' => null, // Not AI-generated if created this way
         'location_string' => null, // Not capturing location here, unless form had it
@@ -127,24 +128,30 @@ try {
                 throw new Exception("Upload directory not found or not writable: " . $upload_dir);
             }
         }
-        $screenshot_filename = $uploadHandler->uploadFile($_FILES['picture_upload'], $upload_dir);
-        if (!$screenshot_filename) {
+        // Corrected: Passed pdo to UploadHandler constructor.
+        // The uploadFile method expects the $_FILES array entry itself, not just parts of it.
+        // It should return the filename directly on success or false on failure.
+        $uploaded_filename = (new UploadHandler($pdo))->uploadFile($_FILES['picture_upload'], $upload_dir);
+        if (!$uploaded_filename) {
             // uploadFile sets $_SESSION['upload_error'] on failure
             throw new Exception("Failed to upload screenshot: " . ($_SESSION['upload_error'] ?? 'Unknown upload error.'));
         }
-        error_log("PROCESS_BOOKING: Screenshot uploaded: " . $screenshot_filename);
+        error_log("PROCESS_BOOKING: Screenshot uploaded: " . $uploaded_filename);
+        $screenshot_filename = $uploaded_filename; // Assign the filename
     } else if (isset($_FILES['picture_upload']) && $_FILES['picture_upload']['error'] !== UPLOAD_ERR_NO_FILE) {
         // If a file was attempted but failed for reasons other than "no file"
         throw new Exception("Screenshot upload error (Code: " . $_FILES['picture_upload']['error'] . ").");
     } else {
-        // If no file was uploaded AND it's required
+        // If no file was uploaded AND it's required (as per book_vendor.php form)
         throw new Exception("Payment screenshot is required. Please upload one.");
     }
+
 
     // Append selected services and uploaded picture URL to special instructions for logging
     $selected_service_names = [];
     foreach ($selected_service_offerings_ids as $offering_id) {
-        $offering_details = $vendor_obj->getServiceOfferingById((int)$offering_id, (int)$vendor_id); // Fetch full offering details to get service name
+        // Ensure vendor_obj->getServiceOfferingById is robust with type casting
+        $offering_details = $vendor_obj->getServiceOfferingById((int)$offering_id, (int)$vendor_id); 
         if ($offering_details) {
             $selected_service_names[] = $offering_details['service_name'];
         }
@@ -168,7 +175,7 @@ try {
         'final_amount' => (float)$final_amount, // Use the explicit amount from form
         'deposit_amount' => (float)$deposit_amount, // Use the explicit amount from form
         'special_instructions' => $special_instructions_for_db, // Use the updated instructions string
-        'status' => 'pending_review',
+        'status' => 'pending', // CHANGED from 'pending_review' to 'pending' to match ENUM
         'screenshot_filename' => $screenshot_filename
     ];
 
@@ -183,24 +190,35 @@ try {
     }
     error_log("PROCESS_BOOKING: Booking created with ID: " . $newBookingId);
 
-    // Create chat conversation for this booking
-    // Note: If chat->startConversation has its own transaction, it will cause an error due to nesting.
-    // Ensure chat methods do NOT manage their own transactions if called within an existing one.
-    $conversation_id = $chat->startConversation((int)$event_id, $_SESSION['user_id'], (int)$vendor_id);
-    if ($conversation_id) { // Only attempt to update if conversation was successfully created
-        $bookingSystem->updateBookingChatConversationId($newBookingId, $conversation_id);
-        error_log("PROCESS_BOOKING: Chat conversation started with ID: " . $conversation_id);
+    // Get vendor's user_id from vendor_profiles table
+    $vendor_profile_details = $vendor_obj->getVendorProfileById((int)$vendor_id);
+    $vendor_user_id_for_chat = $vendor_profile_details['user_id'] ?? null;
+
+    if (!$vendor_user_id_for_chat) {
+        error_log("PROCESS_BOOKING: Vendor user ID not found for vendor_profile.id {$vendor_id}. Cannot start chat.");
+        // Continue process, but set a warning
+        $_SESSION['warning_message'] = "Booking submitted, but chat could not be initiated automatically. Please contact the vendor directly.";
     } else {
-        error_log("PROCESS_BOOKING: Failed to create chat conversation for booking ID: $newBookingId");
-        if ($notification) {
-            $notification->createNotification(
-                $_SESSION['user_id'],
-                "Warning: Could not start chat for your booking (ID: {$newBookingId}). Please contact support if you need to chat with the vendor.",
-                'booking',
-                $newBookingId
-            );
+        // Create chat conversation for this booking
+        // Note: If chat->startConversation has its own transaction, it will cause an error due to nesting.
+        // Ensure chat methods do NOT manage their own transactions if called within an existing one.
+        $conversation_id = $chat->startConversation((int)$event_id, $_SESSION['user_id'], (int)$vendor_user_id_for_chat);
+        if ($conversation_id) { // Only attempt to update if conversation was successfully created
+            $bookingSystem->updateBookingChatConversationId($newBookingId, $conversation_id);
+            error_log("PROCESS_BOOKING: Chat conversation started with ID: " . $conversation_id);
+        } else {
+            error_log("PROCESS_BOOKING: Failed to create chat conversation for booking ID: $newBookingId");
+            if ($notification) {
+                $notification->createNotification(
+                    $_SESSION['user_id'],
+                    "Warning: Could not start chat for your booking (ID: {$newBookingId}). Please contact support if you need to chat with the vendor.",
+                    'booking',
+                    $newBookingId
+                );
+            }
         }
     }
+
 
     $pdo->commit(); // Commit transaction if all successful so far
     error_log("PROCESS_BOOKING: Database transaction committed.");
@@ -215,10 +233,9 @@ try {
         );
         // Also notify the vendor (assuming vendor_id is their user_id, it's vendor_profiles.id here)
         // You might need to fetch the vendor's user_id from vendor_profiles table if vendor_id is vendor_profiles.id
-        $vendor_profile_details = $vendor_obj->getVendorProfileById((int)$vendor_id);
-        if ($vendor_profile_details && isset($vendor_profile_details['user_id'])) {
+        if ($vendor_user_id_for_chat) { // Only notify if vendor's user ID was found
             $notification->createNotification(
-                (int)$vendor_profile_details['user_id'], // Vendor's user_id
+                (int)$vendor_user_id_for_chat, // Vendor's user_id
                 "New booking (ID: {$newBookingId}) received! Please review and confirm.",
                 'booking',
                 $newBookingId
