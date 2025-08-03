@@ -56,7 +56,7 @@ try {
     // Now, let's also fetch booking information for these events
     // This allows us to determine if an event is "booked" for display purposes
     foreach ($user_events as &$event_item) { // Use & to modify array elements directly
-        // Ensure getBookingsByEventId exists and returns an array
+        // Ensure getBookingsByEventId exists and returns an an array
         $bookings_for_event = $booking_obj->getBookingsByEventId($event_item['id']);
         $event_item['is_booked'] = !empty($bookings_for_event); // True if any bookings exist
         $event_item['bookings'] = $bookings_for_event; // Attach booking details if needed
@@ -66,6 +66,7 @@ try {
         $event_item['display_status'] = ucfirst(htmlspecialchars($event_item['status']));
         $event_item['status_class'] = strtolower(htmlspecialchars($event_item['status']));
         $event_item['needs_review'] = false; // New flag for review button
+        $event_item['is_reviewed'] = false; // New flag to show reviewed status
 
         $isEventDatePast = (strtotime($event_item['event_date']) < time());
 
@@ -85,11 +86,15 @@ try {
                     $hasCancelledOrFailedBooking = true;
                 }
                 
-                // Check if a completed booking's date has passed and it's not reviewed yet
-                if (($booking['status'] === 'completed') && $isEventDatePast && ($booking['is_reviewed'] == 0)) {
+                // Check if a completed booking exists and needs a review
+                if (($booking['status'] === 'completed') && ($booking['is_reviewed'] == 0)) {
                     $event_item['needs_review'] = true;
-                    // We also need the booking ID for the review link
                     $event_item['review_booking_id'] = $booking['id'];
+                }
+                
+                // Check if a completed booking has already been reviewed
+                if ($booking['is_reviewed'] == 1) {
+                    $event_item['is_reviewed'] = true;
                 }
             }
             
@@ -97,6 +102,9 @@ try {
             if ($event_item['needs_review']) {
                 $event_item['display_status'] = 'Pending Review';
                 $event_item['status_class'] = 'pending-review-action';
+            } elseif ($event_item['is_reviewed']) { // NEW: Add a check for reviewed status
+                $event_item['display_status'] = 'Reviewed';
+                $event_item['status_class'] = 'reviewed';
             } elseif ($hasConfirmedBooking) {
                 $event_item['display_status'] = 'Booked';
                 $event_item['status_class'] = 'booked';
@@ -114,13 +122,6 @@ try {
             }
         }
         // --- END NEW/MODIFIED LOGIC ---
-
-        // --- DEBUGGING: Log event and booking status for each item ---
-        error_log("Events Page Debug: Event ID: {$event_item['id']}, Event Title: '{$event_item['title']}', Original Status: '{$event_item['status']}', Is Booked: " . ($event_item['is_booked'] ? 'True' : 'False') . ", Display Status: '{$event_item['display_status']}'");
-        if ($event_item['is_booked']) {
-            error_log("Events Page Debug: Bookings for Event ID {$event_item['id']}: " . json_encode($event_item['bookings']));
-        }
-        // --- END DEBUGGING ---
     }
     unset($event_item); // Break the reference with the last element
 
@@ -380,6 +381,10 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
         .status-pending-review-action {
             background: #8e44ad;
             color: #ecf0f1;
+        }
+        .status-reviewed { /* NEW: Style for a 'Reviewed' status */
+            background: #2C3E50;
+            color: white;
         }
     </style>
 </head>
