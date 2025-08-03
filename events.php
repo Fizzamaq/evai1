@@ -85,9 +85,11 @@ try {
                     $hasCancelledOrFailedBooking = true;
                 }
                 
-                // Check if a confirmed booking's date has passed and it's not reviewed yet
-                if (($booking['status'] === 'confirmed') && $isEventDatePast && ($booking['is_reviewed'] == 0)) {
+                // Check if a completed booking's date has passed and it's not reviewed yet
+                if (($booking['status'] === 'completed') && $isEventDatePast && ($booking['is_reviewed'] == 0)) {
                     $event_item['needs_review'] = true;
+                    // We also need the booking ID for the review link
+                    $event_item['review_booking_id'] = $booking['id'];
                 }
             }
             
@@ -432,6 +434,11 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
 
                         <div class="event-actions">
                             <a href="event.php?id=<?php echo $event_item['id']; ?>" class="btn btn-primary btn-sm"><i class="fas fa-eye"></i> View Details</a>
+                            <?php if ($event_item['needs_review']): ?>
+                                <a href="review.php?booking_id=<?= htmlspecialchars($event_item['review_booking_id']) ?>" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-star"></i> Leave Review
+                                </a>
+                            <?php endif; ?>
                             <?php if (!$event_item['is_booked']): // Only show edit if no bookings exist for this event ?>
                                 <a href="edit_event.php?id=<?php echo $event_item['id']; ?>" class="btn btn-secondary btn-sm"><i class="fas fa-edit"></i> Edit</a>
                             <?php endif; ?>
