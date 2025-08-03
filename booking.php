@@ -1,4 +1,5 @@
 <?php
+// public/booking.php
 session_start();
 require_once '../includes/config.php';
 require_once '../classes/Booking.class.php';
