@@ -35,8 +35,8 @@ class Review {
             // Update average rating for the reviewed vendor (or user)
             $this->updateAverageRating($data['reviewed_id']);
 
-            // Mark booking as reviewed
-            $stmt = $this->pdo->prepare("UPDATE bookings SET is_reviewed = TRUE WHERE id = ?");
+            // Mark booking as reviewed and set status to completed
+            $stmt = $this->pdo->prepare("UPDATE bookings SET is_reviewed = TRUE, status = 'completed' WHERE id = ?");
             $stmt->execute([$data['booking_id']]);
 
             $this->pdo->commit();
@@ -77,13 +77,14 @@ class Review {
 
     public function getReviewsForEntity($entityId, $entityType = 'vendor') {
         try {
-            // Adjust query based on entityType (e.g., if reviews can be for users or vendors)
+            // UPDATED: Added a GROUP BY clause to ensure only one review per booking is returned.
             $stmt = $this->pdo->prepare("
                 SELECT r.*, u.first_name, u.last_name, up.profile_image
                 FROM reviews r
                 JOIN users u ON r.reviewer_id = u.id
                 LEFT JOIN user_profiles up ON u.id = up.user_id
                 WHERE r.reviewed_id = ?
+                GROUP BY r.booking_id
                 ORDER BY r.created_at DESC
             ");
             $stmt->execute([$entityId]);
