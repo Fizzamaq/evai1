@@ -1,4 +1,5 @@
 <?php
+// public/vendor_dashboard.php
 session_start();
 require_once '../includes/config.php';
 require_once '../classes/User.class.php';
@@ -694,7 +695,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             }
 
             // acceptBookingBtn.addEventListener('click', () => updateBookingStatus(acceptBookingBtn.dataset.bookingId, 'confirmed'));
-            // declineBookingBtn.addEventListener('click', () => updateBookingStatus(declineBookingBtn.dataset.bookingId, 'cancelled')); 
+            // declineBookingBtn.addEventListener('click', () => updateBookingStatus(declineBookingBtn.dataset.bookingId, 'cancelled'));
             // The above listeners are commented out as buttons are removed per new plan.
 
             // Initialize FullCalendar for availability display on the vendor dashboard
