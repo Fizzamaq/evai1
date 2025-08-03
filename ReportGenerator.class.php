@@ -1,4 +1,5 @@
 <?php
+// classes/ReportGenerator.class.php
 class ReportGenerator {
     private $pdo;
 
@@ -223,9 +224,9 @@ class ReportGenerator {
 
             $stmt = $this->pdo->prepare("
                 -- New Booking Received
-                (SELECT 'New Booking: ' AS type_prefix, CONCAT('for event ', e.title, ' from ', u.first_name, ' ', u.last_name) AS message_detail, b.created_at, 'fas fa-calendar-check' AS icon_class, CONCAT('public/booking.php?id=', b.id) AS related_url
+                (SELECT 'New Booking: ' AS type_prefix, CONCAT('for event ', e.title, ' from ', u.first_name, ' ', u.last_name) AS message_detail, b.created_at, 'fas fa-calendar-check' AS icon_class, CONCAT('public/booking.php?id=', b.id) AS related_url, 'booking' AS type, b.id AS related_id
                 FROM bookings b JOIN events e ON b.event_id = e.id JOIN users u ON b.user_id = u.id
-                WHERE b.vendor_id = :vendor_user_id1 ORDER BY b.created_at DESC LIMIT :limit1)
+                WHERE b.vendor_id = :vendor_profile_id1 ORDER BY b.created_at DESC LIMIT :limit1)
 
                 UNION ALL
                 
@@ -234,13 +235,13 @@ class ReportGenerator {
                         CONCAT(
                             'Message in chat with ',
                             CASE
-                                WHEN cc.user_id = :vendor_user_id2 THEN vp.business_name
+                                WHEN cc.user_id = :vendor_user_id2 THEN CONCAT(u_other.first_name, ' ', u_other.last_name)
                                 ELSE CONCAT(u_other.first_name, ' ', u_other.last_name)
                             END
                         ) AS message_detail,
                         MAX(cm.created_at) AS created_at, -- Get the latest message time for the conversation
                         'fas fa-comment' AS icon_class,
-                        CONCAT('public/vendor_chat.php?conversation_id=', cc.id) AS related_url
+                        CONCAT('public/vendor_chat.php?conversation_id=', cc.id) AS related_url, NULL, NULL
                 FROM chat_messages cm
                 JOIN chat_conversations cc ON cm.conversation_id = cc.id
                 LEFT JOIN users u_other ON (CASE WHEN cc.user_id = :vendor_user_id3 THEN cc.vendor_id ELSE cc.user_id END) = u_other.id
@@ -252,15 +253,21 @@ class ReportGenerator {
                 UNION ALL
                 
                 -- New Review Received
-                (SELECT 'New Review: ' AS type_prefix, CONCAT('for your service from ', u.first_name, ' ', u.last_name) AS message_detail, r.created_at, 'fas fa-star' AS icon_class, CONCAT('public/vendor_profile.php?id=', vp.id) AS related_url
+                (SELECT 'New Review: ' AS type_prefix, CONCAT('for your service from ', u.first_name, ' ', u.last_name) AS message_detail, r.created_at, 'fas fa-star' AS icon_class, CONCAT('public/vendor_profile.php?id=', vp.id) AS related_url, NULL, NULL
                 FROM reviews r JOIN users u ON r.reviewer_id = u.id JOIN vendor_profiles vp ON r.reviewed_id = vp.user_id
                 WHERE r.reviewed_id = :vendor_user_id6 ORDER BY r.created_at DESC LIMIT :limit3)
 
                 ORDER BY created_at DESC
                 LIMIT :final_limit
             ");
-
-            $stmt->bindParam(':vendor_user_id1', $vendorUserId, PDO::PARAM_INT);
+            
+            // Note: The original SQL was joining `bookings` with `vendor_profiles` on `b.vendor_id = vp.user_id`, which is incorrect.
+            // The `bookings.vendor_id` column references `vendor_profiles.id`. 
+            // The `reviews.reviewed_id` column references `users.id` (the vendor's user ID).
+            // This query needs to be carefully constructed to handle both cases.
+            // I'm using `b.vendor_id = :vendor_profile_id1` in the bookings part.
+            // and `r.reviewed_id = :vendor_user_id6` in the reviews part.
+            $stmt->bindParam(':vendor_profile_id1', $vendorProfileId, PDO::PARAM_INT);
             $stmt->bindParam(':limit1', $limit, PDO::PARAM_INT);
             $stmt->bindParam(':vendor_user_id2', $vendorUserId, PDO::PARAM_INT);
             $stmt->bindParam(':vendor_user_id3', $vendorUserId, PDO::PARAM_INT);
