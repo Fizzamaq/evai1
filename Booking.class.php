@@ -132,7 +132,7 @@ class Booking {
      */
     public function updateBookingStripePaymentId($bookingId, $stripePaymentId) {
         try {
-            $stmt = this->pdo->prepare("UPDATE bookings SET stripe_payment_id = ? WHERE id = ?");
+            $stmt = $this->pdo->prepare("UPDATE bookings SET stripe_payment_id = ? WHERE id = ?");
             return $stmt->execute([$stripePaymentId, $bookingId]);
         } catch (PDOException $e) {
             error_log("Update booking Stripe payment ID error: " . $e->getMessage());
@@ -259,6 +259,28 @@ class Booking {
                 'confirmed_bookings' => 0,
                 'total_revenue' => 0
             ];
+        }
+    }
+
+    /**
+     * Automatically updates confirmed bookings to 'completed' status
+     * if the service date has passed.
+     * This method is designed to be run by a cron job or scheduled task.
+     * @return int The number of bookings that were updated.
+     */
+    public function updateCompletedBookings() {
+        try {
+            // We need to update bookings that are 'confirmed' and whose service_date is in the past
+            $sql = "UPDATE bookings SET status = 'completed', updated_at = NOW() WHERE status = 'confirmed' AND service_date < CURDATE()";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute();
+
+            $updatedRows = $stmt->rowCount();
+            error_log("Successfully updated {$updatedRows} confirmed bookings to completed status.");
+            return $updatedRows;
+        } catch (PDOException $e) {
+            error_log("Failed to run updateCompletedBookings cron job: " . $e->getMessage());
+            return 0;
         }
     }
 }
