@@ -42,6 +42,9 @@ if (empty($eventDetails)) {
 // --- Determine displayed status based on bookings ---
 $displayStatus = ucfirst(htmlspecialchars($eventDetails['status'])); // Default to event status
 $statusClass = strtolower(htmlspecialchars($eventDetails['status'])); // Default to event status class
+$needsReview = false; // Flag for review button visibility
+$reviewBookingId = null; // Variable to hold the booking ID for the review link
+
 
 $bookingsForEvent = $booking_obj->getBookingsByEventId($eventId); // Fetch all bookings for this event
 $hasAnyBooking = !empty($bookingsForEvent); // Flag to check if any booking exists for the event
@@ -49,35 +52,51 @@ $hasAnyBooking = !empty($bookingsForEvent); // Flag to check if any booking exis
 if ($hasAnyBooking) {
     $hasConfirmed = false;
     $hasPendingReview = false;
-    $hasDeclined = false;
+    $hasCancelledOrFailedBooking = false;
+    $hasBeenReviewed = false;
 
     foreach ($bookingsForEvent as $booking) {
         if ($booking['status'] === 'confirmed') {
             $hasConfirmed = true;
-            break; 
         }
-        // Treat empty string status as 'pending' for display
         if ($booking['status'] === 'pending_review' || $booking['status'] === 'pending' || $booking['status'] === "") { 
             $hasPendingReview = true; 
         }
-        if ($booking['status'] === 'cancelled') { 
-            $hasDeclined = true;
+        if ($booking['status'] === 'cancelled' || $booking['status'] === 'payment_failed' || $booking['status'] === 'refunded') { 
+            $hasCancelledOrFailedBooking = true;
+        }
+        
+        // Check if a completed booking needs a review
+        if (($booking['status'] === 'completed') && ($booking['is_reviewed'] == 0)) {
+            $needsReview = true;
+            $reviewBookingId = $booking['id'];
+        }
+
+        // Check if a completed booking has already been reviewed
+        if ($booking['is_reviewed'] == 1) {
+            $hasBeenReviewed = true;
         }
     }
 
-    if ($hasConfirmed) {
+    if ($needsReview) {
+        $displayStatus = 'Pending Review';
+        $statusClass = 'pending-review-action';
+    } elseif ($hasBeenReviewed) {
+        $displayStatus = 'Reviewed';
+        $statusClass = 'reviewed';
+    } elseif ($hasConfirmed) {
         $displayStatus = 'Booked';
         $statusClass = 'booked';
+    } elseif ($hasCancelledOrFailedBooking) {
+        $displayStatus = 'Cancelled/Failed';
+        $statusClass = 'cancelled';
     } elseif ($hasPendingReview) {
         $displayStatus = 'Pending';
         $statusClass = 'pending';
-    } elseif ($hasDeclined) {
-        $displayStatus = 'Declined by Vendor';
-        $statusClass = 'declined';
     }
-    // If multiple bookings, and none of the above, it will still default to the first logic that sets $displayStatus.
-    // If it falls through all and there are bookings, but not of these statuses, it stays at original event status.
 }
+// --- END OF STATUS LOGIC ---
+
 
 // Get the name and details of the user who created the event
 $eventCreator = $user_obj->getUserById($eventDetails['user_id']);
@@ -147,6 +166,14 @@ $creatorName = htmlspecialchars($eventCreator['first_name'] ?? 'N/A') . ' ' . ht
         font-size: 0.95em;
         color: var(--text-dark);
     }
+    .event-services-list li::before {
+        content: "•";
+        color: var(--primary-color);
+        font-weight: bold;
+        display: inline-block;
+        width: 1em;
+        margin-left: -1em;
+    }
     .event-actions {
         display: flex;
         justify-content: center;
@@ -185,6 +212,15 @@ $creatorName = htmlspecialchars($eventCreator['first_name'] ?? 'N/A') . ' ' . ht
     .status-active { background: #55efc4; color: #00b894; }
     .status-completed { background: #a29bfe; color: #6c5ce7; }
     .status-cancelled { background: #ff7675; color: #d63031; } /* Event cancelled status */
+    .status-reviewed { /* NEW: Style for a 'Reviewed' status */
+        background: #2C3E50;
+        color: white;
+    }
+    .status-pending-review-action { /* NEW: Style for the action button flag */
+        background: #8e44ad;
+        color: #ecf0f1;
+    }
+
 
     /* New styles for AI Preferences and booking lists */
     .ai-preferences-toggle {
@@ -392,7 +428,12 @@ $creatorName = htmlspecialchars($eventCreator['first_name'] ?? 'N/A') . ' ' . ht
     <div class="event-actions">
         <?php if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 3): // Admin actions ?>
             <a href="<?= BASE_URL ?>public/admin/events.php" class="btn btn-secondary">Back to Events Management</a>
-        <?php else: // Customer actions (these links are still there but admin view takes precedence) ?>
+        <?php else: // Customer actions ?>
+            <?php if ($needsReview): ?>
+                <a href="review.php?booking_id=<?= htmlspecialchars($reviewBookingId) ?>" class="btn btn-warning btn-sm">
+                    <i class="fas fa-star"></i> Leave Review
+                </a>
+            <?php endif; ?>
             <?php if (!$hasAnyBooking): // Only show edit if no bookings exist for this event ?>
                 <a href="edit_event.php?id=<?= $eventId ?>" class="btn btn-primary">Edit Event</a>
             <?php endif; ?>
