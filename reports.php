@@ -71,7 +71,7 @@ include '../../includes/admin_header.php'; // Corrected path
         <div class="admin-section">
             <h2>Filter Reports by Date</h2>
             <div class="date-filter-form">
-                <form method="GET" action="<?= BASE_URL ?>public/admin/reports.php" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                <form method="GET" action="<?= BASE_URL ?>public/admin/reports.php" class="date-filter-form-row">
                     <div class="form-group">
                         <label for="start_date">Start Date:</label>
                         <input type="date" id="start_date" name="start_date" value="<?= htmlspecialchars($startDate) ?>" class="form-control">
@@ -105,10 +105,10 @@ include '../../includes/admin_header.php'; // Corrected path
                                 <tr>
                                     <td><?= htmlspecialchars($row['date']) ?></td>
                                     <td><?= htmlspecialchars($row['total_bookings']) ?></td>
-                                    <td>$<?= number_format($row['total_revenue'], 2) ?></td>
-                                    <td>$<?= number_format($row['average_booking_value'], 2) ?></td>
-                                    <td>$<?= number_format($row['collected_amount'], 2) ?></td>
-                                    <td>$<?= number_format($row['pending_amount'], 2) ?></td>
+                                    <td>PKR<?= number_format($row['total_revenue'], 2) ?></td>
+                                    <td>PKR<?= number_format($row['average_booking_value'], 2) ?></td>
+                                    <td>PKR<?= number_format($row['collected_amount'], 2) ?></td>
+                                    <td>PKR<?= number_format($row['pending_amount'], 2) ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -143,7 +143,7 @@ include '../../includes/admin_header.php'; // Corrected path
                                     <td><?= date('F', mktime(0, 0, 0, $row['month'], 1)) ?></td>
                                     <td><?= htmlspecialchars($row['total_bookings']) ?></td>
                                     <td><?= number_format($row['average_rating'], 1) ?></td>
-                                    <td>$<?= number_format($row['total_earnings'], 2) ?></td>
+                                    <td>PKR<?= number_format($row['total_earnings'], 2) ?></td>
                                     <td><?= number_format($row['avg_lead_time'], 0) ?></td>
                                     <td><?= htmlspecialchars($row['total_reviews']) ?></td>
                                 </tr>
@@ -165,7 +165,7 @@ include '../../includes/admin_header.php'; // Corrected path
                             <tr>
                                 <th>Event Type</th>
                                 <th>Total Events</th>
-                                <th>Avg Budget ($)</th>
+                                <th>Avg Budget (PKR)</th>
                                 <th>Completed Events</th>
                                 <th>Cancelled Events</th>
                                 <th>Total Messages</th>
@@ -176,7 +176,7 @@ include '../../includes/admin_header.php'; // Corrected path
                                 <tr>
                                     <td><?= htmlspecialchars(ucfirst($row['event_type'])) ?></td>
                                     <td><?= htmlspecialchars($row['total_events']) ?></td>
-                                    <td>$<?= number_format($row['avg_budget'], 2) ?></td>
+                                    <td>PKR<?= number_format($row['avg_budget'], 2) ?></td>
                                     <td><?= htmlspecialchars($row['completed_events']) ?></td>
                                     <td><?= htmlspecialchars($row['cancelled_events']) ?></td>
                                     <td><?= htmlspecialchars($row['total_messages']) ?></td>
