@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/config.php';
 // Corrected path to User.class.php
 require_once __DIR__ . '/../classes/User.class.php';
 
-// session_start(); // Should be handled by config.php
+include 'header.php';
 
 // Instantiate User class with $pdo
 $user = new User($pdo); 
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="auth-container">
         <div class="auth-card">
-            <h1>Forgot Password?</h1>
+            <h2>Forgot Password?</h2>
             
             <?php if (isset($_SESSION['success'])): ?>
                 <div class="alert success"><?= htmlspecialchars($_SESSION['success']) ?></div>
@@ -60,5 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
     </div>
+    <?php include 'footer.php'; ?>
 </body>
 </html>
