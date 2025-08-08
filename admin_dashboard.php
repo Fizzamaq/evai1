@@ -50,7 +50,7 @@ $stats = [
                 <div class="stat-label">Pending Vendors</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">$<?= number_format($stats['revenue'] ?? 0, 2) ?></div>
+                <div class="stat-value">Pkr<?= number_format($stats['revenue'] ?? 0, 2) ?></div>
                 <div class="stat-label">Total Revenue</div>
             </div>
         </div>
