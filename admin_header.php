@@ -23,7 +23,6 @@
                 <a href="<?= BASE_URL ?>public/admin/events.php">Events</a>
                 <a href="<?= BASE_URL ?>public/admin/vendors.php">Vendors</a>
                 <a href="<?= BASE_URL ?>public/admin/reports.php">Reports</a>
-                <a href="<?= BASE_URL ?>public/admin/settings.php">Settings</a>
                 <a href="<?= BASE_URL ?>public/logout.php">Logout</a>
             </nav>
         </div>
