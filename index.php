@@ -257,7 +257,7 @@ if (isset($_SESSION['user_id']) && ($_SESSION['user_type'] ?? null) == 1) {
             <div class="steps">
                 <div class="step">
                     <div class="step-number">1</div>
-                    <h3>Create Your Event</h3>
+                    <h3>Plan Your Event</h3>
                     <p>Tell us about your event vision, guest count, and budget.</p>
                 </div>
                 <div class="step">
