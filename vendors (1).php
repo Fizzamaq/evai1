@@ -44,8 +44,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit();
 }
 
+// Get search query from URL
+$search_query = $_GET['search_query'] ?? '';
+
 // Fetch all vendor profiles
-$vendors = $vendor_obj->getAllVendorProfiles();
+$vendors = $vendor_obj->getAllVendorProfiles($search_query);
 
 include '../../includes/admin_header.php';
 ?>
@@ -59,6 +62,13 @@ include '../../includes/admin_header.php';
     <?php if (isset($_SESSION['error_message'])): ?>
         <div class="alert error"><?php echo htmlspecialchars($_SESSION['error_message']); unset($_SESSION['error_message']); ?></div>
     <?php endif; ?>
+
+    <div class="admin-actions-header">
+        <form method="GET" class="search-form">
+            <input type="text" name="search_query" placeholder="Search vendors..." value="<?= htmlspecialchars($search_query) ?>">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+    </div>
 
     <div class="table-responsive">
         <table class="admin-table">
@@ -112,4 +122,4 @@ include '../../includes/admin_header.php';
     </div>
 </div>
 
-<?php include 'admin_footer.php'; ?>
+<?php include '../../public/admin/admin_footer.php'; ?>
