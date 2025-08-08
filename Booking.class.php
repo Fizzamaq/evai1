@@ -83,21 +83,28 @@ class Booking {
         }
     }
 
-    // MODIFIED: updateBookingStatus to also update screenshot_proof if provided
-    public function updateBookingStatus($bookingId, $status, $stripePaymentId = null, $screenshotProof = null) {
+    /**
+     * Updates a booking's status.
+     * @param int $bookingId The ID of the booking to update.
+     * @param string $status The new status for the booking.
+     * @param string|null $stripePaymentId An optional Stripe payment ID.
+     * @param string|null $screenshotProof An optional screenshot filename.
+     * @return bool True on success, false on failure.
+     */
+    public function updateBookingStatus(int $bookingId, string $status, string $stripePaymentId = null, string $screenshotProof = null) {
         try {
-            $sql = "UPDATE bookings SET status = ?, updated_at = NOW()";
-            $params = [$status];
+            $sql = "UPDATE bookings SET status = :status, updated_at = NOW()";
+            $params = [':status' => $status];
             if ($stripePaymentId) {
-                $sql .= ", stripe_payment_id = ?";
-                $params[] = $stripePaymentId;
+                $sql .= ", stripe_payment_id = :stripePaymentId";
+                $params[':stripePaymentId'] = $stripePaymentId;
             }
             if ($screenshotProof) {
-                $sql .= ", screenshot_proof = ?";
-                $params[] = $screenshotProof;
+                $sql .= ", screenshot_proof = :screenshotProof";
+                $params[':screenshotProof'] = $screenshotProof;
             }
-            $sql .= " WHERE id = ?";
-            $params[] = $bookingId;
+            $sql .= " WHERE id = :bookingId";
+            $params[':bookingId'] = $bookingId;
 
             $stmt = $this->pdo->prepare($sql);
             return $stmt->execute($params);
