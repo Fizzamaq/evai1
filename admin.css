@@ -319,9 +319,6 @@
         margin-bottom: 5px;
     }
 }
-/* assets/css/admin.css */
-
-/* ... (existing styles) ... */
 
 /* NEW: Styles for Search Form */
 .admin-actions-header {
@@ -381,4 +378,12 @@
         margin-right: 0;
         margin-bottom: 5px;
     }
+}
+
+/* Add this to the top or bottom of the file */
+.main-footer {
+    position: sticky;
+    bottom: 100;
+    width: 100%;
+    z-index: 10;
 }
