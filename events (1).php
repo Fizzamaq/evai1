@@ -43,8 +43,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit();
 }
 
+// Get search query from URL
+$search_query = $_GET['search_query'] ?? '';
+
 // Fetch all events (including AI-generated ones)
-$all_events = $event_obj->getAllEvents();
+$all_events = $event_obj->getAllEvents($search_query);
 
 // Process events to determine display status based on bookings
 foreach ($all_events as &$event_item) {
@@ -99,6 +102,13 @@ include '../../includes/admin_header.php';
         <div class="alert error"><?php echo htmlspecialchars($_SESSION['error_message']); unset($_SESSION['error_message']); ?></div>
     <?php endif; ?>
 
+    <div class="admin-actions-header">
+        <form method="GET" class="search-form">
+            <input type="text" name="search_query" placeholder="Search events..." value="<?= htmlspecialchars($search_query) ?>">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+    </div>
+
     <div class="table-responsive">
         <table class="admin-table">
             <thead>
@@ -145,4 +155,4 @@ include '../../includes/admin_header.php';
     </div>
 </div>
 
-<?php include '../../includes/admin_footer.php'; ?>
+<?php include '../../public/admin/admin_footer.php'; ?>
