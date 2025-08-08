@@ -191,6 +191,6 @@ include '../../includes/admin_header.php'; // Corrected path
         </div>
     </div>
 
-    <?php include '../../includes/admin_footer.php'; ?>
+<?php include '../../public/admin/admin_footer.php'; ?>
 </body>
 </html>
