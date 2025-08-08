@@ -319,3 +319,66 @@
         margin-bottom: 5px;
     }
 }
+/* assets/css/admin.css */
+
+/* ... (existing styles) ... */
+
+/* NEW: Styles for Search Form */
+.admin-actions-header {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--spacing-lg);
+}
+
+.admin-actions-header .search-form {
+    display: flex;
+    gap: var(--spacing-sm);
+    width: 100%;
+    max-width: 400px;
+}
+
+.admin-actions-header .search-form input[type="text"] {
+    flex-grow: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.admin-actions-header .search-form .btn {
+    padding: 8px 12px;
+    font-size: 1em;
+}
+
+/* ... (existing styles) ... */
+
+/* Responsive adjustments for admin dashboard */
+@media (max-width: 992px) {
+    /* ... (existing styles) ... */
+    .admin-actions-header {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 768px) {
+    /* ... (existing styles) ... */
+    .admin-actions-header .search-form {
+        flex-direction: column;
+    }
+    .admin-actions-header .search-form .btn {
+        width: 100%;
+    }
+    .admin-table th,
+    .admin-table td {
+        padding: 10px 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* ... (existing styles) ... */
+    .admin-table .btn {
+        display: block; /* Stack buttons vertically */
+        width: 100%;
+        margin-right: 0;
+        margin-bottom: 5px;
+    }
+}
