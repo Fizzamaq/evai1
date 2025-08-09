@@ -437,7 +437,6 @@ $creatorName = htmlspecialchars($eventCreator['first_name'] ?? 'N/A') . ' ' . ht
             <?php if (!$hasAnyBooking): // Only show edit if no bookings exist for this event ?>
                 <a href="edit_event.php?id=<?= $eventId ?>" class="btn btn-primary">Edit Event</a>
             <?php endif; ?>
-            <a href="ai_chat.php?event_id=<?= $eventId ?>" class="btn btn-secondary">Get AI Recommendations</a>
             <a href="<?= BASE_URL ?>public/chat.php?event_id=<?= $eventId ?>&vendor_id=" class="btn">Start Chat</a>
         <?php endif; ?>
     </div>
