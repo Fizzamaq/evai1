@@ -14,11 +14,15 @@ class Booking {
 
             $stmt = $this->pdo->prepare("
                 INSERT INTO bookings (
-                    user_id, event_id, vendor_id, service_id, booking_date, service_date, /* ADDED booking_date */
+                    user_id, event_id, vendor_id, service_id, booking_date, service_date,
+                    service_time, /* NEW */
                     final_amount, deposit_amount, special_instructions,
                     status, screenshot_proof, created_at, updated_at
                 ) VALUES (
-                    ?, ?, ?, ?, NOW(), ?, /* ADDED NOW() for booking_date */ ?, ?, ?, ?, ?, NOW(), NOW()
+                    ?, ?, ?, ?, NOW(), ?,
+                    ?, /* NEW */
+                    ?, ?, ?,
+                    ?, ?, NOW(), NOW()
                 )
             ");
             $success = $stmt->execute([
@@ -26,8 +30,8 @@ class Booking {
                 $data['event_id'],
                 $data['vendor_id'],
                 $data['service_id'],
-                /* NOW() replaces a placeholder here */
                 $data['service_date'],
+                $data['service_time'], /* NEW */
                 $data['final_amount'],
                 $data['deposit_amount'],
                 $data['special_instructions'],
@@ -58,7 +62,8 @@ class Booking {
 
     public function getBooking($bookingId) {
         try {
-            $stmt = $this->pdo->prepare("SELECT * FROM bookings WHERE id = ?");
+            // ADDED service_time to the SELECT statement
+            $stmt = $this->pdo->prepare("SELECT *, service_time FROM bookings WHERE id = ?");
             $stmt->execute([$bookingId]);
             return $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
@@ -69,10 +74,12 @@ class Booking {
 
     public function getUserBooking($userId, $bookingId) {
         try {
+            // ADDED service_time to the SELECT statement
             $stmt = $this->pdo->prepare("
-                SELECT b.*, v.business_name
+                SELECT b.*, e.title as event_title, vp.business_name
                 FROM bookings b
-                JOIN vendor_profiles v ON b.vendor_id = v.id  /* Corrected JOIN: Use vp.id instead of vp.user_id if vendor_id in bookings refers to vendor_profiles.id */
+                LEFT JOIN events e ON b.event_id = e.id
+                JOIN vendor_profiles vp ON b.vendor_id = vp.id
                 WHERE b.id = ? AND b.user_id = ?
             ");
             $stmt->execute([$bookingId, $userId]);
@@ -83,14 +90,6 @@ class Booking {
         }
     }
 
-    /**
-     * Updates a booking's status.
-     * @param int $bookingId The ID of the booking to update.
-     * @param string $status The new status for the booking.
-     * @param string|null $stripePaymentId An optional Stripe payment ID.
-     * @param string|null $screenshotProof An optional screenshot filename.
-     * @return bool True on success, false on failure.
-     */
     public function updateBookingStatus(int $bookingId, string $status, string $stripePaymentId = null, string $screenshotProof = null) {
         try {
             $sql = "UPDATE bookings SET status = :status, updated_at = NOW()";
@@ -114,12 +113,6 @@ class Booking {
         }
     }
 
-    /**
-     * Updates the chat_conversation_id for a given booking.
-     * @param int $bookingId The ID of the booking to update.
-     * @param int $conversationId The ID of the chat conversation to link.
-     * @return bool True on success, false on failure.
-     */
     public function updateBookingChatConversationId($bookingId, $conversationId) {
         try {
             $stmt = $this->pdo->prepare("UPDATE bookings SET chat_conversation_id = ? WHERE id = ?");
@@ -130,13 +123,6 @@ class Booking {
         }
     }
 
-    /**
-     * Updates the stripe_payment_id for a given booking.
-     * This method might become obsolete if Stripe is not used.
-     * @param int $bookingId The ID of the booking to update.
-     * @param string $stripePaymentId The Stripe Payment Intent ID.
-     * @return bool True on success, false on failure.
-     */
     public function updateBookingStripePaymentId($bookingId, $stripePaymentId) {
         try {
             $stmt = $this->pdo->prepare("UPDATE bookings SET stripe_payment_id = ? WHERE id = ?");
@@ -147,19 +133,13 @@ class Booking {
         }
     }
 
-    /**
-     * Get all bookings for a user.
-     * @param int $userId The ID of the user.
-     * @return array An array of booking data.
-     */
     public function getUserBookings($userId) {
         try {
-            // Added screenshot_proof to the SELECT statement
             $stmt = $this->pdo->prepare("
                 SELECT b.*, e.title as event_title, vp.business_name
                 FROM bookings b
                 LEFT JOIN events e ON b.event_id = e.id
-                JOIN vendor_profiles vp ON b.vendor_id = vp.id /* Corrected JOIN: Use vp.id instead of vp.user_id */
+                JOIN vendor_profiles vp ON b.vendor_id = vp.id
                 WHERE b.user_id = ?
                 ORDER BY b.created_at DESC
             ");
@@ -171,11 +151,6 @@ class Booking {
         }
     }
 
-    /**
-     * Get all bookings associated with a specific event ID.
-     * @param int $eventId The ID of the event.
-     * @return array An array of booking data, or empty array if none found.
-     */
     public function getBookingsByEventId($eventId) {
         try {
             $stmt = $this->pdo->prepare("
@@ -212,7 +187,7 @@ class Booking {
                 $booking['client_name'] = trim($booking['first_name'] . ' ' . $booking['last_name']);
             }
             return $bookings;
-        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+        } catch (PDOException | Exception $e) {
             error_log("Error getting vendor upcoming bookings for vendor {$vendorId}: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return [];
         }
@@ -239,7 +214,7 @@ class Booking {
                 $booking['client_name'] = trim($booking['first_name'] . ' ' . $booking['last_name']);
             }
             return $bookings;
-        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+        } catch (PDOException | Exception $e) {
             error_log("Error getting vendor recent bookings for vendor {$vendorId}: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return [];
         }
@@ -258,7 +233,7 @@ class Booking {
             ");
             $stmt->execute([$vendorId]);
             return $stmt->fetch(PDO::FETCH_ASSOC);
-        } catch (PDOException | Exception $e) { // Catch both PDOException and general Exception
+        } catch (PDOException | Exception $e) {
             error_log("Error getting vendor booking stats for vendor {$vendorId}: " . $e->getMessage() . " - Trace: " . $e->getTraceAsString());
             return [
                 'total_bookings' => 0,
@@ -269,15 +244,8 @@ class Booking {
         }
     }
 
-    /**
-     * Automatically updates confirmed bookings to 'completed' status
-     * if the service date has passed.
-     * This method is designed to be run by a cron job or scheduled task.
-     * @return int The number of bookings that were updated.
-     */
     public function updateCompletedBookings() {
         try {
-            // We need to update bookings that are 'confirmed' and whose service_date is in the past
             $sql = "UPDATE bookings SET status = 'completed', updated_at = NOW() WHERE status = 'confirmed' AND service_date < CURDATE()";
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute();
