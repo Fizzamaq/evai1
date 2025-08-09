@@ -417,7 +417,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                                 <div class="list-item-meta">
                                     Client: <?= htmlspecialchars($booking_item['client_name'] ?? 'N/A') ?> |
                                     Date: <?= date('M j, Y', strtotime($booking_item['service_date'])) ?> |
-                                    Status: <span class="status-badge status-<?= strtolower(htmlspecialchars($booking_item['status'])) ?>"><?= htmlspecialchars($booking_item['status']) ?></span>
+                                    Time: <?= htmlspecialchars($booking_item['service_time'] ?? 'N/A') ?> | Status: <span class="status-badge status-<?= strtolower(htmlspecialchars($booking_item['status'])) ?>"><?= htmlspecialchars($booking_item['status']) ?></span>
                                 </div>
                             </div>
                             <a href="#" class="btn-link view-booking-details" data-booking-id="<?= htmlspecialchars($booking_item['id']) ?>">View</a>
@@ -502,7 +502,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                     <p><strong>Client Name:</strong> <span id="lightboxClientName"></span></p>
                     <p><strong>Client Email:</strong> <span id="lightboxClientEmail"></span></p>
                     <p><strong>Service Date:</strong> <span id="lightboxServiceDate"></span></p>
-                    <p><strong>Service:</strong> <span id="lightboxServiceName"></span></p>
+                    <p><strong>Service Time:</strong> <span id="lightboxServiceTime"></span></p> <p><strong>Service:</strong> <span id="lightboxServiceName"></span></p>
                     <p><strong>Final Amount:</strong> PKR <span id="lightboxFinalAmount"></span></p>
                     <p><strong>Deposit Amount:</strong> PKR <span id="lightboxDepositAmount"></span></p>
                     <p><strong>Instructions:</strong> <span id="lightboxInstructions"></span></p>
@@ -534,6 +534,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             const lightboxClientName = document.getElementById('lightboxClientName');
             const lightboxClientEmail = document.getElementById('lightboxClientEmail');
             const lightboxServiceDate = document.getElementById('lightboxServiceDate');
+            const lightboxServiceTime = document.getElementById('lightboxServiceTime'); // NEW
             const lightboxServiceName = document.getElementById('lightboxServiceName');
             const lightboxFinalAmount = document.getElementById('lightboxFinalAmount');
             const lightboxDepositAmount = document.getElementById('lightboxDepositAmount');
@@ -542,7 +543,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             const lightboxCreatedAt = document.getElementById('lightboxCreatedAt');
             const lightboxScreenshotProof = document.getElementById('lightboxScreenshotProof');
             const noScreenshotMessage = document.getElementById('noScreenshotMessage');
-            const proceedBookingBtn = document.getElementById('proceedBookingBtn'); // New button
+            const proceedBookingBtn = document.getElementById('proceedBookingBtn');
             const messageClientBtn = document.getElementById('messageClientBtn');
 
             // --- Function to open and populate lightbox ---
@@ -557,25 +558,22 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
 
                     if (data.success && data.booking) {
                         const booking = data.booking;
-                        const client = data.client; // Client data from API
+                        const client = data.client;
 
-                        // --- DEBUGGING LOG ---
-                        console.log("Booking Status received by JS:", booking.status); // Log the exact status string
-                        // --- END DEBUGGING LOG ---
-
+                        console.log("Booking Status received by JS:", booking.status);
 
                         lightboxBookingTitle.textContent = `Booking ID: ${booking.id}`;
                         lightboxBookingId.textContent = booking.id;
                         lightboxEventTitle.textContent = booking.event_title || 'N/A';
-                        lightboxClientName.textContent = client.first_name + ' ' + client.last_name + (client.phone ? ` (${client.phone})` : ''); // Show phone if available
+                        lightboxClientName.textContent = client.first_name + ' ' + client.last_name + (client.phone ? ` (${client.phone})` : '');
                         lightboxClientEmail.textContent = client.email;
                         lightboxServiceDate.textContent = new Date(booking.service_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                        lightboxServiceTime.textContent = booking.service_time ? new Date('2000-01-01T' + booking.service_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A'; // NEW
                         lightboxServiceName.textContent = booking.service_name || 'N/A';
                         lightboxFinalAmount.textContent = parseFloat(booking.final_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                         lightboxDepositAmount.textContent = parseFloat(booking.deposit_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                         lightboxInstructions.textContent = booking.special_instructions || 'None provided.';
                         
-                        // Update status badge
                         lightboxStatus.textContent = ucfirst(booking.status);
                         lightboxStatus.className = `status-badge status-${booking.status.toLowerCase().replace(/_/g, '-')}`;
 
@@ -591,24 +589,19 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                             noScreenshotMessage.style.display = 'block';
                         }
 
-                        // Set button data-attributes/hrefs for actions
-                        // 'Proceed' button will link to a booking management page (hypothetical, needs implementation)
-                        proceedBookingBtn.dataset.bookingId = booking.id; // Store ID if needed for action
-                        // For now, let 'Proceed' take them to a dedicated booking management/quote page for this booking
-                        proceedBookingBtn.onclick = () => { window.location.href = `<?= BASE_URL ?>public/booking_confirmed_message.php?booking_id=${booking.id}`; }; 
-                        
                         // Set the message client button's href based on client ID
-                        messageClientBtn.href = `<?= BASE_URL ?>public/vendor_chat.php?user_id=${client.id}`; // Link to chat with client
-
-                        // Show/hide action buttons based on whether client ID is available
-                        if (client.id && client.id !== 0) {
+                        messageClientBtn.href = `<?= BASE_URL ?>public/vendor_chat.php?user_id=${client.id}`;
+                        
+                        // Show/hide action buttons
+                        if (booking.status === 'pending') {
                             proceedBookingBtn.style.display = 'inline-block';
-                            messageClientBtn.style.display = 'inline-block';
                         } else {
                             proceedBookingBtn.style.display = 'none';
-                            messageClientBtn.style.display = 'none';
                         }
+                        messageClientBtn.style.display = (client.id && client.id !== 0) ? 'inline-block' : 'none';
 
+                        // Set the data attribute for the proceed button
+                        proceedBookingBtn.dataset.bookingId = booking.id;
 
                         bookingDetailsLightbox.classList.add('active');
                         document.body.style.overflow = 'hidden';
@@ -623,7 +616,6 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                 }
             }
 
-            // Helper for ucfirst (since it's a PHP function)
             function ucfirst(string) {
                 if (typeof string !== 'string' || string.length === 0) {
                     return '';
@@ -663,74 +655,77 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                     document.body.style.overflow = '';
                 }
             });
-
-            // --- Booking Action Buttons (Accept/Decline) ---
-            // These buttons are removed per the new plan, but keep the updateBookingStatus function if it's still used elsewhere
-            async function updateBookingStatus(bookingId, status) {
-                if (!confirm(`Are you sure you want to ${status} this booking (ID: ${bookingId})?`)) {
+            
+            // --- Proceed Button Click Handler (AJAX) ---
+            proceedBookingBtn.addEventListener('click', async function() {
+                const bookingId = this.dataset.bookingId;
+                if (!bookingId) {
+                    alert('Booking ID not found for proceed action.');
                     return;
                 }
+
+                if (!confirm(`Are you sure you want to confirm booking ID: ${bookingId}?`)) {
+                    return;
+                }
+
                 try {
+                    console.log('Sending AJAX request to confirm booking...');
                     const response = await fetch('<?= BASE_URL ?>api/update_booking_status.php', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ booking_id: bookingId, status: status })
+                        body: JSON.stringify({ booking_id: bookingId, status: 'confirmed' })
                     });
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`Server responded with status: ${response.status}. Error: ${errorText}`);
+                    }
+
                     const data = await response.json();
+                    console.log('Server response:', data);
 
                     if (data.success) {
-                        alert(`Booking ${status} successfully!`);
-                        bookingDetailsLightbox.classList.remove('active');
-                        document.body.style.overflow = '';
-                        location.reload(); // Reload page to reflect changes
+                        alert('Booking confirmed successfully!');
+                        window.location.href = `<?= BASE_URL ?>public/booking_confirmed_message.php?booking_id=${bookingId}`;
                     } else {
-                        alert(`Failed to ${status} booking: ` + (data.error || 'Unknown error.'));
+                        alert('Failed to confirm booking: ' + (data.error || 'Unknown error.'));
+                        console.error('Booking confirmation failed:', data.error);
                     }
                 } catch (error) {
-                    console.error(`Error ${status}ing booking:`, error);
-                    alert(`An error occurred while trying to ${status} the booking.`);
+                    console.error('Error confirming booking:', error);
+                    alert('An error occurred while trying to confirm the booking: ' + error.message);
                 }
-            }
-
-            // acceptBookingBtn.addEventListener('click', () => updateBookingStatus(acceptBookingBtn.dataset.bookingId, 'confirmed'));
-            // declineBookingBtn.addEventListener('click', () => updateBookingStatus(declineBookingBtn.dataset.bookingId, 'cancelled'));
-            // The above listeners are commented out as buttons are removed per new plan.
+            });
 
             // Initialize FullCalendar for availability display on the vendor dashboard
             const calendarEl = document.getElementById('availability-calendar');
             if (calendarEl) {
                 const calendar = new FullCalendar.Calendar(calendarEl, {
                     initialView: 'dayGridMonth',
-                    // Restrict calendar navigation to current and future dates
                     validRange: {
-                        start: '<?= date('Y-m-d') ?>' // Sets the start of the valid range to today
+                        start: '<?= date('Y-m-d') ?>'
                     },
-                    // Events are fetched from the dedicated public/availability.php API endpoint
                     events: function(fetchInfo, successCallback, failureCallback) {
-                        fetch(`<?= BASE_URL ?>public/vendor_availability.php?vendor_id=<?= $_SESSION['vendor_id'] ?? ($vendor_profile['id'] ?? 0) ?>&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`) // Safely access vendor_id
+                        fetch(`<?= BASE_URL ?>public/vendor_availability.php?vendor_id=<?= $_SESSION['vendor_id'] ?? ($vendor_profile['id'] ?? 0) ?>&start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
                             .then(response => {
                                 if (!response.ok) {
-                                    // It appears vendor_availability.php might output HTML errors if vendor_id is problematic.
-                                    // Let's try to get the raw text to see the PHP error.
                                     return response.text().then(text => {
                                         console.error('Error fetching availability: Server response not OK.', response.status, text);
-                                        // Throw an error with the text to prevent JSON parsing
                                         throw new Error('Server returned unexpected HTML/error for availability data. Check server logs.');
                                     });
                                 }
                                 return response.json();
                             })
                             .then(data => {
-                                // Format events for FullCalendar display
                                 const formattedEvents = data.map(event => ({
                                     id: event.id,
-                                    title: (event.status ? event.status.charAt(0).toUpperCase() + event.status.slice(1) : 'N/A'), // Safely access status
-                                    start: event.date + 'T' + event.start_time, // Full datetime string
-                                    end: event.date + 'T' + event.end_time,     // Full datetime string
-                                    allDay: false, // Assuming specific times are always provided
-                                    extendedProps: { // Custom property to store original status
+                                    title: (event.status ? event.status.charAt(0).toUpperCase() + event.status.slice(1) : 'N/A'),
+                                    start: event.date + 'T' + event.start_time,
+                                    end: event.date + 'T' + event.end_time,
+                                    allDay: false,
+                                    extendedProps: {
                                         status: event.status
                                     }
                                 }));
@@ -738,15 +733,13 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                             })
                             .catch(error => {
                                 console.error('Error fetching availability:', error);
-                                // Optionally display an error message on the dashboard
                                 const calendarContainer = document.getElementById('availability-calendar');
                                 if (calendarContainer) {
                                     calendarContainer.innerHTML = '<p class="text-subtle">Failed to load calendar. Please try again.</p>';
                                 }
-                                failureCallback(error); // Notify FullCalendar of the error
+                                failureCallback(error);
                             });
                     },
-                    // Customize how events are rendered in the calendar
                     eventContent: function(arg) {
                         let statusClass = '';
                         if (arg.event.extendedProps.status === 'available') {
@@ -756,17 +749,15 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                         } else if (arg.event.extendedProps.status === 'blocked') {
                             statusClass = 'fc-event-blocked';
                         } else if (arg.event.extendedProps.status === 'holiday') {
-                            statusClass = 'fc-event-holiday'; // New class for Holiday
+                            statusClass = 'fc-event-holiday';
                         }
                         return { html: `<div class="${statusClass}">${arg.event.title}</div>` };
                     },
-                    // Handle clicks on existing events (e.g., to view/edit availability)
                     eventClick: function(info) {
-                        // When an event is clicked, redirect to the full availability management page
                         window.location.href = `<?= BASE_URL ?>public/vendor_availability.php`;
                     }
                 });
-                calendar.render(); // Render the calendar on the page
+                calendar.render();
             }
         });
     </script>
