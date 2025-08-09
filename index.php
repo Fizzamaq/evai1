@@ -154,9 +154,13 @@ if (isset($_SESSION['user_id']) && ($_SESSION['user_type'] ?? null) == 1) {
                                         <?php
                                         $rating = round($vendor_item['rating'] * 2) / 2;
                                         for ($i = 1; $i <= 5; $i++):
-                                            if ($rating >= $i) { echo '<i class="fas fa-star"></i>'; }
-                                            elseif ($rating > ($i - 1) && $rating < $i) { echo '<i class="fas fa-star-half-alt"></i>'; }
-                                            else { echo '<i class="far fa-star"></i>'; }
+                                            if ($rating >= $i) {
+                                                echo '<i class="fas fa-star"></i>';
+                                            } elseif ($rating > ($i - 1) && $rating < $i) {
+                                                echo '<i class="fas fa-star-half-alt"></i>';
+                                            } else {
+                                                echo '<i class="far fa-star"></i>';
+                                            }
                                         endfor;
                                         ?>
                                         <span><?= number_format($vendor_item['rating'], 1) ?> (<?= $vendor_item['total_reviews'] ?> Reviews)</span>
@@ -177,55 +181,56 @@ if (isset($_SESSION['user_id']) && ($_SESSION['user_type'] ?? null) == 1) {
     <?php endif; ?>
 
     <section class="section categories-section">
-        <h2 class="section-title">Explore Categories</h2> <div class="swiper categories-swiper swiper-container-fade-overlay"> <div class="swiper-wrapper">
-                    <?php if (!empty($vendor_categories)): ?>
-                        <?php foreach ($vendor_categories as $category): ?>
-                            <div class="swiper-slide">
-                                <a href="<?= BASE_URL ?>public/vendors.php?category=<?= htmlspecialchars($category['id']) ?>" class="category-card">
-                                    <i class="fas fa-<?= htmlspecialchars($category['icon'] ?: 'tags') ?> category-icon"></i>
-                                    <h3><?= htmlspecialchars($category['category_name']) ?></h3>
-                                </a>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php else: ?>
+        <h2 class="section-title">Explore Categories</h2>
+        <div class="swiper categories-swiper swiper-container-fade-overlay">
+            <div class="swiper-wrapper">
+                <?php if (!empty($vendor_categories)): ?>
+                    <?php foreach ($vendor_categories as $category): ?>
                         <div class="swiper-slide">
-                            <p>No categories found at this time.</p>
+                            <a href="<?= BASE_URL ?>public/vendors.php?category=<?= htmlspecialchars($category['id']) ?>" class="category-card">
+                                <i class="fas fa-<?= htmlspecialchars($category['icon'] ?: 'tags') ?> category-icon"></i>
+                                <h3><?= htmlspecialchars($category['category_name']) ?></h3>
+                            </a>
                         </div>
-                    <?php endif; ?>
-                </div>
-                <div class="swiper-pagination categories-pagination"></div>
-                </div>
-        </section>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="swiper-slide">
+                        <p>No categories found at this time.</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <div class="swiper-pagination categories-pagination"></div>
+        </div>
+    </section>
 
     <?php
-    // Loop through each category and display its vendors in a horizontal carousel-like section
     if (!empty($vendor_categories)):
         foreach ($vendor_categories as $category):
-            // Fetch vendors for the current category
-            $vendors_for_category = $vendor->getVendorsByCategoryId($category['id'], 10); // Limit to 10 vendors per category
+            $vendors_for_category = $vendor->getVendorsByCategoryId($category['id'], 10);
     ?>
             <section class="section vendor-category-section">
                 <div class="container">
                     <h2><?= htmlspecialchars($category['category_name']) ?> Vendors</h2>
                     <?php if (!empty($vendors_for_category)): ?>
-                        <div class="swiper vendors-swiper-<?= htmlspecialchars($category['id']) ?> swiper-container-fade-overlay"> <div class="swiper-wrapper">
+                        <div class="swiper vendors-swiper-<?= htmlspecialchars($category['id']) ?> swiper-container-fade-overlay">
+                            <div class="swiper-wrapper">
                                 <?php foreach ($vendors_for_category as $vendor_item): ?>
                                     <div class="swiper-slide">
                                         <a href="<?= BASE_URL ?>public/vendor_profile.php?id=<?= htmlspecialchars($vendor_item['id']) ?>" class="vendor-card-item">
-                                            <div class="vendor-card-image" style="background-image: url('<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($vendor_item['profile_image'] ?: 'default-avatar.jpg') /* CORRECTED PATH */ ?>')"></div>
+                                            <div class="vendor-card-image" style="background-image: url('<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($vendor_item['profile_image'] ?: 'default-avatar.jpg') ?>')"></div>
                                             <div class="vendor-card-content">
                                                 <h3><?= htmlspecialchars($vendor_item['business_name']) ?></h3>
                                                 <p><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($vendor_item['business_city']) ?></p>
                                                 <div class="vendor-card-rating">
                                                     <?php
-                                                    $rating = round($vendor_item['rating'] * 2) / 2; // Round to nearest 0.5
+                                                    $rating = round($vendor_item['rating'] * 2) / 2;
                                                     for ($i = 1; $i <= 5; $i++):
                                                         if ($rating >= $i) {
-                                                            echo '<i class="fas fa-star"></i>'; // Full star
+                                                            echo '<i class="fas fa-star"></i>';
                                                         } elseif ($rating > ($i - 1) && $rating < $i) {
-                                                            echo '<i class="fas fa-star-half-alt"></i>'; // Half star
+                                                            echo '<i class="fas fa-star-half-alt"></i>';
                                                         } else {
-                                                            echo '<i class="far fa-star"></i>'; // Empty star
+                                                            echo '<i class="far fa-star"></i>';
                                                         }
                                                     endfor;
                                                     ?>
@@ -240,7 +245,7 @@ if (isset($_SESSION['user_id']) && ($_SESSION['user_type'] ?? null) == 1) {
                                 <?php endforeach; ?>
                             </div>
                             <div class="swiper-pagination vendors-pagination-<?= htmlspecialchars($category['id']) ?>"></div>
-                            </div>
+                        </div>
                     <?php else: ?>
                         <p style="padding-left: var(--spacing-md);">No vendors found for this category at this time.</p>
                     <?php endif; ?>
@@ -328,10 +333,10 @@ if (isset($_SESSION['user_id']) && ($_SESSION['user_type'] ?? null) == 1) {
                     console.error('Error generating AI image:', error);
                     // Fallback to gradient on network/API error
                     heroSection.style.backgroundImage = 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))';
-                } finally {
-                    heroLoading.style.display = 'none'; // Hide loading indicator
+                    } finally {
+                        heroLoading.style.display = 'none'; // Hide loading indicator
+                    }
                 }
-            }
             // Call the function to generate background on page load
             generateHeroBackground();
             */
