@@ -177,12 +177,8 @@ include 'header.php';
         .service-item-checkbox input[type="checkbox"]:checked + label + .service-details-content {
             /* Adjust content style when checked if needed */
         }
-        .service-item-checkbox input[type="checkbox"]:checked {
-            /* This is the hidden checkbox, styling applies to its siblings */
-        }
-        
         .service-item-checkbox input[type="checkbox"] {
-            /* Hide the default checkbox */
+            /* This is the hidden checkbox, styling applies to its siblings */
             position: absolute;
             opacity: 0;
             cursor: pointer;
@@ -368,7 +364,8 @@ include 'header.php';
         <?php endif; ?>
 
         <form action="<?= BASE_URL ?>public/process_booking.php" method="POST" enctype="multipart/form-data">
-            <input type="hidden" name="vendor_id" value="<?= htmlspecialchars($vendor_profile['id']) ?>"> <input type="hidden" name="service_date" id="service_date_input" value="<?= htmlspecialchars($prefill_date ?? '') ?>">
+            <input type="hidden" name="vendor_id" value="<?= htmlspecialchars($vendor_profile['id']) ?>">
+            <input type="hidden" name="service_date" id="service_date_input" value="<?= htmlspecialchars($prefill_date ?? '') ?>">
 
             <div class="form-group">
                 <label for="new_event_title">New Event Name <span class="required">*</span></label>
@@ -416,6 +413,11 @@ include 'header.php';
                        value="<?= htmlspecialchars($prefill_date ? date('F j, Y', strtotime($prefill_date)) : 'No date selected') ?>" readonly>
                 <small class="text-muted">Click on an available date in the calendar below to select it.</small>
             </div>
+            
+            <div class="form-group">
+                <label for="service_time_input">Service Time <span class="required">*</span></label>
+                <input type="time" id="service_time_input" name="service_time" class="form-control" required>
+            </div>
 
             <div class="booking-calendar-section">
                 <h3>Select a Date from Availability</h3>
@@ -435,7 +437,7 @@ include 'header.php';
                     <p>This vendor has no services listed yet.</p>
                 <?php else: ?>
                     <?php foreach ($vendor_service_offerings_grouped as $category_name => $service_offerings_in_category): ?>
-                        <h4 style="margin-top: var(--spacing-md); color: var(--text-dark);"><?= htmlspecialchars($category_name) ?></h4>
+                        <h4 style="margin-top: var(--spacing-md); color: var(--text-dark);"><?= htmlspecialchars($category['category_name']) ?></h4>
                         <div class="services-selection-grid">
                             <?php foreach ($service_offerings_in_category as $offering): ?>
                                 <div class="service-item-checkbox">
@@ -600,7 +602,7 @@ include 'header.php';
                 const newEventTypeSelect = document.getElementById('new_event_type_id'); // NEW
                 const finalBookingAmountInput = document.getElementById('final_booking_amount'); // NEW
                 const depositBookingAmountInput = document.getElementById('deposit_booking_amount'); // NEW
-
+                const serviceTimeInput = document.getElementById('service_time_input'); // NEW
 
                 if (selectedServices.length === 0) {
                     alert('Please select at least one service to book.');
@@ -639,6 +641,13 @@ include 'header.php';
                 }
                 if (parseFloat(depositBookingAmountInput.value) > parseFloat(finalBookingAmountInput.value)) {
                     alert('Deposit Amount cannot be greater than Final Booking Amount.');
+                    event.preventDefault();
+                    return;
+                }
+
+                // NEW: Validate service time
+                if (!serviceTimeInput.value) {
+                    alert('Please enter a desired service time.');
                     event.preventDefault();
                     return;
                 }
