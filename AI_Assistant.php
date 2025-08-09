@@ -1,7 +1,7 @@
 <?php
 // classes/AI_Assistant.php
 // Corrected path to config.php relative to this file's expected location in /classes/
-require_once __DIR__ . '/../includes/config.php'; 
+require_once __DIR__ . '/../includes/config.php';
 
 class AI_Assistant {
     private $apiKey;
@@ -16,7 +16,7 @@ class AI_Assistant {
     public function generateEventRecommendation($prompt) {
         try {
             $this->lastPrompt = $prompt;
-            
+
             if (empty($this->apiKey)) {
                 throw new Exception('OpenAI API key not configured');
             }
@@ -61,14 +61,13 @@ class AI_Assistant {
             if ($error) throw new Exception('CURL error: ' . $error);
 
             $data = json_decode($response, true);
-            
+
             if (isset($data['error'])) {
                 throw new Exception('OpenAI API error: ' . $data['error']['message']);
             }
             if (!isset($data['choices'][0]['message']['content'])) {
                 throw new Exception('OpenAI API response missing content.');
             }
-
 
             $content = json_decode($data['choices'][0]['message']['content'], true);
             if (json_last_error() !== JSON_ERROR_NONE) {
@@ -85,16 +84,16 @@ class AI_Assistant {
     private function formatEventData($aiData) {
         $eventTypes = $this->dbFetchAll("SELECT id, type_name FROM event_types");
         $services = $this->dbFetchAll("SELECT id, service_name FROM vendor_services");
-        
+
         $typeMap = array_column($eventTypes, 'id', 'type_name');
-        
+
         // REVISED: Create serviceMap with normalized keys for consistent lookup
         $serviceMap = [];
         foreach ($services as $s) {
             $normalizedDbServiceName = strtolower(str_replace(' ', '_', $s['service_name']));
             $serviceMap[$normalizedDbServiceName] = $s['id'];
         }
-        
+
         $formatted = [
             'event' => [
                 'event_type_id' => $typeMap[$aiData['event_type']] ?? null,
@@ -120,7 +119,7 @@ class AI_Assistant {
 
             // Normalize service name before lookup (e.g., lowercase, remove spaces)
             $normalizedServiceName = strtolower(str_replace(' ', '_', $service['name']));
-            
+
             // Check if service exists in our database's service map before adding
             if (isset($serviceMap[$normalizedServiceName])) {
                 $formatted['services'][] = [
@@ -136,12 +135,12 @@ class AI_Assistant {
         // FALLBACK: If AI did not populate 'required_services', try to infer from 'reasoning'/'decision_factors'
         if (empty($formatted['services']) && isset($aiData['reasoning'])) {
             $reasoning = $aiData['reasoning'];
-            
+
             // ADJUSTED: commonServiceKeywords values to match DB service_name for correct normalization
             $commonServiceKeywords = [
                 'venue' => 'Ballroom Rental', // Mapping 'Venue Rental' from AI to a specific DB service
                 'catering' => 'Buffet Catering',
-                'audio-visual' => 'Audio/Visual Equipment', 
+                'audio-visual' => 'Audio/Visual Equipment',
                 'decor' => 'Venue Decor & Styling',
                 'photography' => 'Wedding Photography',
                 'videography' => 'Event Videography',
@@ -169,7 +168,7 @@ class AI_Assistant {
                 }
             }
         }
-        
+
         return $formatted;
     }
 
@@ -183,37 +182,37 @@ class AI_Assistant {
         try {
             // Fetch event details including coordinates (if available) and required services
             $event = $this->dbFetch(
-                "SELECT e.*, et.type_name, 
-                        ST_X(e.venue_location) AS event_lat, ST_Y(e.venue_location) AS event_lng 
-                 FROM events e JOIN event_types et ON e.event_type_id = et.id 
-                 WHERE e.id = ?", 
+                "SELECT e.*, et.type_name,
+                        ST_X(e.venue_location) AS event_lat, ST_Y(e.venue_location) AS event_lng
+                 FROM events e JOIN event_types et ON e.event_type_id = et.id
+                 WHERE e.id = ?",
                 [$eventId]
             );
-            
+
             if (!$event) {
                 return [];
             }
 
             $requiredServices = $this->dbFetchAll(
-                "SELECT service_id FROM event_service_requirements WHERE event_id = ?", 
+                "SELECT service_id FROM event_service_requirements WHERE event_id = ?",
                 [$eventId]
             );
-            
+
             $serviceIds = array_column($requiredServices, 'service_id');
             if (empty($serviceIds)) {
                 // If no specific services required, perhaps recommend general event planners or top-rated vendors
                 // For now, return empty if no services are explicitly required.
                 error_log("No specific services found for event ID " . $eventId . " for vendor recommendation.");
-                return []; 
+                return [];
             }
 
             $placeholders = implode(',', array_fill(0, count($serviceIds), '?'));
-            
+
             // Fetch vendors that offer any of the required services, including their profile image
             // Also fetch services offered by vendor to provide in summary
             $query = "
-                SELECT 
-                    vp.id, vp.business_name, vp.website, vp.rating, vp.total_reviews, 
+                SELECT
+                    vp.id, vp.business_name, vp.website, vp.rating, vp.total_reviews,
                     vp.business_address, vp.business_city, vp.business_state, vp.business_country,
                     vp.service_radius,
                     ST_X(vp.business_location) AS business_lat, ST_Y(vp.business_location) AS business_lng,
@@ -221,9 +220,9 @@ class AI_Assistant {
                     AVG(vso.price_range_min) AS avg_min_price,
                     AVG(vso.price_range_max) AS avg_max_price,
                     up.profile_image, -- Fetch profile image from user_profiles
-                    (SELECT COUNT(*) FROM vendor_availability 
-                     WHERE vendor_id = vp.id 
-                     AND date = ? 
+                    (SELECT COUNT(*) FROM vendor_availability
+                     WHERE vendor_id = vp.id
+                     AND date = ?
                      AND status = 'available') AS availability_score
                 FROM vendor_profiles vp
                 JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
@@ -234,7 +233,7 @@ class AI_Assistant {
                 GROUP BY vp.id
                 ORDER BY rating DESC, avg_min_price ASC
                 LIMIT 10";
-            
+
             $params = array_merge([$event['event_date']], $serviceIds);
             $vendors = $this->dbFetchAll($query, $params);
 
@@ -276,29 +275,29 @@ class AI_Assistant {
             }
 
             $placeholders = implode(',', array_fill(0, count($serviceIds), '?'));
-            
+
             // Base query to find vendors offering selected services
             $query = "
-                SELECT 
-                    vp.id, vp.business_name, vp.website, vp.rating, vp.total_reviews, 
+                SELECT
+                    vp.id, vp.business_name, vp.website, vp.rating, vp.total_reviews,
                     vp.business_address, vp.business_city, vp.business_state, vp.business_country,
                     vp.service_radius,
                     -- Use ST_X and ST_Y if business_location is POINT type, otherwise just business_lat/lng
-                    ST_X(vp.business_location) AS business_lng, 
+                    ST_X(vp.business_location) AS business_lng,
                     ST_Y(vp.business_location) AS business_lat,
                     GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR '; ') AS offered_services_names,
                     AVG(vso.price_range_min) AS avg_min_price,
                     AVG(vso.price_range_max) AS avg_max_price,
                     up.profile_image, -- Fetch profile image from user_profiles
-                    (SELECT COUNT(*) FROM vendor_availability 
-                     WHERE vendor_id = vp.id 
-                     AND date = ? 
+                    (SELECT COUNT(*) FROM vendor_availability
+                     WHERE vendor_id = vp.id
+                     AND date = ?
                      AND status = 'available') AS availability_score
                 FROM vendor_profiles vp
                 JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
                 JOIN vendor_services vs ON vso.service_id = vs.id
                 JOIN users u ON vp.user_id = u.id
-                LEFT JOIN user_profiles up ON u.id = up.user_id 
+                LEFT JOIN user_profiles up ON u.id = up.user_id
                 WHERE vso.service_id IN ($placeholders)
             ";
 
@@ -349,8 +348,8 @@ class AI_Assistant {
     }
 
     /**
-     * NEW: Get personalized vendor recommendations based on user's recent activity.
-     * This method leverages viewed vendors and possibly recent searches to inform recommendations.
+     * Get personalized vendor recommendations based on user's recent activity.
+     * This method leverages viewed vendors and recent chat history to inform recommendations.
      * @param int $userId The ID of the current user.
      * @param int $limit The maximum number of recommendations to return.
      * @return array An array of recommended vendor data.
@@ -359,6 +358,7 @@ class AI_Assistant {
         error_log("AI_Assistant: Starting getPersonalizedVendorRecommendations for User ID: " . $userId);
 
         try {
+            // Step 1: Get data from user's recent activity (viewed vendors)
             $viewedVendorProfiles = $this->dbFetchAll("
                 SELECT DISTINCT vpv.vendor_profile_id, vp.business_city,
                                 GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS viewed_services
@@ -373,53 +373,59 @@ class AI_Assistant {
             ", [$userId]);
             error_log("AI_Assistant: Fetched viewedVendorProfiles: " . print_r($viewedVendorProfiles, true));
 
-            // Step 1: Get recent session IDs - Refactored due to MariaDB LIMIT in subquery issue
-            $recentSessionIds = $this->dbFetchAll("
-                SELECT id FROM ai_chat_sessions WHERE user_id = ? ORDER BY updated_at DESC LIMIT 3
+            // Step 2: Get data from user's recent AI chat sessions
+            $recentChatData = $this->dbFetchAll("
+                SELECT message_content
+                FROM ai_chat_messages
+                WHERE session_id IN (SELECT id FROM ai_chat_sessions WHERE user_id = ?)
+                AND message_type = 'user'
+                ORDER BY created_at DESC
+                LIMIT 10
             ", [$userId]);
-            $sessionIds = array_column($recentSessionIds, 'id');
-
-            // Step 2: Fetch recent search terms using the fetched session IDs
-            $recentSearchTerms = [];
-            if (!empty($sessionIds)) {
-                $placeholders = implode(',', array_fill(0, count($sessionIds), '?'));
-                $recentSearchTerms = $this->dbFetchAll("
-                    SELECT message_content
-                    FROM ai_chat_messages
-                    WHERE session_id IN ({$placeholders})
-                    AND message_type = 'user'
-                    ORDER BY created_at DESC
-                ", $sessionIds);
-            }
-            error_log("AI_Assistant: Fetched recentSearchTerms: " . print_r($recentSearchTerms, true));
-
 
             $keywords = [];
             $preferredLocations = [];
             $preferredServiceIds = [];
 
-            // Extract keywords from recent searches
-            foreach ($recentSearchTerms as $term) {
-                $content = strtolower($term['message_content']);
-                // Simple keyword extraction (can be improved with NLU)
-                if (strpos($content, 'vendor') !== false || strpos($content, 'suggest') !== false || strpos($content, 'find') !== false) {
-                    // This message might contain search criteria
-                    $words = explode(' ', $content);
-                    foreach ($words as $word) {
-                        $word = trim($word, ".,!?\"'");
-                        if (strlen($word) > 2 && !in_array($word, ['vendor', 'suggest', 'find', 'for', 'a', 'an', 'the', 'in', 'and', 'or', 'my', 'i', 'me', 'want', 'need', 'how', 'much'])) {
-                            $keywords[] = $word;
+            // A list of common cities in Pakistan for better matching
+            $pakistaniCities = ['faisalabad', 'lahore', 'karachi', 'multan', 'islamabad', 'quetta', 'peshawar'];
+
+            // Prioritize extracting a location from recent chat messages
+            foreach ($recentChatData as $message) {
+                $content = strtolower($message['message_content']);
+                foreach ($pakistaniCities as $city) {
+                    if (strpos($content, $city) !== false) {
+                        $preferredLocations[] = ucfirst($city);
+                        break 2; // Found a location, stop searching messages
+                    }
+                }
+            }
+
+            // If no location found in chat, fall back to locations from viewed vendors
+            if (empty($preferredLocations)) {
+                foreach ($viewedVendorProfiles as $vendorView) {
+                    if (!empty($vendorView['business_city'])) {
+                        $preferredLocations[] = $vendorView['business_city'];
+                    }
+                }
+            }
+
+            // Extract preferred service IDs from recent chat and viewed vendors
+            $serviceKeywords = ['catering', 'decoration', 'photography', 'music', 'dj', 'venue', 'audio/visual', 'event planning', 'videography', 'floral'];
+
+            foreach ($recentChatData as $message) {
+                $content = strtolower($message['message_content']);
+                foreach ($serviceKeywords as $keyword) {
+                    if (strpos($content, $keyword) !== false) {
+                        $serviceId = $this->dbFetch("SELECT id FROM vendor_services WHERE service_name LIKE ?", ['%' . ucfirst($keyword) . '%']);
+                        if ($serviceId) {
+                            $preferredServiceIds[] = $serviceId['id'];
                         }
                     }
                 }
             }
-            error_log("AI_Assistant: Extracted keywords: " . print_r($keywords, true));
 
-            // Extract preferred locations and services from viewed vendors
             foreach ($viewedVendorProfiles as $vendorView) {
-                if (!empty($vendorView['business_city'])) {
-                    $preferredLocations[] = $vendorView['business_city'];
-                }
                 if (!empty($vendorView['viewed_services'])) {
                     $services = explode(', ', $vendorView['viewed_services']);
                     foreach ($services as $serviceName) {
@@ -430,22 +436,17 @@ class AI_Assistant {
                     }
                 }
             }
-            error_log("AI_Assistant: Extracted preferredLocations: " . print_r($preferredLocations, true));
-            error_log("AI_Assistant: Extracted preferredServiceIds: " . print_r($preferredServiceIds, true));
-            
-            $combinedSearchQuery = implode(' ', array_unique($keywords));
-            $combinedLocations = implode(', ', array_unique($preferredLocations));
+
+            $combinedLocations = array_unique($preferredLocations);
             $combinedServiceIds = array_unique($preferredServiceIds);
 
-            error_log("AI_Assistant: Combined Search Query: " . $combinedSearchQuery);
-            error_log("AI_Assistant: Combined Locations: " . $combinedLocations);
-            error_log("AI_Assistant: Combined Service IDs: " . print_r($combinedServiceIds, true));
-
+            error_log("AI_Assistant: Final Combined Locations: " . print_r($combinedLocations, true));
+            error_log("AI_Assistant: Final Combined Service IDs: " . print_r($combinedServiceIds, true));
 
             // Fallback: if no specific activity, get highly-rated vendors
-            if (empty($combinedSearchQuery) && empty($combinedLocations) && empty($combinedServiceIds)) {
+            if (empty($combinedLocations) && empty($combinedServiceIds)) {
                 error_log("AI_Assistant: No specific activity found, falling back to highly-rated vendors.");
-                $fallbackVendors = $this->dbFetchAll("
+                return $this->dbFetchAll("
                     SELECT vp.id, vp.business_name, vp.business_city, vp.rating, vp.total_reviews, up.profile_image,
                            GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR ', ') AS offered_services_names
                     FROM vendor_profiles vp
@@ -458,39 +459,30 @@ class AI_Assistant {
                     ORDER BY vp.rating DESC, vp.total_reviews DESC
                     LIMIT ?
                 ", [$limit]);
-                error_log("AI_Assistant: Fallback vendors fetched: " . print_r($fallbackVendors, true));
-                return $fallbackVendors;
             }
 
             // Build dynamic query for personalized recommendations
             $query = "
-                SELECT 
-                    vp.id, vp.business_name, vp.website, vp.rating, vp.total_reviews, 
+                SELECT
+                    vp.id, vp.business_name, vp.website, vp.rating, vp.total_reviews,
                     vp.business_address, vp.business_city, vp.business_state, vp.business_country,
-                    vp.service_radius,
-                    up.profile_image, -- Fetch profile image from user_profiles
+                    up.profile_image,
                     GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR '; ') AS offered_services_names
                 FROM vendor_profiles vp
                 LEFT JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
                 LEFT JOIN vendor_services vs ON vso.service_id = vs.id
                 JOIN users u ON vp.user_id = u.id
-                LEFT JOIN user_profiles up ON u.id = up.user_id 
+                LEFT JOIN user_profiles up ON u.id = up.user_id
                 WHERE vp.verified = TRUE
             ";
-            
+
             $params = [];
             $conditions = [];
 
-            if (!empty($combinedSearchQuery)) {
-                $conditions[] = "(vp.business_name LIKE ? OR vp.business_address LIKE ? OR vs.service_name LIKE ?)";
-                $likeParam = '%' . $combinedSearchQuery . '%';
-                $params = array_merge($params, [$likeParam, $likeParam, $likeParam]);
-            }
-
             if (!empty($combinedLocations)) {
-                $locationPlaceholders = implode(',', array_fill(0, count(array_unique($preferredLocations)), '?'));
+                $locationPlaceholders = implode(',', array_fill(0, count($combinedLocations), '?'));
                 $conditions[] = "vp.business_city IN ({$locationPlaceholders})";
-                $params = array_merge($params, array_unique($preferredLocations));
+                $params = array_merge($params, $combinedLocations);
             }
 
             if (!empty($combinedServiceIds)) {
@@ -507,15 +499,13 @@ class AI_Assistant {
                          ORDER BY vp.rating DESC, vp.total_reviews DESC
                          LIMIT ?";
             $params[] = $limit;
-            
+
             error_log("AI_Assistant: Final query: " . $query);
             error_log("AI_Assistant: Final params: " . print_r($params, true));
 
             $vendors = $this->dbFetchAll($query, $params);
             error_log("AI_Assistant: Final vendors fetched: " . print_r($vendors, true));
 
-            // Refine scoring if needed based on detailed match, but current scoring already uses rating.
-            // For now, return direct results, as detailed scoring on "viewed" criteria is complex without more data.
             return $vendors;
 
         } catch (PDOException $e) {
@@ -591,7 +581,7 @@ class AI_Assistant {
             }
 
             $data = json_decode($response, true);
-            
+
             if (isset($data['error'])) {
                 throw new Exception('OpenAI API error: ' . $data['error']['message']);
             }
@@ -615,7 +605,7 @@ class AI_Assistant {
             'price' => $this->calculatePriceScore($vendor, $event),
             'reviews' => ($vendor['rating'] ?? 0) * 0.2
         ];
-        
+
         return array_sum($scores);
     }
 
@@ -627,16 +617,16 @@ class AI_Assistant {
             // If we relied on city/address LIKE in query, assume a basic match for score.
             return 0.7; // Moderate score if no precise geo-match, implies city match or nearby.
         }
-        
+
         $distance = $this->calculateDistance(
             $vendor['business_lat'], $vendor['business_lng'],
             $event['event_lat'], $event['event_lng']
         );
-        
+
         // If service_radius is 0 or null, assume local/perfect fit if distance is very small
         if (($vendor['service_radius'] ?? 0) == 0 && $distance < 5) return 1; // Very local
         if (($vendor['service_radius'] ?? 0) >= $distance) return 1; // Within service radius
-        
+
         return 0.2; // Not within service radius
     }
 
