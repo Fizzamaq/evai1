@@ -1,0 +1,321 @@
+/* assets/css/profile_redesign.css */
+
+/* Main container for the profile page */
+.profile-container {
+    max-width: 1200px;
+    margin: var(--spacing-xl) auto;
+    background: var(--white);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    padding: var(--spacing-xl);
+}
+
+/* Profile header section with avatar and main info */
+.profile-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding-bottom: var(--spacing-xl);
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: var(--spacing-lg);
+}
+
+.profile-avatar {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-bottom: var(--spacing-md);
+    margin-left: 5px;
+    margin-right: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border: 4px solid var(--primary-color);
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--background-light);
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-avatar .initials {
+    font-size: 3rem;
+    font-weight: bold;
+    color: var(--text-subtle);
+}
+
+.profile-info-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.profile-info-main h1 {
+    font-size: 2.5em;
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-dark);
+}
+
+.profile-info-main .tagline {
+    font-size: 1.1em;
+    color: var(--text-subtle);
+    margin-bottom: var(--spacing-md);
+}
+
+.rating-display {
+    font-size: 1.2em;
+    color: var(--warning-color);
+    margin-bottom: var(--spacing-md);
+}
+
+.rating-display .filled {
+    color: var(--warning-color);
+}
+
+.rating-display .far {
+    color: var(--border-color);
+}
+
+.action-buttons {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+}
+
+/* Tabbed navigation for content sections */
+.tab-navigation {
+    display: flex;
+    justify-content: center;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
+.tab-button {
+    background: none;
+    border: none;
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--text-subtle);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.tab-button.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    font-weight: 700;
+}
+
+.tab-button:hover:not(.active) {
+    color: var(--text-dark);
+}
+
+/* Content cards for each section */
+.tab-content {
+    display: none;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.content-card {
+    background: var(--background-light);
+    border-radius: 12px;
+    padding: var(--spacing-lg);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    margin-bottom: var(--spacing-md);
+}
+
+.content-card h3 {
+    font-size: 1.6em;
+    color: var(--text-dark);
+    margin-bottom: var(--spacing-md);
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: var(--spacing-sm);
+}
+
+.content-card p {
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Services section specific styles */
+.services-list h4 {
+    font-size: 1.2em;
+    color: var(--primary-color);
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.services-list ul {
+    list-style: none;
+    padding: 0;
+}
+
+.services-list li {
+    background-color: var(--white);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: 8px;
+    margin-bottom: var(--spacing-xs);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1em;
+    color: var(--text-dark);
+}
+.services-list li strong {
+    color: var(--primary-color);
+}
+
+/* Portfolio section specific styles */
+.portfolio-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.portfolio-item-card {
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+    transition: transform 0.3s ease;
+}
+
+.portfolio-item-card:hover {
+    transform: translateY(-5px);
+}
+
+.portfolio-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.portfolio-image-wrapper {
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+}
+
+.portfolio-image-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.portfolio-item-card h4 {
+    font-size: 1.2em;
+    padding: var(--spacing-sm) var(--spacing-md) 0;
+    margin: 0;
+    color: var(--primary-color);
+}
+
+.portfolio-item-card p {
+    font-size: 0.9em;
+    padding: 0 var(--spacing-md) var(--spacing-md);
+    color: var(--text-subtle);
+}
+
+/* Reviews section specific styles */
+.reviews-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.review-card {
+    background: var(--white);
+    border-radius: 12px;
+    padding: var(--spacing-md);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.reviewer-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.reviewer-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    background-color: var(--border-color);
+}
+
+.reviewer-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.reviewer-details {
+    flex-grow: 1;
+}
+
+.reviewer-name {
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.review-date {
+    font-size: 0.9em;
+    color: var(--text-subtle);
+    margin-left: auto;
+}
+
+.review-rating-stars {
+    color: var(--warning-color);
+    font-size: 1.1em;
+}
+
+.review-card h4 {
+    font-size: 1.2em;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Responsive adjustments */
+@media (min-width: 768px) {
+    .profile-header {
+        flex-direction: row;
+        align-items: flex-start;
+        text-align: left;
+    }
+    .profile-avatar {
+        margin-bottom: 0;
+    }
+    .profile-info-main {
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 768px) {
+    .profile-container {
+        padding: var(--spacing-md);
+    }
+    .tab-navigation {
+        justify-content: space-between;
+    }
+    .tab-button {
+        flex-grow: 1;
+        text-align: center;
+        padding: var(--spacing-sm);
+        font-size: 1em;
+    }
+}
