@@ -48,7 +48,7 @@ try {
         JOIN event_types et ON e.event_type_id = et.id
         WHERE e.user_id = :user_id
           AND e.status != 'deleted' -- Still exclude events explicitly marked as deleted
-        ORDER BY e.event_date ASC, e.created_at DESC
+        ORDER BY e.event_date DESC, e.created_at DESC
     ");
     $stmt->execute([':user_id' => $_SESSION['user_id']]);
     $user_events = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -86,7 +86,7 @@ try {
                     $hasCancelledOrFailedBooking = true;
                 }
                 
-                // Check if a completed booking exists and needs a review
+                // Check if a completed booking needs a review
                 if (($booking['status'] === 'completed') && ($booking['is_reviewed'] == 0)) {
                     $event_item['needs_review'] = true;
                     $event_item['review_booking_id'] = $booking['id'];
