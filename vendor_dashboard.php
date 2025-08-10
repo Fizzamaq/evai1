@@ -417,7 +417,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                                 <div class="list-item-meta">
                                     Client: <?= htmlspecialchars($booking_item['client_name'] ?? 'N/A') ?> |
                                     Date: <?= date('M j, Y', strtotime($booking_item['service_date'])) ?> |
-                                    Time: <?= htmlspecialchars($booking_item['service_time'] ?? 'N/A') ?> | Status: <span class="status-badge status-<?= strtolower(htmlspecialchars($booking_item['status'])) ?>"><?= htmlspecialchars($booking_item['status']) ?></span>
+                                    Status: <span class="status-badge status-<?= strtolower(htmlspecialchars($booking_item['status'])) ?>"><?= htmlspecialchars($booking_item['status']) ?></span>
                                 </div>
                             </div>
                             <a href="#" class="btn-link view-booking-details" data-booking-id="<?= htmlspecialchars($booking_item['id']) ?>">View</a>
@@ -502,7 +502,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                     <p><strong>Client Name:</strong> <span id="lightboxClientName"></span></p>
                     <p><strong>Client Email:</strong> <span id="lightboxClientEmail"></span></p>
                     <p><strong>Service Date:</strong> <span id="lightboxServiceDate"></span></p>
-                    <p><strong>Service Time:</strong> <span id="lightboxServiceTime"></span></p> <p><strong>Service:</strong> <span id="lightboxServiceName"></span></p>
+                    <p><strong>Service:</strong> <span id="lightboxServiceName"></span></p>
                     <p><strong>Final Amount:</strong> PKR <span id="lightboxFinalAmount"></span></p>
                     <p><strong>Deposit Amount:</strong> PKR <span id="lightboxDepositAmount"></span></p>
                     <p><strong>Instructions:</strong> <span id="lightboxInstructions"></span></p>
@@ -534,7 +534,6 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
             const lightboxClientName = document.getElementById('lightboxClientName');
             const lightboxClientEmail = document.getElementById('lightboxClientEmail');
             const lightboxServiceDate = document.getElementById('lightboxServiceDate');
-            const lightboxServiceTime = document.getElementById('lightboxServiceTime'); // NEW
             const lightboxServiceName = document.getElementById('lightboxServiceName');
             const lightboxFinalAmount = document.getElementById('lightboxFinalAmount');
             const lightboxDepositAmount = document.getElementById('lightboxDepositAmount');
@@ -568,7 +567,6 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
                         lightboxClientName.textContent = client.first_name + ' ' + client.last_name + (client.phone ? ` (${client.phone})` : '');
                         lightboxClientEmail.textContent = client.email;
                         lightboxServiceDate.textContent = new Date(booking.service_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                        lightboxServiceTime.textContent = booking.service_time ? new Date('2000-01-01T' + booking.service_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : 'N/A'; // NEW
                         lightboxServiceName.textContent = booking.service_name || 'N/A';
                         lightboxFinalAmount.textContent = parseFloat(booking.final_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                         lightboxDepositAmount.textContent = parseFloat(booking.deposit_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
