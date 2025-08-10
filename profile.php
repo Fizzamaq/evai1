@@ -1,6 +1,10 @@
 <?php
 session_start();
 require_once '../includes/config.php';
+require_once '../classes/User.class.php';
+require_once '../classes/Vendor.class.php';
+require_once '../classes/Review.class.php';
+
 include 'header.php';
 
 if (!isset($_SESSION['user_id'])) {
@@ -8,145 +12,232 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-require_once '../classes/User.class.php';
-require_once '../classes/Vendor.class.php'; // Include Vendor class
-$user = new User($pdo);
-$profile = $user->getProfile($_SESSION['user_id']);
+$user_obj = new User($pdo);
+$profile_data = $user_obj->getProfile($_SESSION['user_id']);
 
 $is_vendor = false;
 $vendor_data = null;
-$vendor_services_offered = [];
-// Removed: $portfolio_items = []; // No longer fetching for display on profile.php
+$vendor_services_by_category = [];
+$portfolio_items = [];
+$vendor_reviews = [];
 
-// Check if the logged-in user is a vendor
-if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) { // Assuming 2 is vendor type
+if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) {
     $is_vendor = true;
-    $vendor = new Vendor($pdo);
-    $vendor_data = $vendor->getVendorByUserId($_SESSION['user_id']);
+    $vendor_obj = new Vendor($pdo);
+    $review_obj = new Review($pdo);
+    $vendor_data = $vendor_obj->getVendorByUserId($_SESSION['user_id']);
 
     if ($vendor_data) {
-        // Fetch the services offered by this vendor
-        $vendor_services_offered_raw = $vendor->getVendorServices($vendor_data['id']);
-
-        // Group services by category for display
+        $vendor_services_offered_raw = $vendor_obj->getVendorServices($vendor_data['id']);
         foreach ($vendor_services_offered_raw as $service) {
-            $vendor_services_offered[$service['category_name']][] = $service;
+            $full_offering = $vendor_obj->getServiceOfferingById($service['id'], $vendor_data['id']);
+            if ($full_offering) {
+                $vendor_services_by_category[$full_offering['category_name']][] = $full_offering;
+            }
         }
-
-        // Removed: Fetch vendor's portfolio items for display on their profile page
-        // $portfolio_items = $vendor->getVendorPortfolio($vendor_data['id']);
+        $portfolio_items = $vendor_obj->getVendorPortfolio($vendor_data['id']);
+        $vendor_reviews = $review_obj->getReviewsForEntity($vendor_data['user_id'], 'vendor');
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Profile</title>
+    <title>Your Profile - EventCraftAI</title>
     <link rel="stylesheet" href="../assets/css/style.css">
-    <?php /* if ($is_vendor): ?>
-    <link rel="stylesheet" href="../assets/css/vendor_profile.css">
-    <?php endif; */ ?>
+    <link rel="stylesheet" href="../assets/css/profile_redesign.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="profile-container">
-        <h1>Your Profile</h1>
-
-        <?php if (isset($_SESSION['profile_success'])): ?>
-            <div class="alert success" id="profile-success-alert"><?= htmlspecialchars($_SESSION['profile_success']) ?></div>
-            <?php unset($_SESSION['profile_success']); ?>
-        <?php endif; ?>
-        
-        <?php if (isset($_SESSION['profile_error'])): ?>
-            <div class="alert error" id="profile-error-alert"><?= htmlspecialchars($_SESSION['profile_error']) ?></div>
-            <?php unset($_SESSION['profile_error']); ?>
-        <?php endif; ?>
-
-        <div class="profile-section">
-            <div class="profile-pic">
-                <?php if (!empty($profile['profile_image'])): ?>
-                    <img src="<?= ASSETS_PATH ?>uploads/users/<?= htmlspecialchars($profile['profile_image']) ?>" alt="Profile Picture">
+        <div class="profile-header">
+            <div class="profile-avatar">
+                <?php if (!empty($profile_data['profile_image'])): ?>
+                    <img src="<?= BASE_URL ?>assets/uploads/users/<?= htmlspecialchars($profile_data['profile_image']) ?>" alt="Profile Picture">
                 <?php else: ?>
-                    <div class="initials" style="background-image: url('<?= ASSETS_PATH ?>images/default-avatar.jpg'); background-size: cover; background-position: center;">
-                        <?= substr($profile['first_name'], 0, 1) . substr($profile['last_name'], 0, 1) ?>
+                    <div class="initials">
+                        <?= substr($profile_data['first_name'], 0, 1) . substr($profile_data['last_name'], 0, 1) ?>
                     </div>
                 <?php endif; ?>
             </div>
-
-            <div class="profile-info">
-                <h2><?= htmlspecialchars($profile['first_name'] . ' ' . $profile['last_name']) ?></h2>
-                <p><strong>Email:</strong> <?= htmlspecialchars($profile['email']) ?></p>
-                <p><strong>Member Since:</b> <?= date('F Y', strtotime($profile['created_at'])) ?>
-</p>
-
-                <div class="profile-actions-row">
-                    <a href="edit_profile.php" class="btn">Edit Profile</a>
-                    <?php if (isset($is_vendor) && $is_vendor && isset($vendor_data) && $vendor_data): // Only show for vendors with a complete profile?>
-                        <a href="<?= BASE_URL ?>public/vendor_manage_services.php" class="btn btn-secondary">Manage Services</a>
+            <div class="profile-info-main">
+                <h1><?= htmlspecialchars($profile_data['first_name'] . ' ' . $profile_data['last_name']) ?></h1>
+                <?php if ($is_vendor && $vendor_data): ?>
+                    <p class="tagline"><?= htmlspecialchars($vendor_data['business_name']) ?></p>
+                    <div class="rating-display">
+                        <?php
+                        $rating = round($vendor_data['rating'] * 2) / 2;
+                        for ($i = 1; $i <= 5; $i++):
+                            if ($rating >= $i) { echo '<i class="fas fa-star filled"></i>'; }
+                            else { echo '<i class="far fa-star"></i>'; }
+                        endfor;
+                        ?>
+                        <span><?= number_format($vendor_data['rating'], 1) ?> (<?= $vendor_data['total_reviews'] ?> reviews)</span>
+                    </div>
+                <?php else: ?>
+                    <p class="tagline">Event Planner</p>
+                <?php endif; ?>
+                <div class="action-buttons">
+                    <a href="edit_profile.php" class="btn btn-primary">Edit Profile</a>
+                    <?php if ($is_vendor && $vendor_data): ?>
+                        <a href="vendor_manage_services.php" class="btn btn-secondary">Manage Services</a>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <?php if (isset($is_vendor) && $is_vendor && isset($vendor_data) && $vendor_data): // Display vendor specific info?>
-            <div class="profile-section" style="margin-top: 30px;">
-                <div class="profile-info">
-                    <h2>Business Information</h2>
-                    <p><strong>Business Name:</strong> <?= htmlspecialchars($vendor_data['business_name']) ?></p>
-                    <?php if (!empty($vendor_data['website'])): ?>
+        <div class="profile-content">
+            <div class="tab-navigation">
+                <button class="tab-button active" data-tab="details">Details</button>
+                <?php if ($is_vendor && $vendor_data): ?>
+                    <button class="tab-button" data-tab="services">Services</button>
+                    <button class="tab-button" data-tab="portfolio">Portfolio</button>
+                    <button class="tab-button" data-tab="reviews">Reviews</button>
+                <?php endif; ?>
+            </div>
+
+            <div id="tab-details" class="tab-content active">
+                <div class="content-card">
+                    <h3>Personal Information</h3>
+                    <p><strong>Email:</strong> <?= htmlspecialchars($profile_data['email']) ?></p>
+                    <p><strong>Member Since:</strong> <?= date('F Y', strtotime($profile_data['created_at'])) ?></p>
+                    <?php if ($profile_data['address']): ?>
+                        <p><strong>Address:</strong> <?= htmlspecialchars($profile_data['address'] . ', ' . $profile_data['city'] . ', ' . $profile_data['country']) ?></p>
+                    <?php endif; ?>
+                </div>
+                <?php if ($is_vendor && $vendor_data): ?>
+                    <div class="content-card">
+                        <h3>Business Information</h3>
+                        <p><strong>Business Name:</strong> <?= htmlspecialchars($vendor_data['business_name']) ?></p>
                         <p><strong>Website:</strong> <a href="<?= htmlspecialchars($vendor_data['website']) ?>" target="_blank"><?= htmlspecialchars($vendor_data['website']) ?></a></p>
-                    <?php endif; ?>
-                    <p><strong>Address:</strong> <?= htmlspecialchars($vendor_data['business_address']) ?>, <?= htmlspecialchars($vendor_data['business_city']) ?>, <?= htmlspecialchars($vendor_data['business_state']) ?>, <?= htmlspecialchars($vendor_data['business_postal_code']) ?>, <?= htmlspecialchars($vendor_data['business_country']) ?></p>
-                    <p><strong>Years of Experience:</strong> <?= htmlspecialchars($vendor_data['experience_years'] ?? 'N/A') ?></p>
-                    <p><strong>Rating:</strong> <?= htmlspecialchars(number_format($vendor_data['rating'], 1) ?? 'N/A') ?> (<?= htmlspecialchars($vendor_data['total_reviews'] ?? 0) ?> reviews)</p>
-                </div>
+                        <p><strong>Business Address:</strong> <?= htmlspecialchars($vendor_data['business_address'] . ', ' . $vendor_data['business_city']) ?></p>
+                        <p><strong>Years of Experience:</strong> <?= htmlspecialchars($vendor_data['experience_years'] ?? 'N/A') ?></p>
+                    </div>
+                <?php endif; ?>
             </div>
 
-            <div class="profile-section" style="margin-top: 30px;">
-                <div class="profile-info">
-                    <h2>Services Offered Overview</h2>
-                    <?php if (!empty($vendor_services_offered)): ?>
-                        <p>You offer services in the following categories:</p>
-                        <ul>
-                            <?php foreach ($vendor_services_offered as $category_name => $services): ?>
-                                <li>
-                                    <strong><?= htmlspecialchars($category_name) ?>:</strong>
-                                    <?php
-                                        $service_names = array_column($services, 'service_name');
-                                        echo htmlspecialchars(implode(', ', $service_names));
-                                    ?>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                        <p>For detailed pricing and offers, please visit the <a href="<?= BASE_URL ?>public/vendor_manage_services.php">Manage Services</a> page.</p>
-                    <?php else: ?>
-                        <p>No services currently listed. Go to <a href="edit_profile.php">Edit Profile</a> to add your services.</p>
-                    <?php endif; ?>
+            <?php if ($is_vendor && $vendor_data): ?>
+                <div id="tab-services" class="tab-content">
+                    <div class="content-card">
+                        <h3>Services Offered</h3>
+                        <?php if (!empty($vendor_services_by_category)): ?>
+                            <div class="services-list">
+                                <?php foreach ($vendor_services_by_category as $category_name => $services): ?>
+                                    <h4><?= htmlspecialchars($category_name) ?></h4>
+                                    <ul>
+                                        <?php foreach ($services as $service): ?>
+                                            <li>
+                                                <strong><?= htmlspecialchars($service['service_name']) ?></strong>
+                                                <?php if ($service['price_range_min'] !== null || $service['price_range_max'] !== null): ?>
+                                                    (PKR <?= number_format($service['price_range_min'] ?? 0, 0) ?> - <?= number_format($service['price_range_max'] ?? 0, 0) ?>)
+                                                <?php endif; ?>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <p>No services currently listed.</p>
+                        <?php endif; ?>
+                        <div style="margin-top: var(--spacing-md);">
+                           <a href="vendor_manage_services.php" class="btn btn-primary">Manage Services & Packages</a>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-        <?php endif; ?>
+                <div id="tab-portfolio" class="tab-content">
+                    <div class="content-card">
+                        <h3>Portfolio Items</h3>
+                        <?php if (!empty($portfolio_items)): ?>
+                            <div class="portfolio-grid">
+                                <?php foreach ($portfolio_items as $item): ?>
+                                    <a href="view_portfolio_item.php?id=<?= $item['id'] ?>" class="portfolio-card-link">
+                                        <div class="portfolio-item-card">
+                                            <div class="portfolio-image-wrapper">
+                                                <?php if (!empty($item['main_image_url'])): ?>
+                                                    <img src="<?= BASE_URL . htmlspecialchars($item['main_image_url']) ?>" alt="<?= htmlspecialchars($item['title']) ?>">
+                                                <?php else: ?>
+                                                    <div class="portfolio-placeholder"><i class="fas fa-image"></i></div>
+                                                <?php endif; ?>
+                                            </div>
+                                            <h4><?= htmlspecialchars($item['title']) ?></h4>
+                                            <p><?= htmlspecialchars(substr($item['description'] ?? 'No description available.', 0, 70)) ?>...</p>
+                                        </div>
+                                    </a>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <p>No portfolio items added yet.</p>
+                            <div style="margin-top: var(--spacing-md);">
+                                <a href="add_portfolio_item.php" class="btn btn-primary">Add First Item</a>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <div id="tab-reviews" class="tab-content">
+                    <div class="content-card">
+                        <h3>Reviews (<?= count($vendor_reviews) ?>)</h3>
+                        <?php if (!empty($vendor_reviews)): ?>
+                            <div class="reviews-list">
+                                <?php foreach ($vendor_reviews as $review_item): ?>
+                                    <div class="review-card">
+                                        <div class="reviewer-info">
+                                            <div class="reviewer-avatar">
+                                                 <img src="<?= BASE_URL ?>assets/uploads/users/<?= htmlspecialchars($review_item['profile_image'] ?: 'default-avatar.jpg') ?>" alt="Reviewer Avatar">
+                                            </div>
+                                            <div class="reviewer-details">
+                                                <div class="reviewer-name"><?= htmlspecialchars($review_item['first_name'] ?? 'Anonymous') ?></div>
+                                                <div class="review-rating-stars">
+                                                    <?php for ($i = 1; $i <= 5; $i++): ?>
+                                                        <i class="fas fa-star <?= ($review_item['rating'] >= $i) ? 'filled' : '' ?>"></i>
+                                                    <?php endfor; ?>
+                                                </div>
+                                            </div>
+                                            <div class="review-date"><?= date('M j, Y', strtotime($review_item['created_at'])) ?></div>
+                                        </div>
+                                        <h4><?= htmlspecialchars($review_item['review_title']) ?></h4>
+                                        <p><?= nl2br(htmlspecialchars($review_item['review_content'])) ?></p>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <p>No reviews for this vendor yet.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
     </div>
-<?php include 'footer.php'; ?>
 
-<script>
+    <?php include 'footer.php'; ?>
+
+    <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const successAlert = document.getElementById('profile-success-alert');
-        const errorAlert = document.getElementById('profile-error-alert');
+        // Tab switching logic
+        const tabs = document.querySelectorAll('.tab-button');
+        const contents = document.querySelectorAll('.tab-content');
 
-        if (successAlert) {
-            setTimeout(function() {
-                successAlert.style.display = 'none';
-            }, 5000); // 5000 milliseconds = 5 seconds
-        }
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const target = tab.dataset.tab;
+                
+                contents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === `tab-${target}`) {
+                        content.classList.add('active');
+                    }
+                });
 
-        if (errorAlert) {
-            setTimeout(function() {
-                errorAlert.style.display = 'none';
-            }, 5000); // 5000 milliseconds = 5 seconds
-        }
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+            });
+        });
     });
-</script>
+    </script>
+</body>
+</html>
