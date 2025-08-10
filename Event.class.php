@@ -344,7 +344,7 @@ class Event {
 
             $sql .= " ORDER BY e.event_date ASC";
 
-            $stmt = this->pdo->prepare($sql);
+            $stmt = $this->pdo->prepare($sql);
             foreach ($params as $param => $value) {
                 $stmt->bindValue($param, $value);
             }
@@ -401,30 +401,20 @@ class Event {
     }
 
     /**
-     * NEW: Method to get all events for the admin panel with optional search.
+     * NEW: Method to get all events for the admin panel.
      * Includes the earliest booking date for each event.
-     * @param string $search_query Optional search term.
      * @return array
      */
-    public function getAllEvents(string $search_query = '') {
+    public function getAllEvents() {
         try {
             $sql = "SELECT e.*, et.type_name,
                            (SELECT MIN(b.created_at) FROM bookings b WHERE b.event_id = e.id) as date_of_booking
                     FROM events e
                     JOIN event_types et ON e.event_type_id = et.id
-                    WHERE e.status != 'deleted'";
-            $params = [];
-
-            if (!empty($search_query)) {
-                $sql .= " AND (e.title LIKE ? OR e.description LIKE ?)";
-                $like_param = '%' . $search_query . '%';
-                $params = [$like_param, $like_param];
-            }
-            
-            $sql .= " ORDER BY e.event_date ASC, e.created_at DESC";
-
+                    WHERE e.status != 'deleted' /* ADDED: Filter out soft-deleted events */
+                    ORDER BY e.created_at DESC";
             $stmt = $this->pdo->prepare($sql);
-            $stmt->execute($params);
+            $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log("Error getting all events for admin: " . $e->getMessage());
