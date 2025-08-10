@@ -407,8 +407,8 @@ $creatorName = htmlspecialchars($eventCreator['first_name'] ?? 'N/A') . ' ' . ht
         <?php foreach ($bookingsForEvent as $booking):
             $vendorProfile = $vendor_obj->getVendorProfileById($booking['vendor_id']);
             $vendorName = htmlspecialchars($vendorProfile['business_name'] ?? 'N/A');
-            $bookingStatusClass = strtolower(htmlspecialchars($booking['status']));
-            $bookingDisplayStatus = ucfirst(htmlspecialchars($booking['status']));
+            $bookingStatusClass = strtolower($booking['status'] ?? 'pending');
+            $bookingDisplayStatus = ucfirst(htmlspecialchars($booking['status'] ?? 'Pending'));
             ?>
             <div class="bookings-list-item">
                 <p><strong>Booking ID:</strong> <?= htmlspecialchars($booking['id']) ?></p>
