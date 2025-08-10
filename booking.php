@@ -16,22 +16,54 @@ if (!isset($_SESSION['user_id']) || !isset($_GET['id'])) {
 
 $bookingId = (int)$_GET['id'];
 $booking = new Booking($pdo);
+$vendor_obj = new Vendor($pdo);
+$user_obj = new User($pdo);
 
-// Re-fetch booking details with relevant joins for display
-// FIX: Corrected the JOIN condition for vendor_profiles from vp.user_id to vp.id
-$stmt = $pdo->prepare("
-    SELECT b.*, e.title as event_title, vp.business_name
-    FROM bookings b
-    LEFT JOIN events e ON b.event_id = e.id /* Use LEFT JOIN as event_id can be null now */
-    JOIN vendor_profiles vp ON b.vendor_id = vp.id
-    WHERE b.id = ? AND b.user_id = ?
-");
-$stmt->execute([$bookingId, $_SESSION['user_id']]);
-$bookingDetails = $stmt->fetch(PDO::FETCH_ASSOC);
-
+// Fetch booking details first, without restricting by user_id yet
+$bookingDetails = $booking->getBooking($bookingId);
 
 if (!$bookingDetails) {
-    $_SESSION['error'] = "Booking not found or access denied.";
+    $_SESSION['error'] = "Booking not found.";
+    header('Location: ' . BASE_URL . 'public/dashboard.php');
+    exit();
+}
+
+// --- NEW ACCESS CONTROL LOGIC ---
+$is_admin = (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 3);
+$is_customer = ($bookingDetails['user_id'] == $_SESSION['user_id']);
+$is_vendor_of_booking = false;
+
+// Check if logged-in user is the vendor for this booking
+if (isset($_SESSION['user_type']) && $_SESSION['user_type'] == 2) {
+    $vendor_profile = $vendor_obj->getVendorByUserId($_SESSION['user_id']);
+    if ($vendor_profile && $bookingDetails['vendor_id'] == $vendor_profile['id']) {
+        $is_vendor_of_booking = true;
+    }
+}
+
+// If user is not the customer, not the vendor, and not an admin, deny access
+if (!$is_customer && !$is_vendor_of_booking && !$is_admin) {
+    $_SESSION['error'] = "Access denied. You do not have permission to view this booking.";
+    header('Location: ' . BASE_URL . 'public/dashboard.php');
+    exit();
+}
+
+// Re-fetch booking with additional details for display purposes now that access is granted
+$stmt = $pdo->prepare("
+    SELECT b.*, e.title as event_title, vs.service_name, vp.business_name, u.first_name, u.last_name
+    FROM bookings b
+    LEFT JOIN events e ON b.event_id = e.id
+    LEFT JOIN vendor_services vs ON b.service_id = vs.id
+    LEFT JOIN vendor_profiles vp ON b.vendor_id = vp.id
+    LEFT JOIN users u ON b.user_id = u.id
+    WHERE b.id = ?
+");
+$stmt->execute([$bookingId]);
+$bookingDetails = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// If the booking details couldn't be re-fetched for some reason, redirect.
+if (!$bookingDetails) {
+    $_SESSION['error'] = "Booking not found or an error occurred.";
     header('Location: ' . BASE_URL . 'public/dashboard.php');
     exit();
 }
@@ -107,15 +139,17 @@ $clean_instructions = trim(preg_replace('/\n\s*\n/', "\n\n", $clean_instructions
     <?php endif; ?>
 
     <div class="booking-actions">
-        <?php if ($bookingDetails['status'] === 'completed' && !$bookingDetails['is_reviewed']): ?>
+        <?php if ($is_customer && $bookingDetails['status'] === 'completed' && !$bookingDetails['is_reviewed']): ?>
             <a href="<?= BASE_URL ?>public/review.php?booking_id=<?= $bookingId ?>" class="btn btn-primary">Leave Review</a>
-        <?php elseif ($bookingDetails['status'] === 'pending_payment'): ?>
+        <?php elseif ($is_customer && $bookingDetails['status'] === 'pending_payment'): ?>
              <a href="<?= BASE_URL ?>public/payment.php?booking_id=<?= $bookingId ?>" class="btn btn-primary">Complete Payment</a>
         <?php endif; ?>
-        <?php if (!empty($bookingDetails['chat_conversation_id'])): ?>
-            <a href="<?= BASE_URL ?>public/chat.php?conversation_id=<?= htmlspecialchars($bookingDetails['chat_conversation_id']) ?>" class="btn btn-secondary">Go to Chat</a>
-        <?php else: ?>
-            <a href="<?= BASE_URL ?>public/chat.php?vendor_id=<?= htmlspecialchars($bookingDetails['vendor_id']) ?>&event_id=<?= htmlspecialchars($bookingDetails['event_id']) ?>" class="btn btn-secondary">Start Chat</a>
+        <?php if ($is_customer || $is_vendor_of_booking): ?>
+            <?php if (!empty($bookingDetails['chat_conversation_id'])): ?>
+                <a href="<?= BASE_URL ?>public/chat.php?conversation_id=<?= htmlspecialchars($bookingDetails['chat_conversation_id']) ?>" class="btn btn-secondary">Go to Chat</a>
+            <?php else: ?>
+                <a href="<?= BASE_URL ?>public/chat.php?vendor_id=<?= htmlspecialchars($bookingDetails['vendor_id']) ?>&event_id=<?= htmlspecialchars($bookingDetails['event_id']) ?>" class="btn btn-secondary">Start Chat</a>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 </div>
