@@ -437,7 +437,7 @@ include 'header.php';
                     <p>This vendor has no services listed yet.</p>
                 <?php else: ?>
                     <?php foreach ($vendor_service_offerings_grouped as $category_name => $service_offerings_in_category): ?>
-                        <h4 style="margin-top: var(--spacing-md); color: var(--text-dark);"><?= htmlspecialchars($category['category_name']) ?></h4>
+                        <h4 style="margin-top: var(--spacing-md); color: var(--text-dark);"><?= htmlspecialchars($category_name) ?></h4>
                         <div class="services-selection-grid">
                             <?php foreach ($service_offerings_in_category as $offering): ?>
                                 <div class="service-item-checkbox">
