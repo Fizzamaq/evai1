@@ -32,7 +32,7 @@ define('BASE_URL', 'https://eventcraft.gatvia.com/');
 define('ASSETS_PATH', BASE_URL . 'assets/');
 
 // OpenAI API Key (for AI Assistant functionality)
-define('OPENAI_API_KEY', 'fizza'); // !! IMPORTANT: Replace with your actual OpenAI API Key !!
+define('OPENAI_API_KEY', 'Fizza'); // !! IMPORTANT: Replace with your actual OpenAI API Key !!
 
 // SMTP Mailer Configuration for MailSender.class.php
 // !! IMPORTANT: Replace these with your actual SMTP server details !!
@@ -49,9 +49,9 @@ define('MAIL_FROM_NAME', 'EventCraftAI');
 
 
 // Stripe Payment Gateway Configuration (if applicable for future use)
-// define('STRIPE_PUBLISHABLE_KEY', 'pk_test_YOUR_PUBLISHABLE_KEY'); // Frontend key
-// define('STRIPE_SECRET_KEY', 'sk_test_YOUR_SECRET_KEY'); // Backend key
-// define('STRIPE_WEBHOOK_SECRET', 'whsec_YOUR_WEBHOOK_SECRET'); // For webhook signature verification
+define('STRIPE_PUBLISHABLE_KEY', 'Fizza'); // Frontend key
+define('STRIPE_SECRET_KEY', 'Fizza'); // Backend key
+define('STRIPE_WEBHOOK_SECRET', 'whsec_YOUR_WEBHOOK_SECRET'); // For webhook signature verification
 
 
 // Initialize PDO Database Connection
@@ -104,7 +104,7 @@ require_once __DIR__ . '/db.php';
 // define('BASE_URL', 'https://eventcraft.gatvia.com/');
 // define('ASSETS_PATH', BASE_URL . 'assets/');
 // // --- ADD THIS LINE FOR OPENAI API KEY ---
-// define('OPENAI_API_KEY', 'fizza'); // Replace with your actual key!
+// define('OPENAI_API_KEY', 'Fizza'); // Replace with your actual key!
 // // --- END OF ADDITION ---
 
 // // Initialize PDO Connection
@@ -127,3 +127,6 @@ require_once __DIR__ . '/db.php';
 // // Load helper functions
 // require_once __DIR__ . '/auth.php';
 // require_once __DIR__ . '/db.php';
+
+
+
