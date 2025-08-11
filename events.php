@@ -425,7 +425,7 @@ unset($_SESSION['success_message'], $_SESSION['error_message']); // Clear messag
                         <div class="event-meta">
                             <span><i class="fas fa-calendar-alt"></i> <?php echo date('M j, Y', strtotime($event_item['event_date'])); ?></span>
                             <span><i class="fas fa-users"></i> <?php echo $event_item['guest_count'] ?: 'TBD'; ?> guests</span>
-                            <span><i class="fas fa-dollar-sign"></i> Rs<?php echo number_format($event_item['budget_min'] ?? 0, 0); ?> - Rs<?php echo number_format($event_item['budget_max'] ?? 0, 0); ?></span>
+                            <span><i class="fas fa-dollar-sign"></i> PKR <?php echo number_format($event_item['budget_min'] ?? 0, 0); ?> - PKR <?php echo number_format($event_item['budget_max'] ?? 0, 0); ?></span>
                             
                             <?php 
                             // Display the status determined in the PHP logic above
