@@ -937,3 +937,4 @@ $vendor_profile_id_for_js = isset($vendor_profile['id']) ? (int)$vendor_profile[
     </script>
 </body>
 </html>
+
