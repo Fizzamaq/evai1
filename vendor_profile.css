@@ -465,18 +465,22 @@
 /* Apply background color to the event block directly with !important */
 .fc-event-available {
     background-color: #4CAF50 !important; /* Brighter Green */
+    color: #fff !important;
 }
 
 .fc-event-booked {
     background-color: #F44336 !important; /* Brighter Red */
+    color: #fff !important;
 }
 
 .fc-event-blocked {
     background-color: #B0BEC5 !important; /* Lighter, clear Grey */
+    color: #fff !important;
 }
 
 .fc-event-holiday {
     background-color: #FF9800 !important; /* Brighter Orange */
+    color: #fff !important;
 }
 
 
@@ -633,7 +637,7 @@
         margin-bottom: var(--spacing-lg); /* Add space below it */
     }
     /* Style for FULL-WIDTH sections below the two-column layout */
-    .tab-content-section:not(.portfolio-details-left > .tab-content-section) { /* Target sections NOT inside portfolio-details-left */
+.tab-content-section:not(.portfolio-details-left > .tab-content-section) { /* Target sections NOT inside portfolio-details-left */
         max-width: 100%; /* Ensure they are full width */
         margin: var(--spacing-lg) auto; /* Center them and provide vertical spacing */
         box-sizing: border-box; /* Include padding/border in width */
