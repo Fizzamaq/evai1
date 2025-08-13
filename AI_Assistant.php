@@ -257,97 +257,6 @@ class AI_Assistant {
     }
 
     /**
-     * Get vendor recommendations based on form data (new implementation).
-     * This method directly uses the provided event details from the form input.
-     * @param array $eventData An associative array with event details including event_type_id, budget_min, budget_max, event_date, location_string, service_ids.
-     * @return array
-     */
-    public function getVendorRecommendationsFromForm(array $eventData) {
-        try {
-            $eventDate = $eventData['event_date'];
-            $locationString = $eventData['location_string'];
-            $serviceIds = $eventData['service_ids'];
-            $budgetMin = $eventData['budget_min'];
-            $budgetMax = $eventData['budget_max'];
-
-            if (empty($serviceIds)) {
-                return []; // No services selected, no recommendations.
-            }
-
-            $placeholders = implode(',', array_fill(0, count($serviceIds), '?'));
-
-            // Base query to find vendors offering selected services
-            $query = "
-                SELECT
-                    vp.id, vp.business_name, vp.website, vp.rating, vp.total_reviews,
-                    vp.business_address, vp.business_city, vp.business_state, vp.business_country,
-                    vp.service_radius,
-                    -- Use ST_X and ST_Y if business_location is POINT type, otherwise just business_lat/lng
-                    ST_X(vp.business_location) AS business_lng,
-                    ST_Y(vp.business_location) AS business_lat,
-                    GROUP_CONCAT(DISTINCT vs.service_name ORDER BY vs.service_name ASC SEPARATOR '; ') AS offered_services_names,
-                    AVG(vso.price_range_min) AS avg_min_price,
-                    AVG(vso.price_range_max) AS avg_max_price,
-                    up.profile_image, -- Fetch profile image from user_profiles
-                    (SELECT COUNT(*) FROM vendor_availability
-                     WHERE vendor_id = vp.id
-                     AND date = ?
-                     AND status = 'available') AS availability_score
-                FROM vendor_profiles vp
-                JOIN vendor_service_offerings vso ON vp.id = vso.vendor_id
-                JOIN vendor_services vs ON vso.service_id = vs.id
-                JOIN users u ON vp.user_id = u.id
-                LEFT JOIN user_profiles up ON u.id = up.user_id
-                WHERE vso.service_id IN ($placeholders)
-            ";
-
-            $params = [$eventDate];
-            $params = array_merge($params, $serviceIds);
-
-            // Add location filter if location_string is provided (e.g., city, partial address)
-            if (!empty($locationString)) {
-                 $query .= " AND (vp.business_city LIKE ? OR vp.business_address LIKE ?)";
-                 $params[] = '%' . $locationString . '%';
-                 $params[] = '%' . $locationString . '%';
-            }
-
-            $query .= " GROUP BY vp.id
-                         ORDER BY vp.rating DESC, avg_min_price ASC
-                         LIMIT 20"; // Limit results to a reasonable number
-
-            $vendors = $this->dbFetchAll($query, $params);
-
-            // Manual scoring based on availability, price, and reviews
-            $scoredVendors = array_map(function($vendor) use ($eventDate, $budgetMin, $budgetMax) {
-                // This 'event' array is constructed on-the-fly for scoring
-                $mockEvent = [
-                    'event_date' => $eventDate,
-                    'budget_min' => $budgetMin,
-                    'budget_max' => $budgetMax,
-                    'event_lat' => null, // No event lat/lng from form directly, so location score will be neutral or based on city match
-                    'event_lng' => null
-                ];
-                $vendor['score'] = $this->calculateVendorScore($vendor, $mockEvent);
-                return $vendor;
-            }, $vendors);
-
-            // Sort by total score in descending order
-            usort($scoredVendors, function($a, $b) {
-                return $b['score'] <=> $a['score'];
-            });
-
-            return $scoredVendors;
-
-        } catch (PDOException $e) {
-            error_log("Vendor Recommendation From Form PDO Error: " . $e->getMessage());
-            throw new Exception("Database error fetching vendor recommendations. " . $e->getMessage());
-        } catch (Exception $e) {
-            error_log("Vendor Recommendation From Form General Error: " . $e->getMessage());
-            throw $e;
-        }
-    }
-
-    /**
      * Get personalized vendor recommendations based on user's recent activity.
      * This method leverages viewed vendors and recent chat history to inform recommendations.
      * @param int $userId The ID of the current user.
@@ -479,20 +388,23 @@ class AI_Assistant {
             $params = [];
             $conditions = [];
 
+            // Build location conditions
             if (!empty($combinedLocations)) {
                 $locationPlaceholders = implode(',', array_fill(0, count($combinedLocations), '?'));
                 $conditions[] = "vp.business_city IN ({$locationPlaceholders})";
                 $params = array_merge($params, $combinedLocations);
             }
 
+            // Build service conditions
             if (!empty($combinedServiceIds)) {
                 $serviceIdPlaceholders = implode(',', array_fill(0, count($combinedServiceIds), '?'));
                 $conditions[] = "vso.service_id IN ({$serviceIdPlaceholders})";
                 $params = array_merge($params, $combinedServiceIds);
             }
 
+            // Combine conditions with OR
             if (!empty($conditions)) {
-                $query .= " AND " . implode(" AND ", $conditions);
+                $query .= " AND (" . implode(" OR ", $conditions) . ")"; // Corrected logical operator
             }
 
             $query .= " GROUP BY vp.id
