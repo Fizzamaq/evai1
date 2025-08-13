@@ -141,7 +141,7 @@ if (isset($_SESSION['user_id']) && ($_SESSION['user_type'] ?? null) == 1) {
         <section class="section personalized-vendors-section">
             <div class="container">
                 <h2 class="section-title">Recommended Vendors for You</h2>
-                <p class="subtitle">Based on your recent activity and preferences.</p>
+                <!--<p class="subtitle">Based on your recent activity and preferences.</p>-->
                 <div class="personalized-vendors-grid">
                     <?php foreach ($personalized_vendors as $vendor_item): ?>
                         <div class="vendor-card-item">
